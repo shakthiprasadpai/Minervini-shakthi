@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #f9f8f5;
+    color: #1a1a1a;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  body.obsidian-theme {
+    background-color: #0b0d11;
+    color: #f1f5f9;
+  }
+
+  h1, h2, h3, .font-serif {
+    font-family: 'Playfair Display', Georgia, Cambria, 'Times New Roman', Times, serif;
+  }
+
+  code, kbd, samp, pre, .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+}
+
+/* Custom Editorial & Obsidian Utility Classes */
+.editorial-border {
+  border-color: #e5e4e1;
+}
+
+body.obsidian-theme .editorial-border {
+  border-color: #262b36;
+}
+
+.editorial-gold {
+  color: #b5a68d;
+}
+
+body.obsidian-theme .editorial-gold {
+  color: #f59e0b;
+}
+
+.editorial-bg-gold {
+  background-color: #b5a68d;
+}
+
+body.obsidian-theme .editorial-bg-gold {
+  background-color: #f59e0b;
+}
+
+.editorial-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e4e1;
+}
+
+body.obsidian-theme .editorial-card {
+  background-color: #131722;
+  border: 1px solid #262b36;
+  color: #f1f5f9;
+}
+
+body.obsidian-theme header {
+  background-color: rgba(11, 13, 17, 0.9) !important;
+  border-bottom-color: #262b36 !important;
+  color: #f1f5f9 !important;
+}
+
+body.obsidian-theme .bg-white {
+  background-color: #131722 !important;
+  color: #f1f5f9 !important;
+  border-color: #262b36 !important;
+}
+
+body.obsidian-theme .bg-\[\#f9f8f5\] {
+  background-color: #0e1117 !important;
+  border-color: #262b36 !important;
+}
+
+body.obsidian-theme .border-\[\#e5e4e1\] {
+  border-color: #262b36 !important;
+}
+
+body.obsidian-theme .text-\[\#1a1a1a\] {
+  color: #f1f5f9 !important;
+}
+
+body.obsidian-theme .text-slate-900 {
+  color: #f8fafc !important;
+}
+
+body.obsidian-theme .text-gray-900 {
+  color: #f8fafc !important;
+}
+
+body.obsidian-theme .text-gray-700,
+body.obsidian-theme .text-gray-800 {
+  color: #cbd5e1 !important;
+}
+
+body.obsidian-theme .text-gray-600,
+body.obsidian-theme .text-gray-500 {
+  color: #94a3b8 !important;
+}
+
+body.obsidian-theme .bg-gray-50,
+body.obsidian-theme .bg-slate-50 {
+  background-color: #181d2a !important;
+  border-color: #262b36 !important;
+}
+
+body.obsidian-theme .bg-slate-900 {
+  background-color: #090b0e !important;
+}
+
+/* Glassmorphism for Obsidian theme */
+.obsidian-glass-card {
+  background: rgba(19, 23, 34, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+

@@ -1,0 +1,6 @@
+{
+  "name": "Minervini SEPA Trend & VCP Screener",
+  "description": "Mark Minervini SEPA Trend Template & VCP setup analyzer with precise pivot entries, tight volume checks, and exit price levels.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

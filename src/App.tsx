@@ -1,0 +1,467 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Navbar } from './components/Navbar';
+import { ScreenerTable } from './components/ScreenerTable';
+import { VcpChart } from './components/VcpChart';
+import { TrendTemplateChecklist } from './components/TrendTemplateChecklist';
+import { TradePlanCard } from './components/TradePlanCard';
+import { AiMinerviniAnalyst } from './components/AiMinerviniAnalyst';
+import { CustomTickerScanner } from './components/CustomTickerScanner';
+import { EducationalGuide } from './components/EducationalGuide';
+import { GoogleSheetsIntegration } from './components/GoogleSheetsIntegration';
+import { MarketSentimentRibbon } from './components/MarketSentimentRibbon';
+import { PriceAlertSystem } from './components/PriceAlertSystem';
+import { MyPortfolio } from './components/MyPortfolio';
+import { EarningsCalendar } from './components/EarningsCalendar';
+import { MinerviniVideoMasterclass } from './components/MinerviniVideoMasterclass';
+import { TickerNewsGrounding } from './components/TickerNewsGrounding';
+import { ObsidianIntegration } from './components/ObsidianIntegration';
+import { PocketPivotScanner } from './components/PocketPivotScanner';
+import { VcpPatternScanner } from './components/VcpPatternScanner';
+import { GlobalNotificationToast } from './components/GlobalNotificationToast';
+import { MOCK_STOCKS } from './data/mockStocks';
+import { MinerviniTradeSetup } from './types';
+import { formatCurrency, formatVolume, getCurrencySymbol } from './utils/sepaCalculator';
+import { TrendingUp, ShieldCheck, Target, Droplets, ArrowUpRight, Flame, BarChart3, Calculator, Sparkles, Gem } from 'lucide-react';
+
+export default function App() {
+  const [stocksList, setStocksList] = useState<MinerviniTradeSetup[]>(MOCK_STOCKS);
+  const [selectedStock, setSelectedStock] = useState<MinerviniTradeSetup>(MOCK_STOCKS[0]);
+  const [activeTab, setActiveTab] = useState<'screener' | 'chart' | 'calculator' | 'custom' | 'playbook' | 'portfolio' | 'earnings' | 'masterclass' | 'obsidian' | 'pocket_pivot' | 'vcp_scanner'>('screener');
+  const [isObsidian, setIsObsidian] = useState<boolean>(true); // Default to Obsidian Dark theme for luxury feel
+
+  useEffect(() => {
+    if (isObsidian) {
+      document.body.classList.add('obsidian-theme');
+    } else {
+      document.body.classList.remove('obsidian-theme');
+    }
+  }, [isObsidian]);
+
+  const totalSetupsCount = stocksList.length;
+  const tightVolumeCount = stocksList.filter(s => s.isTightVolume || s.volumeDryUpPercent < -50).length;
+
+  const handleAddStock = (newStock: MinerviniTradeSetup) => {
+    // Generate dummy price history if empty
+    if (!newStock.priceHistory || newStock.priceHistory.length === 0) {
+      newStock.priceHistory = MOCK_STOCKS[0].priceHistory;
+    }
+    setStocksList([newStock, ...stocksList]);
+    setSelectedStock(newStock);
+    setActiveTab('screener');
+  };
+
+  const handleImportStocks = (imported: MinerviniTradeSetup[]) => {
+    const updated = [...imported, ...stocksList];
+    setStocksList(updated);
+    if (imported.length > 0) {
+      setSelectedStock(imported[0]);
+    }
+  };
+
+  const currencySymbol = getCurrencySymbol(selectedStock.exchange);
+
+  return (
+    <div className={`min-h-screen font-sans antialiased selection:bg-[#1a1a1a] selection:text-white pb-16 transition-colors duration-300 ${
+      isObsidian ? 'bg-[#0b0d11] text-[#f1f5f9]' : 'bg-[#f9f8f5] text-[#1a1a1a]'
+    }`}>
+      
+      {/* Global Background LocalStorage Pivot Price Checker Toast */}
+      <GlobalNotificationToast
+        stocks={stocksList}
+        onSelectStock={(stock) => setSelectedStock(stock)}
+        onNavigateTab={(tab) => setActiveTab(tab)}
+      />
+
+      {/* Top Navbar */}
+      <Navbar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        selectedStockTicker={selectedStock.ticker}
+        totalSetupsCount={totalSetupsCount}
+        tightVolumeCount={tightVolumeCount}
+        isObsidian={isObsidian}
+        onToggleObsidian={() => setIsObsidian(!isObsidian)}
+      />
+
+      {/* Main Container */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
+        
+        {/* Banner Quick Info - Editorial Style */}
+        <div className="bg-white border border-[#e5e4e1] p-6 sm:p-8 shadow-xs flex flex-wrap items-center justify-between gap-6">
+          <div className="space-y-3 max-w-2xl">
+            <div className="flex items-center space-x-3">
+              <span className="inline-block bg-[#1a1a1a] text-white text-[10px] px-3 py-1 uppercase tracking-[0.2em] font-medium">
+                Priority Setup
+              </span>
+              <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#b5a68d]">
+                Mark Minervini SEPA Engine
+              </span>
+            </div>
+            <h1 className="text-2xl sm:text-4xl font-serif font-black text-[#1a1a1a] tracking-tight leading-tight">
+              Stage 2 Trend Continuation & VCP Screener
+            </h1>
+            <p className="text-sm font-serif italic text-gray-600 leading-relaxed">
+              Identifies high-momentum growth stocks in Stage 2 uptrends forming Volatility Contraction Patterns (VCP) with extreme volume dry-ups prior to pivot breakouts.
+            </p>
+          </div>
+
+          <div className="flex items-center space-x-4 text-xs">
+            <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-4 text-center min-w-[120px]">
+              <span className="text-[10px] uppercase tracking-[0.2em] text-[#b5a68d] font-bold block">Selected Stock</span>
+              <strong className="text-2xl font-serif italic font-black text-[#1a1a1a]">{selectedStock.ticker}</strong>
+            </div>
+            <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-4 text-center min-w-[120px]">
+              <span className="text-[10px] uppercase tracking-[0.2em] text-[#b5a68d] font-bold block">Pivot Entry</span>
+              <strong className="text-xl font-mono font-bold text-[#1a1a1a]">
+                {formatCurrency(selectedStock.pivotPrice, currencySymbol)}
+              </strong>
+            </div>
+            <div className="bg-red-50/50 border border-red-200 p-4 text-center min-w-[120px]">
+              <span className="text-[10px] uppercase tracking-[0.2em] text-red-700 font-bold block">Tight Stop</span>
+              <strong className="text-xl font-mono font-bold text-red-600">
+                {formatCurrency(selectedStock.stopLossPrice, currencySymbol)}
+              </strong>
+            </div>
+          </div>
+        </div>
+
+        {/* TAB ANIMATED CONTAINER */}
+        <AnimatePresence mode="wait">
+          {activeTab === 'screener' && (
+            <motion.div
+              key="screener"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="space-y-8"
+            >
+              
+              {/* Market Sentiment & Health Ribbon */}
+              <MarketSentimentRibbon />
+
+              {/* Screener Table */}
+              <ScreenerTable
+                stocks={stocksList}
+                selectedTicker={selectedStock.ticker}
+                onSelectStock={(stock) => setSelectedStock(stock)}
+                onViewChart={(stock) => {
+                  setSelectedStock(stock);
+                  setActiveTab('chart');
+                }}
+              />
+
+              {/* Price Alert System Monitor */}
+              <PriceAlertSystem
+                stocks={stocksList}
+                selectedStock={selectedStock}
+                onSelectStock={(stock) => setSelectedStock(stock)}
+              />
+
+              {/* Upcoming Earnings Release Calendar & SEPA Risk Guard */}
+              <EarningsCalendar
+                stocks={stocksList}
+                selectedStockTicker={selectedStock.ticker}
+                onSelectStock={(stock) => setSelectedStock(stock)}
+                onViewChart={(stock) => {
+                  setSelectedStock(stock);
+                  setActiveTab('chart');
+                }}
+              />
+
+              {/* My Portfolio Section */}
+              <MyPortfolio
+                stocks={stocksList}
+                onSelectStock={(stock) => setSelectedStock(stock)}
+                onViewChart={(stock) => {
+                  setSelectedStock(stock);
+                  setActiveTab('chart');
+                }}
+              />
+
+              {/* Google Sheets Live Sync & Watchlist Export */}
+              <GoogleSheetsIntegration
+                stocks={stocksList}
+                selectedStock={selectedStock}
+                onImportStocks={handleImportStocks}
+              />
+
+
+              {/* Deep Dive Panel for Selected Stock */}
+              <div className="space-y-8">
+                
+                {/* Selected Stock Overview Ribbon */}
+                <div className="bg-white border border-[#e5e4e1] p-6 flex flex-wrap items-center justify-between gap-4 shadow-xs">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-14 h-14 bg-[#1a1a1a] text-white border border-black flex flex-col items-center justify-center font-mono">
+                      <span className="text-lg font-bold">{selectedStock.ticker}</span>
+                      <span className="text-[9px] text-gray-300 uppercase tracking-widest">{selectedStock.exchange}</span>
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-serif font-black text-[#1a1a1a] flex items-center space-x-2">
+                        <span>{selectedStock.name}</span>
+                        <span className="text-xs font-sans font-normal text-gray-500">
+                          — {selectedStock.sector} / {selectedStock.industry}
+                        </span>
+                      </h2>
+                      <div className="flex items-center space-x-4 text-xs font-mono mt-1">
+                        <span className="text-[#1a1a1a] font-bold">
+                          Price: {formatCurrency(selectedStock.currentPrice, currencySymbol)}
+                        </span>
+                        <span
+                          className={`font-bold ${
+                            selectedStock.changePercent >= 0 ? 'text-green-700' : 'text-red-600'
+                          }`}
+                        >
+                          {selectedStock.changePercent >= 0 ? '+' : ''}
+                          {selectedStock.changePercent}%
+                        </span>
+                        <span className="bg-[#1a1a1a] text-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                          RS Rating: {selectedStock.rsRating}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => setActiveTab('chart')}
+                      className="bg-[#1a1a1a] hover:bg-black text-white font-bold px-5 py-2.5 text-xs uppercase tracking-widest flex items-center space-x-2 transition-all border border-black"
+                    >
+                      <BarChart3 className="w-4 h-4" />
+                      <span>View Interactive VCP Chart</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Trade Plan & Position Size Card */}
+                <TradePlanCard stock={selectedStock} />
+
+                {/* Live Google Search Grounded Financial Headlines Module */}
+                <TickerNewsGrounding stock={selectedStock} />
+
+                {/* 8-Rule Trend Template Checklist */}
+                <TrendTemplateChecklist stock={selectedStock} />
+
+                {/* AI Gemini Analysis Desk */}
+                <AiMinerviniAnalyst stock={selectedStock} />
+
+              </div>
+
+            </motion.div>
+          )}
+
+          {/* TAB 2: VCP INTERACTIVE CHART VIEW */}
+          {activeTab === 'chart' && (
+            <motion.div
+              key="chart"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="space-y-8"
+            >
+              
+              {/* Chart Component */}
+              <VcpChart stock={selectedStock} />
+
+              {/* Live Google Search Grounded Financial Headlines Module */}
+              <TickerNewsGrounding stock={selectedStock} />
+
+              {/* Trade Execution Levels Card */}
+              <TradePlanCard stock={selectedStock} />
+
+              {/* Trend Template Check */}
+              <TrendTemplateChecklist stock={selectedStock} />
+
+            </motion.div>
+          )}
+
+          {/* TAB 3: POSITION RISK CALCULATOR */}
+          {activeTab === 'calculator' && (
+            <motion.div
+              key="calculator"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="space-y-8"
+            >
+              <TradePlanCard stock={selectedStock} />
+              <TrendTemplateChecklist stock={selectedStock} />
+            </motion.div>
+          )}
+
+          {/* TAB: MY PORTFOLIO TRACKER */}
+          {activeTab === 'portfolio' && (
+            <motion.div
+              key="portfolio"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="space-y-8"
+            >
+              <MyPortfolio
+                stocks={stocksList}
+                onSelectStock={(stock) => setSelectedStock(stock)}
+                onViewChart={(stock) => {
+                  setSelectedStock(stock);
+                  setActiveTab('chart');
+                }}
+              />
+            </motion.div>
+          )}
+
+          {/* TAB: EARNINGS CALENDAR & RISK GUARD */}
+          {activeTab === 'earnings' && (
+            <motion.div
+              key="earnings"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="space-y-8"
+            >
+              <EarningsCalendar
+                stocks={stocksList}
+                selectedStockTicker={selectedStock.ticker}
+                onSelectStock={(stock) => setSelectedStock(stock)}
+                onViewChart={(stock) => {
+                  setSelectedStock(stock);
+                  setActiveTab('chart');
+                }}
+              />
+            </motion.div>
+          )}
+
+          {/* TAB 4: CUSTOM TICKER TESTER */}
+          {activeTab === 'custom' && (
+            <motion.div
+              key="custom"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="space-y-8"
+            >
+              <CustomTickerScanner onAddStock={handleAddStock} />
+            </motion.div>
+          )}
+
+          {/* TAB 5: MINERVINI PLAYBOOK */}
+          {activeTab === 'playbook' && (
+            <motion.div
+              key="playbook"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="space-y-8"
+            >
+              <EducationalGuide />
+            </motion.div>
+          )}
+
+          {/* TAB 6: MINERVINI VIDEO MASTERCLASS & 3C CHEAT HUB */}
+          {activeTab === 'masterclass' && (
+            <motion.div
+              key="masterclass"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="space-y-8"
+            >
+              <MinerviniVideoMasterclass
+                stocks={stocksList}
+                onSelectStock={(stock) => setSelectedStock(stock)}
+                onViewChart={(stock) => {
+                  setSelectedStock(stock);
+                  setActiveTab('chart');
+                }}
+              />
+            </motion.div>
+          )}
+
+          {/* TAB 7: OBSIDIAN VAULT SYNC HUB */}
+          {activeTab === 'obsidian' && (
+            <motion.div
+              key="obsidian"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="space-y-8"
+            >
+              <ObsidianIntegration
+                stocks={stocksList}
+                selectedStock={selectedStock}
+                onSelectStock={(stock) => setSelectedStock(stock)}
+              />
+            </motion.div>
+          )}
+
+          {/* TAB 8: POCKET PIVOT & VOLUME SCANNER */}
+          {activeTab === 'pocket_pivot' && (
+            <motion.div
+              key="pocket_pivot"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="space-y-8"
+            >
+              <PocketPivotScanner
+                stocks={stocksList}
+                onSelectStock={(stock) => {
+                  setSelectedStock(stock);
+                  setActiveTab('chart');
+                }}
+              />
+            </motion.div>
+          )}
+
+          {/* TAB 9: VCP PATTERN SCANNER */}
+          {activeTab === 'vcp_scanner' && (
+            <motion.div
+              key="vcp_scanner"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="space-y-8"
+            >
+              <VcpPatternScanner
+                stocks={stocksList}
+                onSelectStock={(stock) => setSelectedStock(stock)}
+                onViewChart={(stock) => {
+                  setSelectedStock(stock);
+                  setActiveTab('chart');
+                }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+      </main>
+
+      {/* Footer - Editorial Style */}
+      <footer className="mt-16 bg-white border-t border-[#e5e4e1] py-8 text-xs text-gray-500 font-sans">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 uppercase tracking-[0.15em] font-semibold text-[10px]">
+          <div>
+            Market Outlook: <span className="text-green-700 font-bold">Confirmed Uptrend</span>
+          </div>
+          <div>
+            Mark Minervini SEPA (Specific Entry Point Analysis) Engine
+          </div>
+          <div className="italic text-gray-400 font-serif normal-case text-xs">
+            &copy; 2026 Growth Stock Alpha — Editorial Intelligence
+          </div>
+        </div>
+      </footer>
+
+    </div>
+  );
+}

@@ -1,0 +1,336 @@
+import { TrendTemplateRule, MinerviniTradeSetup, PositionSizeResult } from '../types';
+
+export function evaluateTrendTemplate(setup: {
+  currentPrice: number;
+  sma50: number;
+  sma150: number;
+  sma200: number;
+  sma200_1mo_ago: number;
+  high52w: number;
+  low52w: number;
+  rsRating: number;
+}): { rules: TrendTemplateRule[]; passedCount: number } {
+  const {
+    currentPrice,
+    sma50,
+    sma150,
+    sma200,
+    sma200_1mo_ago,
+    high52w,
+    low52w,
+    rsRating
+  } = setup;
+
+  const pctAboveLow52 = ((currentPrice - low52w) / low52w) * 100;
+  const pctFromHigh52 = ((high52w - currentPrice) / high52w) * 100;
+
+  const rules: TrendTemplateRule[] = [
+    {
+      id: 'rule_1',
+      title: '1. Price Above 150-day & 200-day SMA',
+      description: 'Current price must be above both the 150-day and 200-day key moving averages.',
+      passed: currentPrice > sma150 && currentPrice > sma200,
+      actualValueStr: `$${currentPrice.toFixed(2)}`,
+      requiredConditionStr: `> $${sma150.toFixed(2)} (150MA) & $${sma200.toFixed(2)} (200MA)`
+    },
+    {
+      id: 'rule_2',
+      title: '2. 150-day SMA Above 200-day SMA',
+      description: '150-day moving average must be above the 200-day moving average.',
+      passed: sma150 > sma200,
+      actualValueStr: `150MA: $${sma150.toFixed(2)}`,
+      requiredConditionStr: `> 200MA: $${sma200.toFixed(2)}`
+    },
+    {
+      id: 'rule_3',
+      title: '3. 200-day SMA Trending Upward',
+      description: '200-day moving average must be sloping upward for at least 1 month.',
+      passed: sma200 > sma200_1mo_ago,
+      actualValueStr: `Now $${sma200.toFixed(2)} vs 1Mo Ago $${sma200_1mo_ago.toFixed(2)}`,
+      requiredConditionStr: `Current 200MA > 1 Month Ago`
+    },
+    {
+      id: 'rule_4',
+      title: '4. 50-day SMA Above 150-day & 200-day SMA',
+      description: '50-day moving average must be above both 150-day and 200-day moving averages.',
+      passed: sma50 > sma150 && sma50 > sma200,
+      actualValueStr: `50MA: $${sma50.toFixed(2)}`,
+      requiredConditionStr: `> $${sma150.toFixed(2)} (150MA) & $${sma200.toFixed(2)} (200MA)`
+    },
+    {
+      id: 'rule_5',
+      title: '5. Price Above 50-day SMA',
+      description: 'Current stock price must be trading above the 50-day moving average.',
+      passed: currentPrice > sma50,
+      actualValueStr: `Price $${currentPrice.toFixed(2)}`,
+      requiredConditionStr: `> 50MA: $${sma50.toFixed(2)}`
+    },
+    {
+      id: 'rule_6',
+      title: '6. Price At Least 30% Above 52-Week Low',
+      description: 'Current price must be at least 30% above its 52-week low level (Stage 2 confirmation).',
+      passed: pctAboveLow52 >= 30,
+      actualValueStr: `+${pctAboveLow52.toFixed(1)}% above 52W Low ($${low52w.toFixed(2)})`,
+      requiredConditionStr: `≥ +30% above $${(low52w * 1.3).toFixed(2)}`
+    },
+    {
+      id: 'rule_7',
+      title: '7. Price Within 25% of 52-Week High',
+      description: 'Current price must be within 25% of its 52-week high (near leadership breakout).',
+      passed: pctFromHigh52 <= 25,
+      actualValueStr: `${pctFromHigh52.toFixed(1)}% off 52W High ($${high52w.toFixed(2)})`,
+      requiredConditionStr: `Within 25% of High (≥ $${(high52w * 0.75).toFixed(2)})`
+    },
+    {
+      id: 'rule_8',
+      title: '8. Relative Strength (RS) Rating ≥ 70',
+      description: 'IBD/Minervini RS Rating must be 70 or higher (outperforming 70%+ of market).',
+      passed: rsRating >= 70,
+      actualValueStr: `RS Rating: ${rsRating}`,
+      requiredConditionStr: `RS Rating ≥ 70`
+    }
+  ];
+
+  const passedCount = rules.filter(r => r.passed).length;
+  return { rules, passedCount };
+}
+
+export function calculatePositionSize(
+  accountCapital: number,
+  riskTolerancePercent: number, // e.g. 1% of account
+  entryPrice: number,
+  stopPrice: number
+): PositionSizeResult {
+  const riskAmount = accountCapital * (riskTolerancePercent / 100);
+  const riskPerShare = Math.max(0.01, entryPrice - stopPrice);
+  const rawShares = Math.floor(riskAmount / riskPerShare);
+  
+  // Cap max position size at 25% of portfolio (Minervini standard position is 10-25%)
+  const maxPositionCapShares = Math.floor((accountCapital * 0.25) / entryPrice);
+  const shareQuantity = Math.min(rawShares, maxPositionCapShares);
+
+  const totalPositionCost = shareQuantity * entryPrice;
+  const portfolioAllocationPercent = accountCapital > 0 ? (totalPositionCost / accountCapital) * 100 : 0;
+
+  return {
+    accountCapital,
+    riskTolerancePercent,
+    riskAmount,
+    entryPrice,
+    stopPrice,
+    riskPerShare,
+    shareQuantity,
+    totalPositionCost,
+    portfolioAllocationPercent
+  };
+}
+
+export function getCurrencySymbol(exchange: string): string {
+  return exchange === 'NSE' || exchange === 'BSE' ? 'Rs. ' : '$';
+}
+
+export function formatCurrency(num: number, symbol = '$', decimals?: number): string {
+  if (decimals !== undefined) {
+    return `${symbol}${num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
+  }
+  if (num >= 10000) {
+    return `${symbol}${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  return `${symbol}${num.toFixed(2)}`;
+}
+
+export interface BreakoutProbabilityResult {
+  score: number; // 0 to 99%
+  rating: 'EXCEPTIONALLY HIGH (INSTITUTIONAL)' | 'HIGH BREAKOUT PROBABILITY' | 'MODERATE / AVERAGE' | 'LOW PROBABILITY / HIGH SLIPPAGE';
+  vcpTightnessScore: number; // max 35
+  volumeDryUpScore: number; // max 30
+  rsLeadershipScore: number; // max 20
+  trendAlignmentScore: number; // max 15
+  factors: {
+    finalContractionDepth: number;
+    volumeDryUpPercent: number;
+    rsRating: number;
+    trendScore: number;
+    squeezeCompressionPercent: number;
+  };
+}
+
+export function calculateBreakoutProbability(stock: MinerviniTradeSetup): BreakoutProbabilityResult {
+  const initialDepth = stock.contractions.length > 0 ? stock.contractions[0].depthPercent : 15;
+  const finalDepth = stock.contractions.length > 0 ? stock.contractions[stock.contractions.length - 1].depthPercent : 8;
+  const squeezeCompressionPercent = initialDepth > 0
+    ? Math.max(0, ((initialDepth - finalDepth) / initialDepth) * 100)
+    : 0;
+
+  // 1. VCP Contraction Tightness (Max 35 Pts)
+  let vcpTightnessScore = 0;
+  if (finalDepth <= 3.5) {
+    vcpTightnessScore += 25;
+  } else if (finalDepth <= 6.0) {
+    vcpTightnessScore += 18;
+  } else if (finalDepth <= 10.0) {
+    vcpTightnessScore += 12;
+  } else {
+    vcpTightnessScore += 5;
+  }
+
+  if (squeezeCompressionPercent >= 70) {
+    vcpTightnessScore += 10;
+  } else if (squeezeCompressionPercent >= 50) {
+    vcpTightnessScore += 7;
+  } else if (squeezeCompressionPercent >= 30) {
+    vcpTightnessScore += 4;
+  }
+  vcpTightnessScore = Math.min(35, vcpTightnessScore);
+
+  // 2. Volume Dry-Up & Contraction Trend (Max 30 Pts)
+  let volumeDryUpScore = 0;
+  const volDryUpAbs = Math.abs(stock.volumeDryUpPercent);
+  if (stock.volumeDryUpPercent <= -60 || volDryUpAbs >= 60) {
+    volumeDryUpScore += 20;
+  } else if (stock.volumeDryUpPercent <= -40 || volDryUpAbs >= 40) {
+    volumeDryUpScore += 15;
+  } else if (stock.volumeDryUpPercent <= -25 || volDryUpAbs >= 25) {
+    volumeDryUpScore += 10;
+  } else {
+    volumeDryUpScore += 5;
+  }
+
+  if (stock.isTightVolume) {
+    volumeDryUpScore += 10;
+  }
+  volumeDryUpScore = Math.min(30, volumeDryUpScore);
+
+  // 3. RS Leadership (Max 20 Pts)
+  let rsLeadershipScore = 0;
+  if (stock.rsRating >= 95) {
+    rsLeadershipScore = 20;
+  } else if (stock.rsRating >= 90) {
+    rsLeadershipScore = 17;
+  } else if (stock.rsRating >= 80) {
+    rsLeadershipScore = 13;
+  } else if (stock.rsRating >= 70) {
+    rsLeadershipScore = 8;
+  } else {
+    rsLeadershipScore = 4;
+  }
+
+  // 4. Trend Alignment (Max 15 Pts)
+  const trendScoreVal = stock.trendScore || 7;
+  const trendAlignmentScore = Math.round((trendScoreVal / 8) * 15);
+
+  const rawTotal = vcpTightnessScore + volumeDryUpScore + rsLeadershipScore + trendAlignmentScore;
+  const score = Math.min(98, Math.max(25, rawTotal));
+
+  let rating: BreakoutProbabilityResult['rating'] = 'MODERATE / AVERAGE';
+  if (score >= 88) {
+    rating = 'EXCEPTIONALLY HIGH (INSTITUTIONAL)';
+  } else if (score >= 75) {
+    rating = 'HIGH BREAKOUT PROBABILITY';
+  } else if (score >= 60) {
+    rating = 'MODERATE / AVERAGE';
+  } else {
+    rating = 'LOW PROBABILITY / HIGH SLIPPAGE';
+  }
+
+  return {
+    score,
+    rating,
+    vcpTightnessScore,
+    volumeDryUpScore,
+    rsLeadershipScore,
+    trendAlignmentScore,
+    factors: {
+      finalContractionDepth: finalDepth,
+      volumeDryUpPercent: stock.volumeDryUpPercent,
+      rsRating: stock.rsRating,
+      trendScore: trendScoreVal,
+      squeezeCompressionPercent: Math.round(squeezeCompressionPercent)
+    }
+  };
+}
+
+export function formatVolume(vol: number): string {
+  if (vol >= 1_000_000_000) return `${(vol / 1_000_000_000).toFixed(2)}B`;
+  if (vol >= 1_000_000) return `${(vol / 1_000_000).toFixed(2)}M`;
+  if (vol >= 1_000) return `${(vol / 1_000).toFixed(1)}K`;
+  return vol.toString();
+}
+
+export interface TrendStrengthMeterResult {
+  slopePercent: number; // e.g. +2.85% 1-month slope of 200MA
+  tier: 'TIER_1_POWER' | 'STAGE_2_STEADY' | 'STAGE_2_TURNING' | 'DECLINING_WEAK';
+  tierLabel: string;
+  badgeBg: string;
+  badgeText: string;
+  badgeBorder: string;
+  meterColor: string;
+  meterFillPercent: number;
+  description: string;
+}
+
+export function calculateTrendStrengthMeter(stock: MinerviniTradeSetup): TrendStrengthMeterResult {
+  const sma200Now = stock.sma200;
+  const sma200Prev = stock.sma200_1mo_ago;
+  
+  const slopePercent = sma200Prev > 0
+    ? ((sma200Now - sma200Prev) / sma200Prev) * 100
+    : 0;
+
+  const isMaAligned = stock.currentPrice > stock.sma50 && stock.sma50 > stock.sma150 && stock.sma150 > stock.sma200;
+
+  if (slopePercent >= 1.5 && stock.trendScore >= 7 && isMaAligned) {
+    const fill = Math.min(100, Math.round(75 + Math.min(25, (slopePercent - 1.5) * 10)));
+    return {
+      slopePercent,
+      tier: 'TIER_1_POWER',
+      tierLabel: 'Tier-1 Power Stage 2',
+      badgeBg: 'bg-[#107c41]',
+      badgeText: 'text-white',
+      badgeBorder: 'border-[#0d6233]',
+      meterColor: 'bg-[#107c41]',
+      meterFillPercent: fill,
+      description: `200MA sharply sloping upward (+${slopePercent.toFixed(2)}%/mo) with perfect MA alignment (50 > 150 > 200).`
+    };
+  } else if (slopePercent >= 0.5) {
+    const fill = Math.min(74, Math.round(50 + Math.min(24, (slopePercent - 0.5) * 20)));
+    return {
+      slopePercent,
+      tier: 'STAGE_2_STEADY',
+      tierLabel: 'Stage 2 Steady Slope',
+      badgeBg: 'bg-teal-700',
+      badgeText: 'text-white',
+      badgeBorder: 'border-teal-800',
+      meterColor: 'bg-teal-600',
+      meterFillPercent: fill,
+      description: `Confirmed Stage 2 advance with steady 200MA slope (+${slopePercent.toFixed(2)}%/mo).`
+    };
+  } else if (slopePercent > 0) {
+    const fill = Math.min(49, Math.round(25 + slopePercent * 40));
+    return {
+      slopePercent,
+      tier: 'STAGE_2_TURNING',
+      tierLabel: 'Stage 2 Base Turning',
+      badgeBg: 'bg-amber-100',
+      badgeText: 'text-amber-900',
+      badgeBorder: 'border-amber-300',
+      meterColor: 'bg-amber-500',
+      meterFillPercent: fill,
+      description: `200MA slope turning positive (+${slopePercent.toFixed(2)}%/mo). Early Stage 2 base accumulation.`
+    };
+  } else {
+    const fill = Math.max(5, Math.round(20 + slopePercent * 10));
+    return {
+      slopePercent,
+      tier: 'DECLINING_WEAK',
+      tierLabel: 'Declining 200MA',
+      badgeBg: 'bg-rose-100',
+      badgeText: 'text-rose-900',
+      badgeBorder: 'border-rose-300',
+      meterColor: 'bg-rose-600',
+      meterFillPercent: fill,
+      description: `200MA sloping downward (${slopePercent.toFixed(2)}%/mo). Fails Minervini Trend Template Rule 3.`
+    };
+  }
+}
+

@@ -1,0 +1,145 @@
+import { PriceAlert, MinerviniTradeSetup } from '../types';
+import { getCurrencySymbol } from './sepaCalculator';
+
+export const ALERTS_STORAGE_KEY = 'minervini_price_alerts';
+export const TRACKER_LOGS_KEY = 'minervini_price_tracker_logs';
+
+export interface BackgroundCheckLog {
+  id: string;
+  timestamp: string;
+  ticker: string;
+  exchange: string;
+  previousPrice: number;
+  currentPrice: number;
+  targetPrice: number;
+  targetType: string;
+  event: 'PIVOT_CROSSED' | 'STOP_LOSS_HIT' | 'PROXIMITY_WARNING' | 'TICK_CHECK';
+  triggered: boolean;
+}
+
+// Ensure default alerts exist in localStorage for initial stocks
+export function initializeLocalStorageAlerts(stocks: MinerviniTradeSetup[]): PriceAlert[] {
+  try {
+    const existing = localStorage.getItem(ALERTS_STORAGE_KEY);
+    if (existing) {
+      const parsed = JSON.parse(existing);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to read price alerts from localStorage:', e);
+  }
+
+  // Create initial default pivot entry & stop loss alerts for provided stocks
+  const initialAlerts: PriceAlert[] = stocks.slice(0, 4).flatMap((stock) => [
+    {
+      id: `alert-${stock.ticker}-pivot-${Date.now()}`,
+      ticker: stock.ticker,
+      stockName: stock.name,
+      targetType: 'PIVOT_ENTRY',
+      targetPrice: stock.pivotPrice,
+      triggerProximityPercent: 1.5,
+      currentPrice: stock.currentPrice,
+      status: 'ACTIVE',
+      createdAt: new Date().toLocaleDateString(),
+      exchange: stock.exchange,
+      notes: `VCP Pivot Entry Breakout Target @ ${getCurrencySymbol(stock.exchange)}${stock.pivotPrice}`,
+    },
+    {
+      id: `alert-${stock.ticker}-stop-${Date.now()}`,
+      ticker: stock.ticker,
+      stockName: stock.name,
+      targetType: 'STOP_LOSS',
+      targetPrice: stock.stopLossPrice,
+      triggerProximityPercent: 1.0,
+      currentPrice: stock.currentPrice,
+      status: 'ACTIVE',
+      createdAt: new Date().toLocaleDateString(),
+      exchange: stock.exchange,
+      notes: `Hard Risk Stop Loss Level @ ${getCurrencySymbol(stock.exchange)}${stock.stopLossPrice}`,
+    },
+  ]);
+
+  try {
+    localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(initialAlerts));
+  } catch (e) {
+    console.error('Failed to write initial alerts to localStorage:', e);
+  }
+
+  return initialAlerts;
+}
+
+// Read current alerts from localStorage
+export function getStoredAlerts(): PriceAlert[] {
+  try {
+    const raw = localStorage.getItem(ALERTS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
+}
+
+// Save alerts array to localStorage
+export function saveStoredAlerts(alerts: PriceAlert[]): void {
+  try {
+    localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(alerts));
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+// Read tracker logs
+export function getTrackerLogs(): BackgroundCheckLog[] {
+  try {
+    const raw = localStorage.getItem(TRACKER_LOGS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+// Append log entry to localStorage
+export function appendTrackerLog(log: Omit<BackgroundCheckLog, 'id' | 'timestamp'>): void {
+  try {
+    const logs = getTrackerLogs();
+    const newLog: BackgroundCheckLog = {
+      ...log,
+      id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      timestamp: new Date().toLocaleTimeString(),
+    };
+    // Keep last 30 logs
+    const updated = [newLog, ...logs].slice(0, 30);
+    localStorage.setItem(TRACKER_LOGS_KEY, JSON.stringify(updated));
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+// Web Audio sound synthesizer
+export function playAlertChime(): void {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime); // A5 note
+    osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.15); // A6 note
+
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.4);
+  } catch (e) {
+    // Audio context may require user interaction first
+  }
+}
