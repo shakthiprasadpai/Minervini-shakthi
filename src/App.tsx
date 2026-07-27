@@ -18,6 +18,7 @@ import { TickerNewsGrounding } from './components/TickerNewsGrounding';
 import { ObsidianIntegration } from './components/ObsidianIntegration';
 import { PocketPivotScanner } from './components/PocketPivotScanner';
 import { VcpPatternScanner } from './components/VcpPatternScanner';
+import { TradeJournal } from './components/TradeJournal';
 import { GlobalNotificationToast } from './components/GlobalNotificationToast';
 import { MOCK_STOCKS } from './data/mockStocks';
 import { MinerviniTradeSetup } from './types';
@@ -27,7 +28,7 @@ import { TrendingUp, ShieldCheck, Target, Droplets, ArrowUpRight, Flame, BarChar
 export default function App() {
   const [stocksList, setStocksList] = useState<MinerviniTradeSetup[]>(MOCK_STOCKS);
   const [selectedStock, setSelectedStock] = useState<MinerviniTradeSetup>(MOCK_STOCKS[0]);
-  const [activeTab, setActiveTab] = useState<'screener' | 'chart' | 'calculator' | 'custom' | 'playbook' | 'portfolio' | 'earnings' | 'masterclass' | 'obsidian' | 'pocket_pivot' | 'vcp_scanner'>('screener');
+  const [activeTab, setActiveTab] = useState<'screener' | 'chart' | 'calculator' | 'custom' | 'playbook' | 'portfolio' | 'earnings' | 'masterclass' | 'obsidian' | 'pocket_pivot' | 'vcp_scanner' | 'journal'>('screener');
   const [isObsidian, setIsObsidian] = useState<boolean>(true); // Default to Obsidian Dark theme for luxury feel
 
   useEffect(() => {
@@ -435,6 +436,28 @@ export default function App() {
             >
               <VcpPatternScanner
                 stocks={stocksList}
+                onSelectStock={(stock) => setSelectedStock(stock)}
+                onViewChart={(stock) => {
+                  setSelectedStock(stock);
+                  setActiveTab('chart');
+                }}
+              />
+            </motion.div>
+          )}
+
+          {/* TAB: TRADE JOURNAL */}
+          {activeTab === 'journal' && (
+            <motion.div
+              key="journal"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="space-y-8"
+            >
+              <TradeJournal
+                stocks={stocksList}
+                selectedStock={selectedStock}
                 onSelectStock={(stock) => setSelectedStock(stock)}
                 onViewChart={(stock) => {
                   setSelectedStock(stock);

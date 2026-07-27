@@ -165,3 +165,33 @@ export interface MinerviniVideoLesson {
   takeaways: string[];
 }
 
+export type EmotionalState = 
+  | 'CONFIDENT'
+  | 'CALM'
+  | 'ANXIOUS'
+  | 'FOMO'
+  | 'DISCIPLINED'
+  | 'IMPATIENT'
+  | 'EUPHORIC'
+  | 'REGRETFUL'
+  | 'PATIENT';
+
+export type TradeStatus = 'PLANNING' | 'ACTIVE_TRADE' | 'CLOSED_WIN' | 'CLOSED_LOSS' | 'SCRATCHED';
+
+export interface TradeJournalNote {
+  id: string;
+  ticker: string;
+  stockName: string;
+  exchange: 'NASDAQ' | 'NYSE' | 'NSE' | 'BSE';
+  date: string;
+  setupType: string;
+  entryPrice?: number;
+  exitPrice?: number;
+  emotionalState: EmotionalState;
+  notes: string;
+  keyLesson: string;
+  tradeStatus: TradeStatus;
+  rating: number; // 1 to 5 stars
+}
+
+

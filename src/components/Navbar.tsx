@@ -1,10 +1,10 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { TrendingUp, BarChart3, Calculator, BookOpen, SlidersHorizontal, Briefcase, Calendar, Video, Gem, Moon, Sun, Zap, Target } from 'lucide-react';
+import { TrendingUp, BarChart3, Calculator, BookOpen, SlidersHorizontal, Briefcase, Calendar, Video, Gem, Moon, Sun, Zap, Target, BookMarked } from 'lucide-react';
 
 interface NavbarProps {
-  activeTab: 'screener' | 'chart' | 'calculator' | 'custom' | 'playbook' | 'portfolio' | 'earnings' | 'masterclass' | 'obsidian' | 'pocket_pivot' | 'vcp_scanner';
-  setActiveTab: (tab: 'screener' | 'chart' | 'calculator' | 'custom' | 'playbook' | 'portfolio' | 'earnings' | 'masterclass' | 'obsidian' | 'pocket_pivot' | 'vcp_scanner') => void;
+  activeTab: 'screener' | 'chart' | 'calculator' | 'custom' | 'playbook' | 'portfolio' | 'earnings' | 'masterclass' | 'obsidian' | 'pocket_pivot' | 'vcp_scanner' | 'journal';
+  setActiveTab: (tab: 'screener' | 'chart' | 'calculator' | 'custom' | 'playbook' | 'portfolio' | 'earnings' | 'masterclass' | 'obsidian' | 'pocket_pivot' | 'vcp_scanner' | 'journal') => void;
   selectedStockTicker: string;
   totalSetupsCount: number;
   tightVolumeCount: number;
@@ -275,6 +275,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Target className="w-3.5 h-3.5 text-amber-400" />
               <span className="hidden sm:inline font-bold">VCP Scanner</span>
+            </button>
+
+            <button
+              id="nav-tab-journal"
+              onClick={() => setActiveTab('journal')}
+              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
+                activeTab === 'journal'
+                  ? 'border-[#1a1a1a] text-[#1a1a1a] font-bold'
+                  : 'border-transparent text-gray-500 hover:text-black hover:border-gray-300'
+              }`}
+            >
+              <BookMarked className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="font-bold">Trade Journal</span>
             </button>
           </nav>
 
