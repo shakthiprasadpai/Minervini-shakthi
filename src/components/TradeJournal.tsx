@@ -208,6 +208,35 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
   const winRate = winCount + lossCount > 0 ? Math.round((winCount / (winCount + lossCount)) * 100) : 0;
   const avgRating = totalNotes > 0 ? (journalNotes.reduce((acc, n) => acc + n.rating, 0) / totalNotes).toFixed(1) : '0.0';
 
+  // Emotional state frequencies and note keyword frequencies for Word Cloud
+  const emotionalStateFrequencies = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    journalNotes.forEach((n) => {
+      counts[n.emotionalState] = (counts[n.emotionalState] || 0) + 1;
+    });
+    return counts;
+  }, [journalNotes]);
+
+  const recurringKeywordsFrequencies = React.useMemo(() => {
+    const stopWords = new Set(['the','and','a','to','of','in','for','is','on','that','by','this','with','it','as','an','be','at','or','from','which','was','were','have','has','had','not','but','they','their','we','our','you','your','all','will','one','so','if','out','up','do','get','got','gotten']);
+    const counts: Record<string, number> = {};
+    
+    journalNotes.forEach((n) => {
+      const combinedText = `${n.notes} ${n.keyLesson} ${n.setupType}`.toLowerCase();
+      const words = combinedText.replace(/[^\w\s]/gi, '').split(/\s+/);
+      words.forEach((w) => {
+        const cleaned = w.trim();
+        if (cleaned.length > 3 && !stopWords.has(cleaned)) {
+          counts[cleaned] = (counts[cleaned] || 0) + 1;
+        }
+      });
+    });
+
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 14);
+  }, [journalNotes]);
+
   return (
     <div className="space-y-8">
       
@@ -261,6 +290,86 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
         <div className="bg-white border border-[#e5e4e1] p-4 text-center">
           <span className="text-[10px] uppercase tracking-widest text-[#b5a68d] font-bold block">Unique Tickers Tracked</span>
           <strong className="text-2xl font-mono font-bold text-blue-700">{allTickers.length}</strong>
+        </div>
+      </div>
+
+      {/* Emotional State & Note Keywords Word Cloud */}
+      <div className="bg-white border border-[#e5e4e1] p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-[#e5e4e1] pb-3">
+          <div className="flex items-center space-x-2">
+            <Brain className="w-5 h-5 text-amber-600" />
+            <h3 className="text-base font-serif font-black text-[#1a1a1a]">
+              Psychological State & Keyword Word Cloud
+            </h3>
+          </div>
+          <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">
+            Click emotional keyword to filter
+          </span>
+        </div>
+
+        <div className="space-y-4 pt-2">
+          {/* Emotional States Word Cloud */}
+          <div>
+            <span className="text-[10px] uppercase font-bold text-gray-500 font-mono tracking-wider block mb-2">
+              Frequently Highlighted Emotional States:
+            </span>
+            <div className="flex flex-wrap items-center gap-2.5">
+              {EMOTIONAL_STATES.map((em) => {
+                const count = emotionalStateFrequencies[em.state] || 0;
+                if (count === 0 && journalNotes.length > 0) return null;
+                const isActive = selectedEmotionFilter === em.state;
+                
+                const scaleClass = count >= 3 ? 'text-sm px-4 py-2 font-black' : count >= 2 ? 'text-xs px-3 py-1.5 font-bold' : 'text-xs px-2.5 py-1 font-medium';
+                
+                return (
+                  <button
+                    key={em.state}
+                    onClick={() => setSelectedEmotionFilter(isActive ? 'ALL' : em.state)}
+                    className={`transition-all border flex items-center space-x-1.5 cursor-pointer ${scaleClass} ${
+                      isActive
+                        ? 'bg-[#1a1a1a] text-white border-black shadow-sm ring-2 ring-amber-400'
+                        : em.color + ' hover:opacity-80'
+                    }`}
+                  >
+                    <span>{em.icon}</span>
+                    <span>{em.label}</span>
+                    <span className="text-[9px] opacity-75 ml-1 bg-white/60 text-black px-1 rounded">
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Recurring Lesson / Note Keywords Cloud */}
+          {recurringKeywordsFrequencies.length > 0 && (
+            <div className="pt-3 border-t border-[#f0eee6]">
+              <span className="text-[10px] uppercase font-bold text-gray-500 font-mono tracking-wider block mb-2">
+                Recurring Note & Lesson Keywords (Top Terminology):
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                {recurringKeywordsFrequencies.map(([word, freq]) => {
+                  const sizeClasses = freq >= 3 
+                    ? 'text-sm font-black bg-amber-100 text-amber-900 border-amber-300' 
+                    : freq >= 2 
+                    ? 'text-xs font-bold bg-blue-50 text-blue-900 border-blue-200' 
+                    : 'text-xs font-normal bg-gray-100 text-gray-700 border-gray-200';
+                  
+                  return (
+                    <span
+                      key={word}
+                      onClick={() => setSearchQuery(word)}
+                      className={`px-3 py-1 border transition-all cursor-pointer hover:scale-105 font-mono capitalize ${sizeClasses}`}
+                      title={`Frequency: ${freq} times. Click to search.`}
+                    >
+                      #{word} <span className="text-[9px] opacity-60 ml-0.5 font-sans">({freq})</span>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
