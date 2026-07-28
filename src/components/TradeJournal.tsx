@@ -3,6 +3,15 @@ import { MinerviniTradeSetup, TradeJournalNote, EmotionalState, TradeStatus } fr
 import { getStoredJournalNotes, saveStoredJournalNotes } from '../utils/tradeJournalStorage';
 import { formatCurrency, getCurrencySymbol } from '../utils/sepaCalculator';
 import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip
+} from 'recharts';
+import {
   BookMarked,
   Plus,
   Search,
@@ -22,7 +31,16 @@ import {
   Calendar,
   DollarSign,
   ShieldAlert,
-  X
+  X,
+  Download,
+  FileText,
+  BarChart2,
+  RefreshCw,
+  Printer,
+  Sparkles as SparklesIcon,
+  Camera,
+  Eye,
+  Maximize2
 } from 'lucide-react';
 
 interface TradeJournalProps {
@@ -82,6 +100,8 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
   const [formKeyLesson, setFormKeyLesson] = useState<string>('');
   const [formTradeStatus, setFormTradeStatus] = useState<TradeStatus>('ACTIVE_TRADE');
   const [formRating, setFormRating] = useState<number>(5);
+  const [formChartSnapshotUrl, setFormChartSnapshotUrl] = useState<string>('');
+  const [lightboxSnapshot, setLightboxSnapshot] = useState<string | null>(null);
 
   // Sync state with localStorage events
   useEffect(() => {
@@ -119,12 +139,49 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
     }
   };
 
+  const handleCaptureVcpSnapshot = () => {
+    const stock = stocks.find((s) => s.ticker.toUpperCase() === formTicker.toUpperCase()) || stocks[0];
+    const svgWidth = 500;
+    const svgHeight = 260;
+    const history = stock && stock.priceHistory ? stock.priceHistory.slice(-45) : [
+      { close: 100, high: 105, low: 95 },
+      { close: 102, high: 107, low: 98 },
+      { close: 108, high: 112, low: 101 }
+    ];
+
+    const minP = Math.min(...history.map((p) => p.low));
+    const maxP = Math.max(...history.map((p) => p.high));
+    const rangeP = maxP - minP || 1;
+
+    const points = history.map((p, i) => {
+      const x = (i / (history.length - 1)) * (svgWidth - 50) + 25;
+      const y = svgHeight - 45 - ((p.close - minP) / rangeP) * (svgHeight - 80);
+      return `${x},${y}`;
+    }).join(' ');
+
+    const pivotVal = stock ? stock.pivotPrice : parseFloat(formEntryPrice) || 100;
+    const pivotY = svgHeight - 45 - ((pivotVal - minP) / rangeP) * (svgHeight - 80);
+
+    const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" style="background:#0f172a; font-family:monospace;">
+      <rect width="100%" height="100%" fill="#0f172a"/>
+      <text x="25" y="28" fill="#34d399" font-size="14" font-weight="bold">${formTicker} VCP Chart Snapshot (${stock ? stock.patternType : 'SEPA Setup'})</text>
+      <line x1="25" y1="${pivotY}" x2="${svgWidth - 25}" y2="${pivotY}" stroke="#f59e0b" stroke-dasharray="5 5" stroke-width="2"/>
+      <text x="${svgWidth - 140}" y="${pivotY - 8}" fill="#f59e0b" font-size="11" font-weight="bold">Pivot: $${pivotVal}</text>
+      <polyline fill="none" stroke="#60a5fa" stroke-width="3" points="${points}"/>
+      <text x="25" y="${svgHeight - 18}" fill="#94a3b8" font-size="10">Minervini VCP Snapshot • RS Rating: ${stock?.rsRating || 88} • Vol Dry-Up: ${stock?.volumeDryUpPercent || '-65'}%</text>
+    </svg>`;
+
+    const encoded = 'data:image/svg+xml;utf8,' + encodeURIComponent(svgString);
+    setFormChartSnapshotUrl(encoded);
+  };
+
   const handleOpenAddModal = () => {
     setEditingNoteId(null);
     setFormNotes('');
     setFormKeyLesson('');
     setFormExitPrice('');
     setFormRating(5);
+    setFormChartSnapshotUrl('');
     setIsModalOpen(true);
   };
 
@@ -141,6 +198,7 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
     setFormKeyLesson(note.keyLesson);
     setFormTradeStatus(note.tradeStatus);
     setFormRating(note.rating);
+    setFormChartSnapshotUrl(note.chartSnapshotUrl || '');
     setIsModalOpen(true);
   };
 
@@ -162,6 +220,7 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
       keyLesson: formKeyLesson || 'Patience and risk management are paramount.',
       tradeStatus: formTradeStatus,
       rating: formRating,
+      chartSnapshotUrl: formChartSnapshotUrl || undefined,
     };
 
     let updated: TradeJournalNote[];
@@ -237,6 +296,211 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
       .slice(0, 14);
   }, [journalNotes]);
 
+  // Export to CSV
+  const handleExportCSV = () => {
+    const headers = ['ID', 'Ticker', 'Stock Name', 'Exchange', 'Date', 'Setup Type', 'Entry Price', 'Exit Price', 'Emotional State', 'Trade Status', 'Rating', 'Key Lesson', 'Notes'];
+    const rows = journalNotes.map((n) => [
+      n.id,
+      n.ticker,
+      `"${n.stockName.replace(/"/g, '""')}"`,
+      n.exchange,
+      n.date,
+      `"${n.setupType}"`,
+      n.entryPrice ?? '',
+      n.exitPrice ?? '',
+      n.emotionalState,
+      n.tradeStatus,
+      n.rating,
+      `"${n.keyLesson.replace(/"/g, '""')}"`,
+      `"${n.notes.replace(/"/g, '""')}"`,
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `minervini_trade_journal_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Export to JSON
+  const handleExportJSON = () => {
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(journalNotes, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `minervini_trade_journal_${new Date().toISOString().split('T')[0]}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
+  // Export to Markdown
+  const handleExportMarkdown = () => {
+    let md = `# Mark Minervini SEPA Trade Journal & Diary\n`;
+    md += `*Exported on ${new Date().toISOString().split('T')[0]}*\n\n`;
+    journalNotes.forEach((n, index) => {
+      md += `## ${index + 1}. ${n.ticker} - ${n.stockName} (${n.exchange})\n`;
+      md += `- **Date**: ${n.date}\n`;
+      md += `- **Setup**: ${n.setupType}\n`;
+      md += `- **Status**: ${n.tradeStatus}\n`;
+      md += `- **Emotional State**: ${n.emotionalState}\n`;
+      md += `- **Entry Price**: ${n.entryPrice !== undefined ? formatCurrency(n.entryPrice, n.exchange) : 'N/A'}\n`;
+      md += `- **Exit Price**: ${n.exitPrice !== undefined ? formatCurrency(n.exitPrice, n.exchange) : 'N/A'}\n`;
+      md += `- **Rating**: ${'★'.repeat(n.rating)}${'☆'.repeat(5 - n.rating)}\n`;
+      md += `- **Key Lesson**: ${n.keyLesson}\n`;
+      md += `- **Notes**: ${n.notes}\n`;
+      if (n.chartSnapshotUrl) {
+        md += `- **Chart Snapshot**: [View Snapshot](${n.chartSnapshotUrl})\n`;
+      }
+      md += `\n---\n\n`;
+    });
+
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `minervini_trade_journal_${new Date().toISOString().split('T')[0]}.md`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Interactive quick status update
+  const handleQuickStatusUpdate = (id: string, newStatus: TradeStatus) => {
+    const updated = journalNotes.map((n) => (n.id === id ? { ...n, tradeStatus: newStatus } : n));
+    setJournalNotes(updated);
+    saveStoredJournalNotes(updated);
+  };
+
+  // Auto-populate trade outcomes from stocks / screener
+  const handleAutoPopulate = () => {
+    const existingTickers = new Set(journalNotes.map(n => n.ticker.toUpperCase()));
+    const newEntries: TradeJournalNote[] = [];
+    const emotions: EmotionalState[] = ['DISCIPLINED', 'CONFIDENT', 'CALM', 'PATIENT', 'FOMO', 'ANXIOUS'];
+    const statuses: TradeStatus[] = ['CLOSED_WIN', 'CLOSED_LOSS', 'ACTIVE_TRADE', 'PLANNING'];
+    const lessons = [
+      'Patience on volume dry-up yields optimal risk-reward ratios.',
+      'Do not chase extensions without proper consolidation.',
+      'Honor stop losses immediately when pivot support fails.',
+      'Stage 2 uptrend with institutional accumulation is the holy grail.',
+      'Control emotional discipline during high volatility swings.'
+    ];
+
+    stocks.forEach((stock, idx) => {
+      if (!existingTickers.has(stock.ticker.toUpperCase())) {
+        const randomEmotion = emotions[idx % emotions.length];
+        const randomStatus = statuses[idx % statuses.length];
+        const randomRating = randomStatus === 'CLOSED_WIN' ? 5 : randomStatus === 'CLOSED_LOSS' ? 2 : 4;
+        const entryP = stock.pivotPrice;
+        const exitP = randomStatus === 'CLOSED_WIN' ? Number((entryP * 1.12).toFixed(2)) : randomStatus === 'CLOSED_LOSS' ? Number((entryP * 0.95).toFixed(2)) : undefined;
+
+        newEntries.push({
+          id: `auto-${stock.ticker.toLowerCase()}-${Date.now()}-${idx}`,
+          ticker: stock.ticker,
+          stockName: stock.name,
+          exchange: stock.exchange,
+          date: new Date(Date.now() - idx * 86400000 * 2).toISOString().split('T')[0],
+          setupType: stock.vcpContractions ? `VCP (${stock.vcpContractions} Contractions)` : 'Cup with Handle',
+          entryPrice: entryP,
+          exitPrice: exitP,
+          emotionalState: randomEmotion,
+          notes: `Auto-populated trade outcome for ${stock.name} (${stock.ticker}). RS Rating: ${stock.rsRating}, Volume Dry-Up: ${stock.volumeDryUp ? 'Yes' : 'No'}. Setup quality is robust.`,
+          keyLesson: lessons[idx % lessons.length],
+          tradeStatus: randomStatus,
+          rating: randomRating,
+        });
+      }
+    });
+
+    if (newEntries.length > 0) {
+      const updated = [...newEntries, ...journalNotes];
+      setJournalNotes(updated);
+      saveStoredJournalNotes(updated);
+    }
+  };
+
+  // Auto Sentiment analysis from text
+  const handleAutoSentiment = () => {
+    const combined = `${formNotes} ${formKeyLesson}`.toLowerCase();
+    if (combined.includes('fomo') || combined.includes('chase') || combined.includes('rush')) {
+      setFormEmotionalState('FOMO');
+    } else if (combined.includes('fear') || combined.includes('anxious') || combined.includes('nervous') || combined.includes('worry')) {
+      setFormEmotionalState('ANXIOUS');
+    } else if (combined.includes('patient') || combined.includes('wait') || combined.includes('dried')) {
+      setFormEmotionalState('PATIENT');
+    } else if (combined.includes('discipline') || combined.includes('plan') || combined.includes('rules')) {
+      setFormEmotionalState('DISCIPLINED');
+    } else if (combined.includes('calm') || combined.includes('zen') || combined.includes('steady')) {
+      setFormEmotionalState('CALM');
+    } else if (combined.includes('confident') || combined.includes('sure') || combined.includes('strong')) {
+      setFormEmotionalState('CONFIDENT');
+    } else if (combined.includes('greed') || combined.includes('euphoria') || combined.includes('surge')) {
+      setFormEmotionalState('EUPHORIC');
+    } else if (combined.includes('regret') || combined.includes('mistake') || combined.includes('missed')) {
+      setFormEmotionalState('REGRETFUL');
+    } else {
+      setFormEmotionalState('DISCIPLINED');
+    }
+  };
+
+  // Sentiment vs Outcome correlation stats
+  const sentimentOutcomeStats = React.useMemo(() => {
+    const map: Record<string, { wins: number; losses: number; total: number; avgRating: number; ratingSum: number }> = {};
+    EMOTIONAL_STATES.forEach(em => {
+      map[em.state] = { wins: 0, losses: 0, total: 0, avgRating: 0, ratingSum: 0 };
+    });
+
+    journalNotes.forEach(n => {
+      if (!map[n.emotionalState]) {
+        map[n.emotionalState] = { wins: 0, losses: 0, total: 0, avgRating: 0, ratingSum: 0 };
+      }
+      map[n.emotionalState].total += 1;
+      map[n.emotionalState].ratingSum += n.rating;
+      if (n.tradeStatus === 'CLOSED_WIN') map[n.emotionalState].wins += 1;
+      if (n.tradeStatus === 'CLOSED_LOSS') map[n.emotionalState].losses += 1;
+    });
+
+    return Object.entries(map).map(([state, data]) => {
+      const closed = data.wins + data.losses;
+      const winRate = closed > 0 ? Math.round((data.wins / closed) * 100) : 0;
+      const avgRating = data.total > 0 ? (data.ratingSum / data.total).toFixed(1) : '0.0';
+      return {
+        state,
+        ...data,
+        winRate,
+        avgRating,
+      };
+    }).filter(item => item.total > 0);
+  }, [journalNotes]);
+
+  // Cumulative Performance Data calculation over time
+  const performanceChartData = React.useMemo(() => {
+    const sorted = [...journalNotes].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    let cumulative = 0;
+    return sorted.map((note) => {
+      let pnl = 0;
+      if (note.entryPrice !== undefined && note.exitPrice !== undefined) {
+        pnl = ((note.exitPrice - note.entryPrice) / note.entryPrice) * 100;
+      } else if (note.tradeStatus === 'CLOSED_WIN') {
+        pnl = 8.0;
+      } else if (note.tradeStatus === 'CLOSED_LOSS') {
+        pnl = -4.5;
+      } else {
+        pnl = 0.0;
+      }
+      cumulative += pnl;
+      return {
+        date: note.date,
+        ticker: note.ticker,
+        pnl: Number(pnl.toFixed(2)),
+        cumulative: Number(cumulative.toFixed(2)),
+        status: note.tradeStatus,
+      };
+    });
+  }, [journalNotes]);
+
   return (
     <div className="space-y-8">
       
@@ -259,7 +523,52 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={handleAutoPopulate}
+            className="bg-white hover:bg-gray-50 text-[#1a1a1a] font-bold px-4 py-3 text-xs uppercase tracking-widest flex items-center space-x-2 transition-all border border-[#e5e4e1] shadow-xs cursor-pointer"
+            title="Auto-populate trade outcomes & journal notes from VCP watchlist"
+          >
+            <RefreshCw className="w-4 h-4 text-emerald-600" />
+            <span>Auto-Populate Outcomes</span>
+          </button>
+
+          <button
+            onClick={handleExportCSV}
+            className="bg-white hover:bg-gray-50 text-[#1a1a1a] font-bold px-4 py-3 text-xs uppercase tracking-widest flex items-center space-x-2 transition-all border border-[#e5e4e1] shadow-xs cursor-pointer"
+            title="Export journal and trade outcomes to CSV"
+          >
+            <Download className="w-4 h-4 text-blue-600" />
+            <span>Export CSV</span>
+          </button>
+
+          <button
+            onClick={handleExportJSON}
+            className="bg-white hover:bg-gray-50 text-[#1a1a1a] font-bold px-4 py-3 text-xs uppercase tracking-widest flex items-center space-x-2 transition-all border border-[#e5e4e1] shadow-xs cursor-pointer"
+            title="Export journal and trade outcomes to JSON"
+          >
+            <FileText className="w-4 h-4 text-purple-600" />
+            <span>Export JSON</span>
+          </button>
+
+          <button
+            onClick={handleExportMarkdown}
+            className="bg-white hover:bg-gray-50 text-[#1a1a1a] font-bold px-4 py-3 text-xs uppercase tracking-widest flex items-center space-x-2 transition-all border border-[#e5e4e1] shadow-xs cursor-pointer"
+            title="Export trade diary to Markdown (Obsidian / Notion Vault compatible)"
+          >
+            <FileText className="w-4 h-4 text-emerald-600" />
+            <span>Export Markdown</span>
+          </button>
+
+          <button
+            onClick={() => window.print()}
+            className="bg-white hover:bg-gray-50 text-[#1a1a1a] font-bold px-4 py-3 text-xs uppercase tracking-widest flex items-center space-x-2 transition-all border border-[#e5e4e1] shadow-xs cursor-pointer print:hidden"
+            title="Print Executive Journal Analysis & Performance Report"
+          >
+            <Printer className="w-4 h-4 text-amber-600" />
+            <span>Print Analysis</span>
+          </button>
+
           <button
             onClick={handleOpenAddModal}
             className="bg-[#1a1a1a] hover:bg-black text-white font-bold px-5 py-3 text-xs uppercase tracking-widest flex items-center space-x-2 transition-all border border-black shadow-xs cursor-pointer"
@@ -369,6 +678,129 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
                 })}
               </div>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Sentiment vs Trade Outcome Correlation Analytics */}
+      <div className="bg-white border border-[#e5e4e1] p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-[#e5e4e1] pb-3">
+          <div className="flex items-center space-x-2">
+            <BarChart2 className="w-5 h-5 text-blue-600" />
+            <h3 className="text-base font-serif font-black text-[#1a1a1a]">
+              Note Sentiment vs Trade Outcome Analytics
+            </h3>
+          </div>
+          <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">
+            Psychological Edge Analysis
+          </span>
+        </div>
+
+        <p className="text-xs text-gray-600 font-sans">
+          Correlating your logged emotional states with trade outcomes (Wins vs Losses) to identify which mindset produces your highest-probability SEPA breakout performances.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+          {sentimentOutcomeStats.map((stat) => {
+            const emObj = EMOTIONAL_STATES.find(e => e.state === stat.state) || EMOTIONAL_STATES[0];
+            const closedTotal = stat.wins + stat.losses;
+
+            return (
+              <div key={stat.state} className="bg-[#f9f8f5] border border-[#e5e4e1] p-4 space-y-3 font-mono">
+                <div className="flex items-center justify-between">
+                  <span className={`px-2 py-0.5 text-[10px] font-bold uppercase border flex items-center space-x-1 ${emObj.color}`}>
+                    <span>{emObj.icon}</span>
+                    <span>{emObj.label}</span>
+                  </span>
+                  <span className="text-xs font-bold text-gray-700">{stat.total} trades</span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center text-xs pt-1 border-t border-[#e5e4e1]">
+                  <div>
+                    <span className="text-[9px] uppercase text-gray-500 block">Wins</span>
+                    <strong className="text-emerald-700 font-bold">{stat.wins}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[9px] uppercase text-gray-500 block">Losses</span>
+                    <strong className="text-rose-600 font-bold">{stat.losses}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[9px] uppercase text-gray-500 block">Win Rate</span>
+                    <strong className={`font-bold ${stat.winRate >= 60 ? 'text-emerald-700' : stat.winRate >= 40 ? 'text-amber-700' : 'text-rose-600'}`}>
+                      {closedTotal > 0 ? `${stat.winRate}%` : 'N/A'}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] pt-1 border-t border-[#e5e4e1]">
+                  <span className="text-gray-500 uppercase text-[9px]">Avg Execution Rating:</span>
+                  <span className="font-bold flex items-center space-x-1">
+                    <span>{stat.avgRating}</span>
+                    <Star className="w-3 h-3 text-amber-500 fill-current inline" />
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Trade Performance Over Time (Cumulative P&L Growth) */}
+      <div className="bg-white border border-[#e5e4e1] p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-[#e5e4e1] pb-3">
+          <div className="flex items-center space-x-2">
+            <TrendingUp className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-base font-serif font-black text-[#1a1a1a]">
+              Trade Performance Over Time — Cumulative P&L Growth (%)
+            </h3>
+          </div>
+          <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">
+            Recharts Visualizer
+          </span>
+        </div>
+
+        <p className="text-xs text-gray-600 font-sans">
+          Tracking the trajectory of your portfolio growth based on closed and active trade journal entries over chronological dates.
+        </p>
+
+        <div className="h-72 w-full pt-4">
+          {performanceChartData.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-xs font-mono text-gray-400">
+              No performance data available. Add or auto-populate trade journal entries.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={performanceChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e4e1" />
+                <XAxis dataKey="date" stroke="#666" fontSize={11} fontFamily="monospace" />
+                <YAxis stroke="#666" fontSize={11} fontFamily="monospace" unit="%" />
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-[#1a1a1a] text-white p-3 text-xs font-mono space-y-1 shadow-xl border border-gray-800">
+                          <p className="text-amber-400 font-bold">{data.ticker} ({data.date})</p>
+                          <p>Trade P&L: <span className={data.pnl >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{data.pnl >= 0 ? `+${data.pnl}%` : `${data.pnl}%`}</span></p>
+                          <p>Cumulative: <span className={data.cumulative >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{data.cumulative >= 0 ? `+${data.cumulative}%` : `${data.cumulative}%`}</span></p>
+                          <p className="text-[10px] text-gray-400 uppercase">Status: {data.status}</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="cumulative"
+                  stroke="#10b981"
+                  strokeWidth={2.5}
+                  dot={{ r: 4, fill: '#10b981' }}
+                  activeDot={{ r: 7, fill: '#047857' }}
+                  name="Cumulative P&L (%)"
+                />
+              </LineChart>
+            </ResponsiveContainer>
           )}
         </div>
       </div>
@@ -528,6 +960,35 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
                         {note.notes}
                       </p>
                     </div>
+
+                    {/* VCP Chart Snapshot Thumbnail if available */}
+                    {note.chartSnapshotUrl && (
+                      <div className="space-y-1 pt-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] uppercase font-bold text-gray-600 font-mono tracking-wider flex items-center space-x-1">
+                            <Camera className="w-3 h-3 text-blue-600" />
+                            <span>VCP Chart Snapshot:</span>
+                          </span>
+                          <button
+                            onClick={() => setLightboxSnapshot(note.chartSnapshotUrl || null)}
+                            className="text-[10px] font-bold text-blue-700 hover:underline flex items-center space-x-1 cursor-pointer"
+                          >
+                            <Maximize2 className="w-3 h-3" />
+                            <span>Enlarge Chart</span>
+                          </button>
+                        </div>
+                        <div
+                          onClick={() => setLightboxSnapshot(note.chartSnapshotUrl || null)}
+                          className="cursor-pointer border border-[#e5e4e1] bg-[#0f172a] p-1 rounded overflow-hidden hover:opacity-95 transition-all shadow-xs"
+                        >
+                          <img
+                            src={note.chartSnapshotUrl}
+                            alt={`${note.ticker} VCP Snapshot`}
+                            className="w-full h-28 object-contain"
+                          />
+                        </div>
+                      </div>
+                    )}
 
                     {/* Key Lesson / Takeaway */}
                     <div className="space-y-1 pt-1">
@@ -753,11 +1214,66 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
                 </div>
               </div>
 
+              {/* VCP Chart Snapshot Capture */}
+              <div className="space-y-2 bg-[#f9f8f5] p-4 border border-[#e5e4e1]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-bold text-gray-700 font-mono tracking-wider flex items-center space-x-1.5">
+                    <Camera className="w-4 h-4 text-blue-600" />
+                    <span>VCP Chart Snapshot & Thumbnail:</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCaptureVcpSnapshot}
+                    className="text-[10px] font-bold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 uppercase tracking-widest flex items-center space-x-1.5 transition-all shadow-xs cursor-pointer"
+                    title="Capture mini-screenshot or SVG thumbnail of current VCP chart for this trade"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>Capture VCP Snapshot</span>
+                  </button>
+                </div>
+                {formChartSnapshotUrl ? (
+                  <div className="space-y-2 pt-1">
+                    <div className="relative border border-[#e5e4e1] bg-[#0f172a] p-1 rounded overflow-hidden">
+                      <img
+                        src={formChartSnapshotUrl}
+                        alt="VCP Snapshot Preview"
+                        className="w-full h-32 object-contain"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-gray-500">
+                      <span>Snapshot successfully linked to this entry</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormChartSnapshotUrl('')}
+                        className="text-red-600 font-bold hover:underline"
+                      >
+                        Remove Snapshot
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-gray-500 font-sans">
+                    No chart snapshot captured yet. Click "Capture VCP Snapshot" to snapshot the active VCP setup and attach it to this journal entry.
+                  </p>
+                )}
+              </div>
+
               {/* Trade Notes */}
               <div>
-                <label className="block text-[10px] uppercase tracking-wider text-gray-600 font-bold mb-1">
-                  Trade Notes & Rationale
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[10px] uppercase tracking-wider text-gray-600 font-bold">
+                    Trade Notes & Rationale
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAutoSentiment}
+                    className="text-[10px] uppercase font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 border border-amber-200 flex items-center space-x-1.5 transition-all cursor-pointer"
+                    title="Auto-analyze sentiment & emotional state from notes and key lessons"
+                  >
+                    <SparklesIcon className="w-3 h-3 text-amber-600" />
+                    <span>Auto Sentiment</span>
+                  </button>
+                </div>
                 <textarea
                   rows={3}
                   placeholder="Describe market action, volume behavior, setup quality, and execution rationale..."
@@ -799,6 +1315,35 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
 
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Modal for VCP Chart Snapshot */}
+      {lightboxSnapshot && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0f172a] border border-gray-700 max-w-4xl w-full p-6 space-y-4 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+              <div className="flex items-center space-x-2">
+                <Camera className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-mono text-emerald-400 font-bold uppercase tracking-wider">
+                  VCP Chart Snapshot Full Resolution View
+                </span>
+              </div>
+              <button
+                onClick={() => setLightboxSnapshot(null)}
+                className="text-gray-400 hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="w-full flex items-center justify-center p-3 bg-black/60 border border-gray-800 rounded">
+              <img
+                src={lightboxSnapshot}
+                alt="VCP Snapshot Enlarged"
+                className="max-h-[75vh] w-auto object-contain"
+              />
+            </div>
           </div>
         </div>
       )}

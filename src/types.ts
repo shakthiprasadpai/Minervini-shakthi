@@ -192,6 +192,7 @@ export interface TradeJournalNote {
   keyLesson: string;
   tradeStatus: TradeStatus;
   rating: number; // 1 to 5 stars
+  chartSnapshotUrl?: string;
 }
 
 
