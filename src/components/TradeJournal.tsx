@@ -83,6 +83,7 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
   const [selectedTickerFilter, setSelectedTickerFilter] = useState<string>('ALL');
   const [selectedEmotionFilter, setSelectedEmotionFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [journalViewMode, setJournalViewMode] = useState<'grid' | 'grouped'>('grid');
 
   // Modal form state for Adding/Editing Note
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -845,6 +846,30 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
               ))}
             </select>
           </div>
+
+          {/* View Mode Toggle */}
+          <div className="flex items-center space-x-1 bg-[#f9f8f5] border border-[#e5e4e1] p-1">
+            <button
+              onClick={() => setJournalViewMode('grid')}
+              className={`px-3 py-1 text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                journalViewMode === 'grid'
+                  ? 'bg-[#1a1a1a] text-white shadow-xs'
+                  : 'text-gray-600 hover:text-black'
+              }`}
+            >
+              Grid View
+            </button>
+            <button
+              onClick={() => setJournalViewMode('grouped')}
+              className={`px-3 py-1 text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                journalViewMode === 'grouped'
+                  ? 'bg-[#1a1a1a] text-white shadow-xs'
+                  : 'text-gray-600 hover:text-black'
+              }`}
+            >
+              Grouped by Sentiment
+            </button>
+          </div>
         </div>
 
         {/* Search Input */}
@@ -869,6 +894,212 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
             <p className="text-xs text-gray-500 font-sans max-w-md mx-auto">
               No journal notes match your current ticker or emotional filter. Click the button above to log your first trade reflection.
             </p>
+          </div>
+        ) : journalViewMode === 'grouped' ? (
+          <div className="space-y-8">
+            {EMOTIONAL_STATES.map((em) => {
+              const notesInEmotion = filteredNotes.filter((n) => n.emotionalState === em.state);
+              if (notesInEmotion.length === 0) return null;
+
+              const wins = notesInEmotion.filter(n => n.tradeStatus === 'CLOSED_WIN').length;
+              const losses = notesInEmotion.filter(n => n.tradeStatus === 'CLOSED_LOSS').length;
+              const closedCount = wins + losses;
+              const winRate = closedCount > 0 ? Math.round((wins / closedCount) * 100) : 0;
+              const avgRating = (notesInEmotion.reduce((acc, n) => acc + n.rating, 0) / notesInEmotion.length).toFixed(1);
+
+              return (
+                <div key={em.state} className="bg-white border border-[#e5e4e1] p-6 space-y-4 shadow-xs">
+                  <div className={`flex flex-wrap items-center justify-between border-b pb-3 ${em.color} px-4 py-3 rounded`}>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xl">{em.icon}</span>
+                      <h3 className="text-base font-serif font-black uppercase tracking-wide">
+                        {em.label} Sentiment Group ({notesInEmotion.length} trades)
+                      </h3>
+                    </div>
+                    <div className="flex items-center space-x-4 text-xs font-mono font-bold">
+                      <span>Wins: <span className="text-emerald-700">{wins}</span></span>
+                      <span>Losses: <span className="text-rose-700">{losses}</span></span>
+                      <span>Win Rate: <span className={winRate >= 60 ? 'text-emerald-700' : 'text-amber-700'}>{closedCount > 0 ? `${winRate}%` : 'N/A'}</span></span>
+                      <span>Avg Rating: {avgRating} ★</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {notesInEmotion.map((note) => {
+                      const emotionObj = EMOTIONAL_STATES.find((e) => e.state === note.emotionalState) || EMOTIONAL_STATES[0];
+                      const statusObj = TRADE_STATUSES.find((s) => s.status === note.tradeStatus) || TRADE_STATUSES[1];
+                      const currency = getCurrencySymbol(note.exchange);
+                      const matchingStock = stocks.find((s) => s.ticker.toUpperCase() === note.ticker.toUpperCase());
+
+                      return (
+                        <div
+                          key={note.id}
+                          className="bg-white border border-[#e5e4e1] p-6 space-y-4 hover:shadow-md transition-all flex flex-col justify-between"
+                        >
+                          <div className="space-y-3">
+                            
+                            {/* Ticker Header & Badges */}
+                            <div className="flex items-center justify-between border-b border-[#e5e4e1] pb-3">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-11 h-11 bg-[#1a1a1a] text-white flex flex-col items-center justify-center font-mono">
+                                  <span className="text-sm font-bold">{note.ticker}</span>
+                                  <span className="text-[8px] text-gray-300 uppercase">{note.exchange}</span>
+                                </div>
+                                <div>
+                                  <h4 className="text-base font-serif font-black text-[#1a1a1a] flex items-center space-x-2">
+                                    <span>{note.stockName}</span>
+                                  </h4>
+                                  <span className="text-[10px] font-mono text-gray-500 block">
+                                    Logged on {note.date} &bull; Setup: <strong className="text-[#1a1a1a]">{note.setupType}</strong>
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Trade Status Badge */}
+                              <span className={`text-[10px] font-mono font-bold px-2.5 py-1 uppercase border ${statusObj.badge}`}>
+                                {statusObj.label}
+                              </span>
+                            </div>
+
+                            {/* Emotional State & Execution Rating */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 bg-[#f9f8f5] p-3 border border-[#e5e4e1] text-xs font-mono">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-gray-500 uppercase text-[10px]">Emotional State:</span>
+                                <span className={`px-2.5 py-0.5 text-[10px] font-bold uppercase border flex items-center space-x-1 ${emotionObj.color}`}>
+                                  <span>{emotionObj.icon}</span>
+                                  <span>{emotionObj.label}</span>
+                                </span>
+                              </div>
+
+                              <div className="flex items-center space-x-1">
+                                <span className="text-gray-500 text-[10px] uppercase">Rating:</span>
+                                <div className="flex items-center">
+                                  {Array.from({ length: 5 }).map((_, i) => (
+                                    <Star
+                                      key={i}
+                                      className={`w-3.5 h-3.5 ${
+                                        i < note.rating ? 'text-amber-500 fill-current' : 'text-gray-300'
+                                      }`}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Entry / Exit Prices if available */}
+                            {(note.entryPrice !== undefined || note.exitPrice !== undefined) && (
+                              <div className="flex items-center space-x-6 text-xs font-mono pt-1">
+                                {note.entryPrice !== undefined && (
+                                  <div>
+                                    <span className="text-gray-500 uppercase text-[9px] block">Entry Price</span>
+                                    <strong className="text-[#1a1a1a] font-bold">{formatCurrency(note.entryPrice, currency)}</strong>
+                                  </div>
+                                )}
+                                {note.exitPrice !== undefined && (
+                                  <div>
+                                    <span className="text-gray-500 uppercase text-[9px] block">Exit Price</span>
+                                    <strong className="text-emerald-700 font-bold">{formatCurrency(note.exitPrice, currency)}</strong>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Trade Notes */}
+                            <div className="space-y-1 pt-1">
+                              <span className="text-[10px] uppercase font-bold text-gray-500 font-mono tracking-wider block">
+                                Trade Rationale & Notes:
+                              </span>
+                              <p className="text-xs font-sans text-gray-700 leading-relaxed bg-gray-50 p-3 border border-gray-200">
+                                {note.notes}
+                              </p>
+                            </div>
+
+                            {/* VCP Chart Snapshot Thumbnail if available */}
+                            {note.chartSnapshotUrl && (
+                              <div className="space-y-1 pt-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] uppercase font-bold text-gray-600 font-mono tracking-wider flex items-center space-x-1">
+                                    <Camera className="w-3 h-3 text-blue-600" />
+                                    <span>VCP Chart Snapshot:</span>
+                                  </span>
+                                  <button
+                                    onClick={() => setLightboxSnapshot(note.chartSnapshotUrl || null)}
+                                    className="text-[10px] font-bold text-blue-700 hover:underline flex items-center space-x-1 cursor-pointer"
+                                  >
+                                    <Maximize2 className="w-3 h-3" />
+                                    <span>Enlarge Chart</span>
+                                  </button>
+                                </div>
+                                <div
+                                  onClick={() => setLightboxSnapshot(note.chartSnapshotUrl || null)}
+                                  className="cursor-pointer border border-[#e5e4e1] bg-[#0f172a] p-1 rounded overflow-hidden hover:opacity-95 transition-all shadow-xs"
+                                >
+                                  <img
+                                    src={note.chartSnapshotUrl}
+                                    alt={`${note.ticker} VCP Snapshot`}
+                                    className="w-full h-28 object-contain"
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Key Lesson / Takeaway */}
+                            <div className="space-y-1 pt-1">
+                              <span className="text-[10px] uppercase font-bold text-amber-800 font-mono tracking-wider flex items-center space-x-1">
+                                <Sparkles className="w-3 h-3 text-amber-600" />
+                                <span>Key Lesson / Takeaway:</span>
+                              </span>
+                              <p className="text-xs font-serif italic text-amber-950 bg-amber-50/70 p-3 border border-amber-200">
+                                "{note.keyLesson}"
+                              </p>
+                            </div>
+
+                          </div>
+
+                          {/* Card Footer Actions */}
+                          <div className="flex items-center justify-between pt-4 border-t border-[#e5e4e1] text-xs font-mono mt-4">
+                            <div className="flex items-center space-x-2">
+                              {matchingStock && (
+                                <button
+                                  onClick={() => {
+                                    if (onSelectStock) onSelectStock(matchingStock);
+                                    if (onViewChart) onViewChart(matchingStock);
+                                  }}
+                                  className="text-blue-700 font-bold hover:underline flex items-center space-x-1"
+                                >
+                                  <TrendingUp className="w-3.5 h-3.5" />
+                                  <span>View Ticker Chart</span>
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => handleOpenEditModal(note)}
+                                className="bg-white hover:bg-gray-100 text-[#1a1a1a] p-2 border border-[#e5e4e1] transition-all flex items-center space-x-1 font-bold text-[11px]"
+                                title="Edit Note"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteNote(note.id)}
+                                className="bg-white hover:bg-red-50 text-red-600 p-2 border border-[#e5e4e1] transition-all flex items-center space-x-1 font-bold text-[11px]"
+                                title="Delete Note"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Delete</span>
+                              </button>
+                            </div>
+                          </div>
+
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
