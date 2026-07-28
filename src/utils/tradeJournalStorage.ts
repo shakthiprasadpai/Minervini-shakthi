@@ -1,6 +1,46 @@
 import { TradeJournalNote } from '../types';
 
+export interface TradeGoals {
+  targetWinRate: number;
+  maxDrawdownLimit: number;
+  minRiskRewardRatio: number;
+  weeklyTradesTarget: number;
+  targetDisciplineScore: number;
+}
+
 const LOCAL_STORAGE_KEY = 'minervini_trade_journal_notes_v1';
+const STORAGE_GOALS_KEY = 'minervini_trade_goals_v1';
+
+const DEFAULT_TRADE_GOALS: TradeGoals = {
+  targetWinRate: 60,
+  maxDrawdownLimit: 5.0,
+  minRiskRewardRatio: 3.0,
+  weeklyTradesTarget: 5,
+  targetDisciplineScore: 4.5,
+};
+
+export function getStoredTradeGoals(): TradeGoals {
+  try {
+    const raw = localStorage.getItem(STORAGE_GOALS_KEY);
+    if (!raw) {
+      localStorage.setItem(STORAGE_GOALS_KEY, JSON.stringify(DEFAULT_TRADE_GOALS));
+      return DEFAULT_TRADE_GOALS;
+    }
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error('Error reading trade goals from localStorage:', err);
+    return DEFAULT_TRADE_GOALS;
+  }
+}
+
+export function saveStoredTradeGoals(goals: TradeGoals): void {
+  try {
+    localStorage.setItem(STORAGE_GOALS_KEY, JSON.stringify(goals));
+    window.dispatchEvent(new CustomEvent('minervini_goals_updated'));
+  } catch (err) {
+    console.error('Error saving trade goals to localStorage:', err);
+  }
+}
 
 const INITIAL_JOURNAL_NOTES: TradeJournalNote[] = [
   {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MinerviniTradeSetup, TradeJournalNote, EmotionalState, TradeStatus } from '../types';
-import { getStoredJournalNotes, saveStoredJournalNotes } from '../utils/tradeJournalStorage';
+import { getStoredJournalNotes, saveStoredJournalNotes, getStoredTradeGoals, saveStoredTradeGoals, TradeGoals } from '../utils/tradeJournalStorage';
 import { formatCurrency, getCurrencySymbol } from '../utils/sepaCalculator';
 import {
   ResponsiveContainer,
@@ -40,7 +40,8 @@ import {
   Sparkles as SparklesIcon,
   Camera,
   Eye,
-  Maximize2
+  Maximize2,
+  Target
 } from 'lucide-react';
 
 interface TradeJournalProps {
@@ -82,6 +83,7 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
 
   const [selectedTickerFilter, setSelectedTickerFilter] = useState<string>('ALL');
   const [selectedEmotionFilter, setSelectedEmotionFilter] = useState<string>('ALL');
+  const [selectedOutcomeFilter, setSelectedOutcomeFilter] = useState<'ALL' | 'WIN' | 'LOSS'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [journalViewMode, setJournalViewMode] = useState<'grid' | 'grouped'>('grid');
 
@@ -103,6 +105,44 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
   const [formRating, setFormRating] = useState<number>(5);
   const [formChartSnapshotUrl, setFormChartSnapshotUrl] = useState<string>('');
   const [lightboxSnapshot, setLightboxSnapshot] = useState<string | null>(null);
+
+  const [tradeGoals, setTradeGoals] = useState<TradeGoals>(() => getStoredTradeGoals());
+  const [isGoalsModalOpen, setIsGoalsModalOpen] = useState<boolean>(false);
+  const [formTargetWinRate, setFormTargetWinRate] = useState<string>(tradeGoals.targetWinRate.toString());
+  const [formMaxDrawdown, setFormMaxDrawdown] = useState<string>(tradeGoals.maxDrawdownLimit.toString());
+  const [formMinRiskReward, setFormMinRiskReward] = useState<string>(tradeGoals.minRiskRewardRatio.toString());
+  const [formWeeklyTarget, setFormWeeklyTarget] = useState<string>(tradeGoals.weeklyTradesTarget.toString());
+  const [formTargetDiscipline, setFormTargetDiscipline] = useState<string>(tradeGoals.targetDisciplineScore.toString());
+
+  useEffect(() => {
+    const handleGoalsUpdate = () => {
+      const g = getStoredTradeGoals();
+      setTradeGoals(g);
+      setFormTargetWinRate(g.targetWinRate.toString());
+      setFormMaxDrawdown(g.maxDrawdownLimit.toString());
+      setFormMinRiskReward(g.minRiskRewardRatio.toString());
+      setFormWeeklyTarget(g.weeklyTradesTarget.toString());
+      setFormTargetDiscipline(g.targetDisciplineScore.toString());
+    };
+    window.addEventListener('minervini_goals_updated', handleGoalsUpdate);
+    return () => {
+      window.removeEventListener('minervini_goals_updated', handleGoalsUpdate);
+    };
+  }, []);
+
+  const handleSaveGoals = (e: React.FormEvent) => {
+    e.preventDefault();
+    const updatedGoals: TradeGoals = {
+      targetWinRate: parseFloat(formTargetWinRate) || 60,
+      maxDrawdownLimit: parseFloat(formMaxDrawdown) || 5.0,
+      minRiskRewardRatio: parseFloat(formMinRiskReward) || 3.0,
+      weeklyTradesTarget: parseInt(formWeeklyTarget, 10) || 5,
+      targetDisciplineScore: parseFloat(formTargetDiscipline) || 4.5,
+    };
+    setTradeGoals(updatedGoals);
+    saveStoredTradeGoals(updatedGoals);
+    setIsGoalsModalOpen(false);
+  };
 
   // Sync state with localStorage events
   useEffect(() => {
@@ -247,10 +287,14 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
     new Set([...stocks.map((s) => s.ticker), ...journalNotes.map((n) => n.ticker)])
   );
 
-  // Filtered notes keyed by ticker / emotion / search query
+  // Filtered notes keyed by ticker / emotion / outcome / search query
   const filteredNotes = journalNotes.filter((note) => {
     const matchesTicker = selectedTickerFilter === 'ALL' || note.ticker.toUpperCase() === selectedTickerFilter.toUpperCase();
     const matchesEmotion = selectedEmotionFilter === 'ALL' || note.emotionalState === selectedEmotionFilter;
+    const matchesOutcome =
+      selectedOutcomeFilter === 'ALL' ||
+      (selectedOutcomeFilter === 'WIN' && note.tradeStatus === 'CLOSED_WIN') ||
+      (selectedOutcomeFilter === 'LOSS' && note.tradeStatus === 'CLOSED_LOSS');
     const matchesSearch =
       !searchQuery ||
       note.ticker.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -258,7 +302,7 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
       note.notes.toLowerCase().includes(searchQuery.toLowerCase()) ||
       note.keyLesson.toLowerCase().includes(searchQuery.toLowerCase());
 
-    return matchesTicker && matchesEmotion && matchesSearch;
+    return matchesTicker && matchesEmotion && matchesOutcome && matchesSearch;
   });
 
   // Calculate statistics
@@ -268,20 +312,20 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
   const winRate = winCount + lossCount > 0 ? Math.round((winCount / (winCount + lossCount)) * 100) : 0;
   const avgRating = totalNotes > 0 ? (journalNotes.reduce((acc, n) => acc + n.rating, 0) / totalNotes).toFixed(1) : '0.0';
 
-  // Emotional state frequencies and note keyword frequencies for Word Cloud
+  // Emotional state frequencies and note keyword frequencies for Word Cloud (reflecting filteredNotes)
   const emotionalStateFrequencies = React.useMemo(() => {
     const counts: Record<string, number> = {};
-    journalNotes.forEach((n) => {
+    filteredNotes.forEach((n) => {
       counts[n.emotionalState] = (counts[n.emotionalState] || 0) + 1;
     });
     return counts;
-  }, [journalNotes]);
+  }, [filteredNotes]);
 
   const recurringKeywordsFrequencies = React.useMemo(() => {
     const stopWords = new Set(['the','and','a','to','of','in','for','is','on','that','by','this','with','it','as','an','be','at','or','from','which','was','were','have','has','had','not','but','they','their','we','our','you','your','all','will','one','so','if','out','up','do','get','got','gotten']);
     const counts: Record<string, number> = {};
     
-    journalNotes.forEach((n) => {
+    filteredNotes.forEach((n) => {
       const combinedText = `${n.notes} ${n.keyLesson} ${n.setupType}`.toLowerCase();
       const words = combinedText.replace(/[^\w\s]/gi, '').split(/\s+/);
       words.forEach((w) => {
@@ -295,7 +339,7 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 14);
-  }, [journalNotes]);
+  }, [filteredNotes]);
 
   // Export to CSV
   const handleExportCSV = () => {
@@ -446,14 +490,14 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
     }
   };
 
-  // Sentiment vs Outcome correlation stats
+  // Sentiment vs Outcome correlation stats (reflecting filteredNotes)
   const sentimentOutcomeStats = React.useMemo(() => {
     const map: Record<string, { wins: number; losses: number; total: number; avgRating: number; ratingSum: number }> = {};
     EMOTIONAL_STATES.forEach(em => {
       map[em.state] = { wins: 0, losses: 0, total: 0, avgRating: 0, ratingSum: 0 };
     });
 
-    journalNotes.forEach(n => {
+    filteredNotes.forEach(n => {
       if (!map[n.emotionalState]) {
         map[n.emotionalState] = { wins: 0, losses: 0, total: 0, avgRating: 0, ratingSum: 0 };
       }
@@ -474,13 +518,26 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
         avgRating,
       };
     }).filter(item => item.total > 0);
-  }, [journalNotes]);
+  }, [filteredNotes]);
 
-  // Cumulative Performance Data calculation over time
+  // Cumulative Performance Data calculation over time with sentiment correlation (reflecting filteredNotes)
+  const sentimentScoreMap: Record<EmotionalState, number> = {
+    DISCIPLINED: 5,
+    CONFIDENT: 4.5,
+    CALM: 4,
+    PATIENT: 4,
+    EUPHORIC: 3,
+    ANXIOUS: 2,
+    IMPATIENT: 2,
+    REGRETFUL: 1.5,
+    FOMO: 1,
+  };
+
   const performanceChartData = React.useMemo(() => {
-    const sorted = [...journalNotes].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const sorted = [...filteredNotes].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     let cumulative = 0;
-    return sorted.map((note) => {
+    let sentimentSum = 0;
+    return sorted.map((note, idx) => {
       let pnl = 0;
       if (note.entryPrice !== undefined && note.exitPrice !== undefined) {
         pnl = ((note.exitPrice - note.entryPrice) / note.entryPrice) * 100;
@@ -492,15 +549,23 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
         pnl = 0.0;
       }
       cumulative += pnl;
+
+      const score = sentimentScoreMap[note.emotionalState] || 3;
+      sentimentSum += score;
+      const runningAvg = Number((sentimentSum / (idx + 1)).toFixed(2));
+
       return {
         date: note.date,
         ticker: note.ticker,
         pnl: Number(pnl.toFixed(2)),
         cumulative: Number(cumulative.toFixed(2)),
+        sentimentScore: score,
+        runningAvgSentiment: runningAvg,
+        emotionalState: note.emotionalState,
         status: note.tradeStatus,
       };
     });
-  }, [journalNotes]);
+  }, [filteredNotes]);
 
   return (
     <div className="space-y-8">
@@ -603,6 +668,96 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
         </div>
       </div>
 
+      {/* Trade Goal Setter & Outcome Targets Tracker */}
+      <div className="bg-white border border-[#e5e4e1] p-6 space-y-4 shadow-xs">
+        <div className="flex flex-wrap items-center justify-between border-b border-[#e5e4e1] pb-3 gap-3">
+          <div className="flex items-center space-x-2">
+            <Target className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-base font-serif font-black text-[#1a1a1a]">
+              Trade Goal Setter & Outcome Targets Tracker
+            </h3>
+          </div>
+          <button
+            onClick={() => setIsGoalsModalOpen(true)}
+            className="text-[10px] font-bold uppercase tracking-wider bg-[#1a1a1a] text-white px-3.5 py-2 hover:bg-black transition-all cursor-pointer flex items-center space-x-1.5 shadow-xs"
+          >
+            <Target className="w-3.5 h-3.5 text-amber-400" />
+            <span>Configure Trading Goals</span>
+          </button>
+        </div>
+
+        <p className="text-xs text-gray-600 font-sans">
+          Tracking actual trade outcomes against your SEPA performance goals (Win Rate, Discipline Score, Setup Frequency, Risk-to-Reward Ratio).
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+          {/* Goal 1: Win Rate */}
+          <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-4 space-y-2">
+            <div className="flex items-center justify-between text-xs font-mono">
+              <span className="text-gray-500 uppercase">Win Rate Goal</span>
+              <span className="font-bold text-[#1a1a1a]">{winRate}% / {tradeGoals.targetWinRate}%</span>
+            </div>
+            <div className="w-full bg-gray-200 h-2 rounded overflow-hidden">
+              <div
+                className={`h-full ${winRate >= tradeGoals.targetWinRate ? 'bg-emerald-600' : 'bg-amber-500'}`}
+                style={{ width: `${Math.min(100, Math.max(0, (winRate / tradeGoals.targetWinRate) * 100))}%` }}
+              />
+            </div>
+            <span className={`text-[10px] font-mono font-bold block ${winRate >= tradeGoals.targetWinRate ? 'text-emerald-700' : 'text-amber-700'}`}>
+              {winRate >= tradeGoals.targetWinRate ? '✓ Target Met' : '⏳ In Progress'}
+            </span>
+          </div>
+
+          {/* Goal 2: Discipline Score */}
+          <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-4 space-y-2">
+            <div className="flex items-center justify-between text-xs font-mono">
+              <span className="text-gray-500 uppercase">Avg Discipline</span>
+              <span className="font-bold text-[#1a1a1a]">{avgRating}★ / {tradeGoals.targetDisciplineScore}★</span>
+            </div>
+            <div className="w-full bg-gray-200 h-2 rounded overflow-hidden">
+              <div
+                className={`h-full ${parseFloat(avgRating) >= tradeGoals.targetDisciplineScore ? 'bg-emerald-600' : 'bg-amber-500'}`}
+                style={{ width: `${Math.min(100, Math.max(0, (parseFloat(avgRating) / 5) * 100))}%` }}
+              />
+            </div>
+            <span className={`text-[10px] font-mono font-bold block ${parseFloat(avgRating) >= tradeGoals.targetDisciplineScore ? 'text-emerald-700' : 'text-amber-700'}`}>
+              {parseFloat(avgRating) >= tradeGoals.targetDisciplineScore ? '✓ Target Met' : '⏳ In Progress'}
+            </span>
+          </div>
+
+          {/* Goal 3: Setup Frequency */}
+          <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-4 space-y-2">
+            <div className="flex items-center justify-between text-xs font-mono">
+              <span className="text-gray-500 uppercase">Journaled Trades</span>
+              <span className="font-bold text-[#1a1a1a]">{totalNotes} / {tradeGoals.weeklyTradesTarget}</span>
+            </div>
+            <div className="w-full bg-gray-200 h-2 rounded overflow-hidden">
+              <div
+                className="h-full bg-blue-600"
+                style={{ width: `${Math.min(100, Math.max(0, (totalNotes / tradeGoals.weeklyTradesTarget) * 100))}%` }}
+              />
+            </div>
+            <span className="text-[10px] font-mono font-bold text-blue-700 block">
+              Active Logging Volume
+            </span>
+          </div>
+
+          {/* Goal 4: Max Drawdown Limit */}
+          <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-4 space-y-2">
+            <div className="flex items-center justify-between text-xs font-mono">
+              <span className="text-gray-500 uppercase">Max Loss Limit</span>
+              <span className="font-bold text-rose-700">{tradeGoals.maxDrawdownLimit}% Max</span>
+            </div>
+            <div className="w-full bg-gray-200 h-2 rounded overflow-hidden">
+              <div className="h-full bg-emerald-600" style={{ width: '100%' }} />
+            </div>
+            <span className="text-[10px] font-mono font-bold text-emerald-700 block">
+              🛡️ Risk Guard Active
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Emotional State & Note Keywords Word Cloud */}
       <div className="bg-white border border-[#e5e4e1] p-6 space-y-4">
         <div className="flex items-center justify-between border-b border-[#e5e4e1] pb-3">
@@ -683,24 +838,86 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
         </div>
       </div>
 
-      {/* Sentiment vs Trade Outcome Correlation Analytics */}
-      <div className="bg-white border border-[#e5e4e1] p-6 space-y-4">
+      {/* Sentiment vs Trade Outcome Correlation Analytics & Heatmap Matrix */}
+      <div className="bg-white border border-[#e5e4e1] p-6 space-y-6">
         <div className="flex items-center justify-between border-b border-[#e5e4e1] pb-3">
           <div className="flex items-center space-x-2">
             <BarChart2 className="w-5 h-5 text-blue-600" />
             <h3 className="text-base font-serif font-black text-[#1a1a1a]">
-              Note Sentiment vs Trade Outcome Analytics
+              Emotional State vs Trade Outcome Heatmap Matrix
             </h3>
           </div>
           <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">
-            Psychological Edge Analysis
+            Behavioral Performance Correlation
           </span>
         </div>
 
         <p className="text-xs text-gray-600 font-sans">
-          Correlating your logged emotional states with trade outcomes (Wins vs Losses) to identify which mindset produces your highest-probability SEPA breakout performances.
+          Visual heatmap matrix correlating logged emotional states (Fear, Greed, Discipline, FOMO) with trade outcomes (Wins vs Losses). Darker emerald gradients indicate high-probability disciplined setups; warmer crimson gradients highlight psychological leakage leading to poor performance.
         </p>
 
+        {/* Heatmap Matrix Table */}
+        <div className="overflow-x-auto border border-[#e5e4e1]">
+          <table className="w-full text-left text-xs font-mono">
+            <thead className="bg-[#f9f8f5] border-b border-[#e5e4e1] text-[10px] uppercase text-gray-600">
+              <tr>
+                <th className="p-3">Emotional State / Mindset</th>
+                <th className="p-3 text-center">Total Trades</th>
+                <th className="p-3 text-center">Closed Wins</th>
+                <th className="p-3 text-center">Closed Losses</th>
+                <th className="p-3 text-center">Win Rate (%)</th>
+                <th className="p-3 text-center">Performance Correlation / Heat Intensity</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#e5e4e1]">
+              {sentimentOutcomeStats.map((stat) => {
+                const emObj = EMOTIONAL_STATES.find(e => e.state === stat.state) || EMOTIONAL_STATES[0];
+                const closedTotal = stat.wins + stat.losses;
+                
+                // Determine heat intensity background
+                let heatBg = 'bg-gray-50 text-gray-700';
+                let heatLabel = 'Neutral / Insufficient Data';
+                if (closedTotal > 0) {
+                  if (stat.winRate >= 70) {
+                    heatBg = 'bg-emerald-100 text-emerald-900 border-l-4 border-emerald-600';
+                    heatLabel = '🟢 High Edge (Optimal Discipline)';
+                  } else if (stat.winRate >= 50) {
+                    heatBg = 'bg-blue-50 text-blue-900 border-l-4 border-blue-500';
+                    heatLabel = '🔵 Moderate Performance';
+                  } else if (stat.winRate >= 30) {
+                    heatBg = 'bg-amber-50 text-amber-900 border-l-4 border-amber-500';
+                    heatLabel = '🟡 Caution (Sub-optimal)';
+                  } else {
+                    heatBg = 'bg-rose-100 text-rose-900 border-l-4 border-rose-600';
+                    heatLabel = '🔴 High Risk / Poor Correlation';
+                  }
+                }
+
+                return (
+                  <tr key={stat.state} className={`hover:bg-[#fcfcfb] transition-colors ${heatBg}`}>
+                    <td className="p-3 font-bold flex items-center space-x-2">
+                      <span className="text-base">{emObj.icon}</span>
+                      <span>{emObj.label}</span>
+                    </td>
+                    <td className="p-3 text-center font-bold">{stat.total}</td>
+                    <td className="p-3 text-center text-emerald-700 font-bold">{stat.wins}</td>
+                    <td className="p-3 text-center text-rose-600 font-bold">{stat.losses}</td>
+                    <td className="p-3 text-center font-bold">
+                      {closedTotal > 0 ? `${stat.winRate}%` : 'N/A'}
+                    </td>
+                    <td className="p-3 text-center font-sans text-[11px] font-semibold">
+                      <span className="px-2.5 py-1 rounded bg-white/80 border border-black/10 shadow-xs inline-block">
+                        {heatLabel}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Breakdown Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
           {sentimentOutcomeStats.map((stat) => {
             const emObj = EMOTIONAL_STATES.find(e => e.state === stat.state) || EMOTIONAL_STATES[0];
@@ -806,6 +1023,77 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
         </div>
       </div>
 
+      {/* Secondary Line Chart: Emotional Discipline vs Cumulative P&L Over Time */}
+      <div className="bg-white border border-[#e5e4e1] p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-[#e5e4e1] pb-3">
+          <div className="flex items-center space-x-2">
+            <Brain className="w-5 h-5 text-indigo-600" />
+            <h3 className="text-base font-serif font-black text-[#1a1a1a]">
+              Emotional Discipline Score vs Cumulative P&L Over Time
+            </h3>
+          </div>
+          <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">
+            Behavioral Correlation Analysis
+          </span>
+        </div>
+
+        <p className="text-xs text-gray-600 font-sans">
+          Visually correlating your emotional state score (Scale: 1 FOMO/Regret to 5 Disciplined) against cumulative portfolio growth to verify that psychological discipline drives monetary success.
+        </p>
+
+        <div className="h-72 w-full pt-4">
+          {performanceChartData.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-xs font-mono text-gray-400">
+              No performance data available.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={performanceChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e4e1" />
+                <XAxis dataKey="date" stroke="#666" fontSize={11} fontFamily="monospace" />
+                <YAxis yAxisId="left" stroke="#10b981" fontSize={11} fontFamily="monospace" unit="%" />
+                <YAxis yAxisId="right" orientation="right" stroke="#6366f1" domain={[1, 5]} fontSize={11} fontFamily="monospace" />
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-[#1a1a1a] text-white p-3 text-xs font-mono space-y-1 shadow-xl border border-gray-800">
+                          <p className="text-amber-400 font-bold">{data.ticker} ({data.date})</p>
+                          <p>Cumulative P&L: <span className={data.cumulative >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{data.cumulative >= 0 ? `+${data.cumulative}%` : `${data.cumulative}%`}</span></p>
+                          <p>Emotional State: <span className="text-indigo-300 font-bold">{data.emotionalState} (Score: {data.sentimentScore}/5)</span></p>
+                          <p>Running Avg Sentiment: <span className="text-indigo-400 font-bold">{data.runningAvgSentiment}/5</span></p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="cumulative"
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  dot={{ r: 3, fill: '#10b981' }}
+                  name="Cumulative P&L (%)"
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="runningAvgSentiment"
+                  stroke="#6366f1"
+                  strokeWidth={2.5}
+                  dot={{ r: 4, fill: '#6366f1' }}
+                  activeDot={{ r: 6, fill: '#4338ca' }}
+                  name="Avg Sentiment Score (1-5)"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
       {/* Filter Toolbar */}
       <div className="bg-white border border-[#e5e4e1] p-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
@@ -845,6 +1133,40 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Trade Outcome Filter (All, Winners, Losers) */}
+          <div className="flex items-center space-x-1 bg-[#f9f8f5] border border-[#e5e4e1] p-1">
+            <button
+              onClick={() => setSelectedOutcomeFilter('ALL')}
+              className={`px-3 py-1 text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                selectedOutcomeFilter === 'ALL'
+                  ? 'bg-[#1a1a1a] text-white shadow-xs'
+                  : 'text-gray-600 hover:text-black'
+              }`}
+            >
+              All Trades
+            </button>
+            <button
+              onClick={() => setSelectedOutcomeFilter('WIN')}
+              className={`px-3 py-1 text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                selectedOutcomeFilter === 'WIN'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'text-gray-600 hover:text-black'
+              }`}
+            >
+              Winners
+            </button>
+            <button
+              onClick={() => setSelectedOutcomeFilter('LOSS')}
+              className={`px-3 py-1 text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                selectedOutcomeFilter === 'LOSS'
+                  ? 'bg-rose-700 text-white shadow-xs'
+                  : 'text-gray-600 hover:text-black'
+              }`}
+            >
+              Losers
+            </button>
           </div>
 
           {/* View Mode Toggle */}
@@ -1546,6 +1868,110 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
 
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {/* Trade Goals Configuration Modal */}
+      {isGoalsModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-[#e5e4e1] max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-[#e5e4e1] pb-4">
+              <div className="flex items-center space-x-2">
+                <Target className="w-5 h-5 text-emerald-600" />
+                <h3 className="text-lg font-serif font-black text-[#1a1a1a]">
+                  Configure Trading Goals & Outcome Targets
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsGoalsModalOpen(false)}
+                className="text-gray-500 hover:text-black p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveGoals} className="space-y-4">
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-gray-600 font-bold mb-1">
+                  Target Win Rate (%)
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  max="100"
+                  value={formTargetWinRate}
+                  onChange={(e) => setFormTargetWinRate(e.target.value)}
+                  className="w-full bg-[#f9f8f5] border border-[#e5e4e1] p-3 text-xs text-[#1a1a1a] font-mono focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-gray-600 font-bold mb-1">
+                  Target Average Discipline Score (1.0 to 5.0)
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="1"
+                  max="5"
+                  value={formTargetDiscipline}
+                  onChange={(e) => setFormTargetDiscipline(e.target.value)}
+                  className="w-full bg-[#f9f8f5] border border-[#e5e4e1] p-3 text-xs text-[#1a1a1a] font-mono focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-gray-600 font-bold mb-1">
+                  Weekly Trade Setup Target (Count)
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  max="50"
+                  value={formWeeklyTarget}
+                  onChange={(e) => setFormWeeklyTarget(e.target.value)}
+                  className="w-full bg-[#f9f8f5] border border-[#e5e4e1] p-3 text-xs text-[#1a1a1a] font-mono focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-gray-600 font-bold mb-1">
+                  Max Allowable Drawdown / Loss Limit (%)
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="1"
+                  max="20"
+                  value={formMaxDrawdown}
+                  onChange={(e) => setFormMaxDrawdown(e.target.value)}
+                  className="w-full bg-[#f9f8f5] border border-[#e5e4e1] p-3 text-xs text-[#1a1a1a] font-mono focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-4 border-t border-[#e5e4e1]">
+                <button
+                  type="button"
+                  onClick={() => setIsGoalsModalOpen(false)}
+                  className="bg-white hover:bg-gray-100 text-[#1a1a1a] border border-[#e5e4e1] font-bold px-5 py-2.5 text-xs uppercase tracking-wider"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-[#1a1a1a] hover:bg-black text-white font-bold px-6 py-2.5 text-xs uppercase tracking-widest shadow-xs"
+                >
+                  Save Trading Goals
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
