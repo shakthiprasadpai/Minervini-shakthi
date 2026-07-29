@@ -3,6 +3,7 @@ import { MinerviniTradeSetup, PricePoint } from '../types';
 import { formatCurrency, formatVolume, getCurrencySymbol, evaluateTrendTemplate } from '../utils/sepaCalculator';
 import { PineScriptExporter } from './PineScriptExporter';
 import { LorentzianClassification } from './LorentzianClassification';
+import { VcpTemplateOverlay } from './VcpTemplateOverlay';
 import {
   ComposedChart,
   Line,
@@ -797,6 +798,9 @@ export const VcpChart: React.FC<VcpChartProps> = ({ stock }) => {
           <strong className="text-[#1a1a1a] font-sans not-italic">How to read this chart:</strong> Hover over any node dot on the line chart or click any node pill above to reveal specific price, volume, and contraction depth metadata. Look for sequential contractions (T1, T2, T3) where price swings get narrower. Notice how the volume bars turn <span className="text-[#1a1a1a] font-bold font-sans">solid black</span> near the right side as volume dries up to <span className="text-[#1a1a1a] font-bold font-sans">{stock.volumeDryUpPercent}%</span> below average. Buy immediately as price breaks above the green dashed line <span className="text-green-700 font-bold font-sans">({currencySymbol}{stock.pivotPrice.toFixed(2)})</span> on expanding volume!
         </p>
       </div>
+
+      {/* Summary Overlay Listing Contractions & Historical VCP Success Templates */}
+      <VcpTemplateOverlay stock={stock} />
 
       {/* Lorentzian Classification Machine Learning Component by Ankur Jain */}
       <LorentzianClassification stock={stock} />
