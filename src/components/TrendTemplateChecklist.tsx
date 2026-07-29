@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { MinerviniTradeSetup } from '../types';
 import { evaluateTrendTemplate } from '../utils/sepaCalculator';
-import { CheckCircle2, XCircle, ShieldCheck, AlertCircle, Info, Code, Copy, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle2, XCircle, ShieldCheck, AlertCircle, Info, Code, Copy, Check, ChevronDown, ChevronUp, Award, Zap } from 'lucide-react';
 import { PineScriptExporter, PINE_SCRIPT_CODE } from './PineScriptExporter';
 import { HistoricalBacktestPanel } from './HistoricalBacktestPanel';
 
@@ -12,6 +12,18 @@ interface TrendTemplateChecklistProps {
 export const TrendTemplateChecklist: React.FC<TrendTemplateChecklistProps> = ({ stock }) => {
   const { rules, passedCount } = evaluateTrendTemplate(stock);
   const isPerfectScore = passedCount === 8;
+  const setupQualityScore = Math.round((passedCount / rules.length) * 100);
+
+  const getQualityGrade = (score: number) => {
+    if (score === 100) return { grade: 'A+', label: 'Institutional Stage 2', color: 'text-emerald-400 bg-emerald-950/80 border-emerald-500' };
+    if (score >= 87) return { grade: 'A', label: 'High Probability Setup', color: 'text-emerald-300 bg-emerald-900/60 border-emerald-500' };
+    if (score >= 75) return { grade: 'B', label: 'Developing Trend', color: 'text-amber-300 bg-amber-950/80 border-amber-500' };
+    if (score >= 50) return { grade: 'C', label: 'Sub-Optimal Trend', color: 'text-orange-300 bg-orange-950/80 border-orange-500' };
+    return { grade: 'F', label: 'Unqualified / High Risk', color: 'text-rose-300 bg-rose-950/80 border-rose-500' };
+  };
+
+  const qualityInfo = getQualityGrade(setupQualityScore);
+
   const [isPineModalOpen, setIsPineScriptModalOpen] = useState(false);
   const [showCodePreview, setShowCodePreview] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -63,6 +75,68 @@ export const TrendTemplateChecklist: React.FC<TrendTemplateChecklistProps> = ({ 
             <span>
               {isPerfectScore ? 'QUALIFIED STAGE 2 (8/8)' : `PASSES ${passedCount}/8 CRITERIA`}
             </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Setup Quality Score Card */}
+      <div className="bg-[#0f141c] text-white border border-gray-800 p-5 space-y-4 font-mono shadow-md">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-800 pb-4">
+          <div className="flex items-center space-x-3">
+            <div className="w-11 h-11 bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 font-bold shrink-0">
+              <Award className="w-6 h-6 text-amber-400" />
+            </div>
+            <div>
+              <span className="text-[10px] uppercase font-mono tracking-[0.2em] font-bold text-amber-400 block">
+                SEPA Quantitative Evaluation
+              </span>
+              <h4 className="text-base font-serif font-black text-white mt-0.5">
+                Setup Quality Score
+              </h4>
+              <p className="text-xs text-gray-400 font-sans mt-0.5">
+                0–100 Rating calculated from 8 Minervini Trend Template rules
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-4">
+            {/* Numeric Score Readout */}
+            <div className="text-right">
+              <span className="text-[10px] text-gray-400 uppercase tracking-widest block font-mono">Quality Score</span>
+              <div className="flex items-baseline space-x-1">
+                <span className="text-3xl font-black text-amber-400 font-mono leading-none">{setupQualityScore}</span>
+                <span className="text-sm text-gray-400 font-bold">/ 100</span>
+              </div>
+            </div>
+
+            {/* Quality Grade Badge */}
+            <div className={`px-3.5 py-2 border text-center font-bold ${qualityInfo.color}`}>
+              <span className="text-lg font-black block leading-none">{qualityInfo.grade}</span>
+              <span className="text-[9px] font-sans tracking-wider uppercase block mt-1">{qualityInfo.label}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Progress Bar & Rule Count Status */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center text-xs text-gray-300">
+            <span className="font-sans text-gray-400">Rule Pass Rate: <strong className="text-white font-mono">{passedCount} / {rules.length} Criteria Passed</strong></span>
+            <span className="font-mono font-bold text-amber-300">{setupQualityScore}% Quality Score</span>
+          </div>
+
+          <div className="w-full bg-gray-800 h-2.5 rounded-none overflow-hidden border border-gray-700">
+            <div
+              className={`h-full transition-all duration-500 ${
+                setupQualityScore === 100
+                  ? 'bg-emerald-400'
+                  : setupQualityScore >= 87
+                  ? 'bg-emerald-500'
+                  : setupQualityScore >= 75
+                  ? 'bg-amber-400'
+                  : 'bg-rose-500'
+              }`}
+              style={{ width: `${setupQualityScore}%` }}
+            />
           </div>
         </div>
       </div>

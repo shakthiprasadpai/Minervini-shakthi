@@ -15,6 +15,12 @@ export interface VcpScanResult extends MinerviniTradeSetup {
   contractionPercent: number;
   tightnessLevel: 'Ultra-Tight (<3%)' | 'Moderate (3-6%)' | 'Wide (>6%)';
   barCount: number;
+  // 3-Week VCP Tightness & Base Completion Metrics
+  threeWeekHigh: number;
+  threeWeekLow: number;
+  threeWeekTightnessPct: number;
+  threeWeekBaseStatus: 'PRIMED (≤3.5%)' | 'COMPLETED (≤5%)' | 'BUILDING (>5%)';
+  isThreeWeekBaseCompleted: boolean;
 }
 
 export const VcpPatternScanner: React.FC<VcpPatternScannerProps> = ({
@@ -22,19 +28,19 @@ export const VcpPatternScanner: React.FC<VcpPatternScannerProps> = ({
   onSelectStock,
   onViewChart,
 }) => {
-  const [filterTightness, setFilterTightness] = useState<'all' | 'ultra_tight' | 'moderate'>('all');
-  const [sortBy, setSortBy] = useState<'tightness' | 'rs_rating' | 'price'>('tightness');
+  const [filterTightness, setFilterTightness] = useState<'all' | '3week_primed' | 'ultra_tight' | 'moderate'>('all');
+  const [sortBy, setSortBy] = useState<'tightness' | '3week_tightness' | 'rs_rating' | 'price'>('3week_tightness');
 
-  // Scan stocks and calculate 20-bar local high/low contraction
+  // Scan stocks and calculate 20-bar local high/low contraction & 3-week base tightness
   const scannedStocks: VcpScanResult[] = useMemo(() => {
     return stocks.map((stock) => {
       const history = stock.priceHistory || [];
       const slice20 = history.slice(-20);
-      const highs = slice20.length > 0 ? slice20.map((h) => h.high || h.close) : [stock.currentPrice * 1.05];
-      const lows = slice20.length > 0 ? slice20.map((l) => l.low || l.close) : [stock.currentPrice * 0.95];
+      const highs20 = slice20.length > 0 ? slice20.map((h) => h.high || h.close) : [stock.currentPrice * 1.05];
+      const lows20 = slice20.length > 0 ? slice20.map((l) => l.low || l.close) : [stock.currentPrice * 0.95];
 
-      const last20High = Math.max(...highs);
-      const last20Low = Math.min(...lows);
+      const last20High = Math.max(...highs20);
+      const last20Low = Math.min(...lows20);
       const contractionPercent = Number((((last20High - last20Low) / last20High) * 100).toFixed(2));
 
       let tightnessLevel: 'Ultra-Tight (<3%)' | 'Moderate (3-6%)' | 'Wide (>6%)' = 'Wide (>6%)';
@@ -44,27 +50,52 @@ export const VcpPatternScanner: React.FC<VcpPatternScannerProps> = ({
         tightnessLevel = 'Moderate (3-6%)';
       }
 
+      // Calculate 3-Week (15 trading days) Tightness
+      const slice15 = history.slice(-15);
+      const highs15 = slice15.length > 0 ? slice15.map((h) => h.high || h.close) : [stock.currentPrice * 1.04];
+      const lows15 = slice15.length > 0 ? slice15.map((l) => l.low || l.close) : [stock.currentPrice * 0.96];
+
+      const threeWeekHigh = Math.max(...highs15);
+      const threeWeekLow = Math.min(...lows15);
+      const threeWeekTightnessPct = Number((((threeWeekHigh - threeWeekLow) / threeWeekHigh) * 100).toFixed(2));
+
+      const isThreeWeekBaseCompleted = threeWeekTightnessPct <= 5.0;
+      let threeWeekBaseStatus: 'PRIMED (≤3.5%)' | 'COMPLETED (≤5%)' | 'BUILDING (>5%)' = 'BUILDING (>5%)';
+      if (threeWeekTightnessPct <= 3.5) {
+        threeWeekBaseStatus = 'PRIMED (≤3.5%)';
+      } else if (threeWeekTightnessPct <= 5.0) {
+        threeWeekBaseStatus = 'COMPLETED (≤5%)';
+      }
+
       return {
         ...stock,
         last20High,
         last20Low,
         contractionPercent,
         tightnessLevel,
-        barCount: slice20.length
+        barCount: slice20.length,
+        threeWeekHigh,
+        threeWeekLow,
+        threeWeekTightnessPct,
+        threeWeekBaseStatus,
+        isThreeWeekBaseCompleted,
       };
     });
   }, [stocks]);
 
   const filteredAndSortedStocks = useMemo(() => {
     let result = [...scannedStocks];
-    if (filterTightness === 'ultra_tight') {
+    if (filterTightness === '3week_primed') {
+      result = result.filter((s) => s.threeWeekTightnessPct <= 5.0);
+    } else if (filterTightness === 'ultra_tight') {
       result = result.filter((s) => s.contractionPercent <= 3.0);
     } else if (filterTightness === 'moderate') {
       result = result.filter((s) => s.contractionPercent > 3.0 && s.contractionPercent <= 6.0);
     }
 
     result.sort((a, b) => {
-      if (sortBy === 'tightness') return a.contractionPercent - b.contractionPercent; // tightest first
+      if (sortBy === '3week_tightness') return a.threeWeekTightnessPct - b.threeWeekTightnessPct; // tightest 3-week first
+      if (sortBy === 'tightness') return a.contractionPercent - b.contractionPercent; // tightest 20-bar first
       if (sortBy === 'rs_rating') return b.rsRating - a.rsRating;
       return b.currentPrice - a.currentPrice;
     });
@@ -72,6 +103,7 @@ export const VcpPatternScanner: React.FC<VcpPatternScannerProps> = ({
     return result;
   }, [scannedStocks, filterTightness, sortBy]);
 
+  const threeWeekPrimedCount = scannedStocks.filter((s) => s.threeWeekTightnessPct <= 5.0).length;
   const ultraTightCount = scannedStocks.filter((s) => s.contractionPercent <= 3.0).length;
   const moderateCount = scannedStocks.filter((s) => s.contractionPercent > 3.0 && s.contractionPercent <= 6.0).length;
 
@@ -122,6 +154,16 @@ export const VcpPatternScanner: React.FC<VcpPatternScannerProps> = ({
             All Stocks ({scannedStocks.length})
           </button>
           <button
+            onClick={() => setFilterTightness('3week_primed')}
+            className={`px-3 py-1.5 text-xs font-mono font-bold uppercase border transition-all ${
+              filterTightness === '3week_primed'
+                ? 'bg-purple-600 text-white border-purple-400 shadow-purple-500/20'
+                : 'bg-[#161b22] text-purple-300 border-[#30363d] hover:bg-[#21262d]'
+            }`}
+          >
+            ⚡ 3-Wk Base Primed ≤5% ({threeWeekPrimedCount})
+          </button>
+          <button
             onClick={() => setFilterTightness('ultra_tight')}
             className={`px-3 py-1.5 text-xs font-mono font-bold uppercase border transition-all ${
               filterTightness === 'ultra_tight'
@@ -129,7 +171,7 @@ export const VcpPatternScanner: React.FC<VcpPatternScannerProps> = ({
                 : 'bg-[#161b22] text-gray-300 border-[#30363d] hover:bg-[#21262d]'
             }`}
           >
-            Ultra-Tight &le;3% ({ultraTightCount})
+            Ultra-Tight ≤3% ({ultraTightCount})
           </button>
           <button
             onClick={() => setFilterTightness('moderate')}
@@ -150,10 +192,83 @@ export const VcpPatternScanner: React.FC<VcpPatternScannerProps> = ({
             onChange={(e) => setSortBy(e.target.value as any)}
             className="bg-[#161b22] text-white border border-[#30363d] px-3 py-1.5 font-mono text-xs focus:outline-none focus:border-amber-500"
           >
-            <option value="tightness">Contraction % (Tightest First)</option>
+            <option value="3week_tightness">⚡ 3-Week Range Tightness % (Tightest First)</option>
+            <option value="tightness">20-Bar Contraction % (Tightest First)</option>
             <option value="rs_rating">RS Rating (Highest First)</option>
             <option value="price">Current Price</option>
           </select>
+        </div>
+      </div>
+
+      {/* 3-Week VCP Base Completion Radar Summary Card */}
+      <div className="bg-[#110b24] border border-purple-800/80 p-5 space-y-4 text-white font-mono">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-purple-900/80 pb-3">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-purple-950 border border-purple-500/60 flex items-center justify-center text-amber-300 font-bold shrink-0">
+              <Activity className="w-5 h-5 text-amber-300" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-amber-400">
+                  3-Week Price Range Tightness Engine
+                </span>
+                <span className="bg-purple-950 border border-purple-600 text-purple-200 text-[9px] px-2 py-0.5 font-bold uppercase">
+                  VCP Base Completion Analysis
+                </span>
+              </div>
+              <h3 className="text-base font-serif font-black text-white mt-0.5">
+                VCP Final Contraction & Base Completion Readiness
+              </h3>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-3 text-xs">
+            <div className="bg-purple-950/80 border border-purple-700/80 px-3 py-1.5 font-bold text-amber-300">
+              <span>{threeWeekPrimedCount} / {scannedStocks.length} Stocks Primed (≤5.0% 3-Wk Range)</span>
+            </div>
+          </div>
+        </div>
+
+        <p className="text-xs text-purple-200/90 font-sans leading-relaxed">
+          <strong className="text-amber-300 font-mono">Minervini Base Completion Rule:</strong> Prior to an explosive pivot breakout, a stock enters its final contraction (T3 or T4 phase) where price movement dries up dramatically over the last <strong className="text-white">3 weeks (15 trading days)</strong>. A 3-week range tightness <strong className="text-emerald-400 font-mono">≤ 5.0%</strong> signals that supply overhang has been completely absorbed by institutional buyers.
+        </p>
+
+        {/* Top 3-Week Tightest Base Completion Candidates */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+          {scannedStocks
+            .sort((a, b) => a.threeWeekTightnessPct - b.threeWeekTightnessPct)
+            .slice(0, 3)
+            .map((topStock) => {
+              const currency = getCurrencySymbol(topStock.exchange);
+              return (
+                <div
+                  key={`top-3wk-${topStock.ticker}`}
+                  className="bg-[#090514] border border-purple-900 p-3 flex items-center justify-between hover:border-purple-500 transition-all cursor-pointer"
+                  onClick={() => {
+                    onSelectStock(topStock);
+                    onViewChart(topStock);
+                  }}
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <strong className="text-white font-bold">{topStock.ticker}</strong>
+                      <span className="text-[10px] text-purple-300/70">({topStock.exchange})</span>
+                    </div>
+                    <span className="text-[11px] text-gray-400 block font-sans truncate max-w-[140px]">{topStock.name}</span>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="flex items-baseline justify-end space-x-1">
+                      <strong className="text-emerald-400 text-sm font-extrabold">{topStock.threeWeekTightnessPct}%</strong>
+                      <span className="text-[9px] text-gray-400 font-bold">3-Wk Range</span>
+                    </div>
+                    <span className="text-[9px] uppercase font-bold text-amber-300 bg-purple-950 px-1.5 py-0.5 border border-purple-800 inline-block mt-0.5">
+                      {topStock.threeWeekBaseStatus}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
         </div>
       </div>
 
@@ -163,10 +278,10 @@ export const VcpPatternScanner: React.FC<VcpPatternScannerProps> = ({
           <thead>
             <tr className="bg-[#0e1117] text-gray-400 uppercase text-[10px] tracking-wider border-b border-[#30363d]">
               <th className="py-3 px-4 font-bold text-white">Stock / Ticker</th>
-              <th className="py-3 px-4 font-bold">20-Bar High</th>
-              <th className="py-3 px-4 font-bold">20-Bar Low</th>
-              <th className="py-3 px-4 font-bold">Contraction Range</th>
-              <th className="py-3 px-4 font-bold">Tightness Classification</th>
+              <th className="py-3 px-4 font-bold">⚡ 3-Wk Range Tightness</th>
+              <th className="py-3 px-4 font-bold">VCP Base Status</th>
+              <th className="py-3 px-4 font-bold">20-Bar High / Low</th>
+              <th className="py-3 px-4 font-bold">20-Bar Contraction</th>
               <th className="py-3 px-4 font-bold">RS Rating</th>
               <th className="py-3 px-4 font-bold text-right">Action / Chart</th>
             </tr>
@@ -175,6 +290,7 @@ export const VcpPatternScanner: React.FC<VcpPatternScannerProps> = ({
             {filteredAndSortedStocks.map((stock) => {
               const currency = getCurrencySymbol(stock.exchange);
               const isUltraTight = stock.contractionPercent <= 3.0;
+              const is3WkPrimed = stock.threeWeekTightnessPct <= 5.0;
 
               return (
                 <tr key={stock.ticker} className="hover:bg-[#21262d] transition-colors">
@@ -190,12 +306,45 @@ export const VcpPatternScanner: React.FC<VcpPatternScannerProps> = ({
                     </div>
                   </td>
 
-                  <td className="py-3.5 px-4 font-bold text-gray-200">
-                    {formatCurrency(stock.last20High, currency)}
+                  {/* 3-Week Range Tightness Column */}
+                  <td className="py-3.5 px-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <strong className={`font-extrabold text-sm ${is3WkPrimed ? 'text-purple-300' : 'text-gray-300'}`}>
+                          {stock.threeWeekTightnessPct}%
+                        </strong>
+                        <div className="w-16 bg-gray-800 h-2 rounded overflow-hidden">
+                          <div
+                            className={`h-full ${is3WkPrimed ? 'bg-purple-500' : 'bg-gray-600'}`}
+                            style={{ width: `${Math.min(100, stock.threeWeekTightnessPct * 10)}%` }}
+                          />
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-gray-400 block">
+                        3-Wk High: {formatCurrency(stock.threeWeekHigh, currency)} / Low: {formatCurrency(stock.threeWeekLow, currency)}
+                      </span>
+                    </div>
+                  </td>
+
+                  {/* VCP Base Status Column */}
+                  <td className="py-3.5 px-4">
+                    <span className={`px-2.5 py-1 text-[10px] font-bold uppercase border ${
+                      stock.threeWeekTightnessPct <= 3.5
+                        ? 'bg-purple-950 text-amber-300 border-purple-500 shadow-xs'
+                        : is3WkPrimed
+                        ? 'bg-teal-950 text-teal-300 border-teal-700'
+                        : 'bg-gray-900 text-gray-400 border-gray-800'
+                    }`}>
+                      {stock.threeWeekBaseStatus}
+                    </span>
                   </td>
 
                   <td className="py-3.5 px-4 font-bold text-gray-200">
-                    {formatCurrency(stock.last20Low, currency)}
+                    <div className="text-[11px]">
+                      <span className="text-emerald-400">H: {formatCurrency(stock.last20High, currency)}</span>
+                      <br />
+                      <span className="text-rose-400">L: {formatCurrency(stock.last20Low, currency)}</span>
+                    </div>
                   </td>
 
                   <td className="py-3.5 px-4">
@@ -203,23 +352,13 @@ export const VcpPatternScanner: React.FC<VcpPatternScannerProps> = ({
                       <strong className={`font-bold ${isUltraTight ? 'text-emerald-400' : 'text-amber-400'}`}>
                         {stock.contractionPercent}%
                       </strong>
-                      <div className="w-20 bg-gray-800 h-2 rounded overflow-hidden">
+                      <div className="w-16 bg-gray-800 h-2 rounded overflow-hidden">
                         <div
                           className={`h-full ${isUltraTight ? 'bg-emerald-500' : 'bg-amber-500'}`}
                           style={{ width: `${Math.min(100, stock.contractionPercent * 10)}%` }}
                         />
                       </div>
                     </div>
-                  </td>
-
-                  <td className="py-3.5 px-4">
-                    <span className={`px-2.5 py-1 text-[10px] font-bold uppercase border ${
-                      isUltraTight
-                        ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800'
-                        : 'bg-amber-950/60 text-amber-300 border-amber-800'
-                    }`}>
-                      {stock.tightnessLevel}
-                    </span>
                   </td>
 
                   <td className="py-3.5 px-4">

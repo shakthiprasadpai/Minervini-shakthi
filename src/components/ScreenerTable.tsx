@@ -8,6 +8,8 @@ import {
   Droplets,
   CheckCircle2,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   Flame,
   LayoutGrid,
   List,
@@ -21,7 +23,8 @@ import {
   Activity,
   ArrowUpRight,
   TrendingDown,
-  Layers
+  Layers,
+  Award
 } from 'lucide-react';
 
 interface ScreenerTableProps {
@@ -41,6 +44,16 @@ export interface VcpHeatmapInfo {
   barColor: string;
   label: string;
 }
+
+export type SortField =
+  | 'VCP_INTENSITY'
+  | 'TREND_SLOPE'
+  | 'DRY_UP'
+  | 'SEPA_SCORE'
+  | 'TICKER'
+  | 'RS_RATING'
+  | 'PRICE'
+  | 'CHANGE_PERCENT';
 
 export function calculateVcpHeatmap(stock: MinerviniTradeSetup): VcpHeatmapInfo {
   const dryUpAbs = Math.min(100, Math.abs(stock.volumeDryUpPercent || 0));
@@ -120,7 +133,43 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
   const [viewMode, setViewMode] = useState<'table' | 'heatmap' | 'sector_strength'>('table');
   const [highlightRows, setHighlightRows] = useState<boolean>(true);
-  const [sortBy, setSortBy] = useState<'VCP_INTENSITY' | 'TREND_SLOPE' | 'DRY_UP' | 'SEPA_SCORE' | 'TICKER'>('VCP_INTENSITY');
+  const [sortBy, setSortBy] = useState<SortField>('VCP_INTENSITY');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  const handleSort = (field: SortField) => {
+    if (sortBy === field) {
+      setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(field);
+      setSortOrder(field === 'TICKER' ? 'asc' : 'desc');
+    }
+  };
+
+  const renderSortHeader = (label: string, field: SortField, align: 'left' | 'center' | 'right' = 'left') => {
+    const isActive = sortBy === field;
+    return (
+      <th
+        onClick={() => handleSort(field)}
+        className={`py-3 px-2.5 cursor-pointer hover:bg-gray-200/80 transition-all select-none group ${
+          align === 'center' ? 'text-center' : align === 'right' ? 'text-right' : 'text-left'
+        } ${isActive ? 'bg-amber-100/80 text-black font-extrabold border-b-2 border-b-amber-500' : ''}`}
+        title={`Click to rank by ${label} (${isActive && sortOrder === 'desc' ? 'Ascending' : 'Descending'})`}
+      >
+        <div className={`inline-flex items-center space-x-1 ${align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start'}`}>
+          <span>{label}</span>
+          {isActive ? (
+            sortOrder === 'asc' ? (
+              <ChevronUp className="w-3.5 h-3.5 text-amber-600 font-bold shrink-0" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5 text-amber-600 font-bold shrink-0" />
+            )
+          ) : (
+            <ArrowUpDown className="w-3 h-3 text-gray-400 group-hover:text-gray-700 opacity-60 group-hover:opacity-100 transition-all shrink-0" />
+          )}
+        </div>
+      </th>
+    );
+  };
 
   // Filtering logic
   let filteredStocks = stocks.filter((stock) => {
@@ -145,21 +194,26 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
 
   // Sorting logic
   filteredStocks = [...filteredStocks].sort((a, b) => {
+    let diff = 0;
     if (sortBy === 'VCP_INTENSITY') {
-      const scoreA = calculateVcpHeatmap(a).score;
-      const scoreB = calculateVcpHeatmap(b).score;
-      return scoreB - scoreA;
+      diff = calculateVcpHeatmap(b).score - calculateVcpHeatmap(a).score;
+    } else if (sortBy === 'RS_RATING') {
+      diff = b.rsRating - a.rsRating;
+    } else if (sortBy === 'PRICE') {
+      diff = b.currentPrice - a.currentPrice;
+    } else if (sortBy === 'CHANGE_PERCENT') {
+      diff = b.changePercent - a.changePercent;
+    } else if (sortBy === 'TREND_SLOPE') {
+      diff = calculateTrendStrengthMeter(b).slopePercent - calculateTrendStrengthMeter(a).slopePercent;
+    } else if (sortBy === 'DRY_UP') {
+      diff = a.volumeDryUpPercent - b.volumeDryUpPercent; // Tightest first when desc
+    } else if (sortBy === 'SEPA_SCORE') {
+      diff = b.trendScore - a.trendScore;
+    } else if (sortBy === 'TICKER') {
+      diff = a.ticker.localeCompare(b.ticker);
     }
-    if (sortBy === 'TREND_SLOPE') {
-      return calculateTrendStrengthMeter(b).slopePercent - calculateTrendStrengthMeter(a).slopePercent;
-    }
-    if (sortBy === 'DRY_UP') {
-      return a.volumeDryUpPercent - b.volumeDryUpPercent; // Most negative (tightest) first
-    }
-    if (sortBy === 'SEPA_SCORE') {
-      return b.trendScore - a.trendScore;
-    }
-    return a.ticker.localeCompare(b.ticker);
+
+    return sortOrder === 'desc' ? diff : -diff;
   });
 
   return (
@@ -267,14 +321,20 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
             <span className="text-gray-500 font-bold uppercase text-[10px]">Sort By:</span>
             <select
               value={sortBy}
-              onChange={(e: any) => setSortBy(e.target.value)}
+              onChange={(e: any) => {
+                setSortBy(e.target.value as SortField);
+                setSortOrder('desc');
+              }}
               className="bg-white border border-[#e5e4e1] p-1 text-xs font-bold text-[#1a1a1a] focus:outline-none cursor-pointer"
             >
               <option value="VCP_INTENSITY">VCP Intensity Score</option>
+              <option value="RS_RATING">⭐ RS Rating (1-99 Highest)</option>
+              <option value="PRICE">Current Price ($ / ₹)</option>
+              <option value="CHANGE_PERCENT">Daily Change % (+/-)</option>
               <option value="TREND_SLOPE">200MA Trend Slope (Steepest First)</option>
               <option value="DRY_UP">Volume Dry-Up % (Tightest First)</option>
               <option value="SEPA_SCORE">SEPA Score (8/8)</option>
-              <option value="TICKER">Ticker Symbol</option>
+              <option value="TICKER">Ticker Symbol (A-Z)</option>
             </select>
           </div>
         </div>
@@ -341,23 +401,25 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-[#e5e4e1] text-[10px] uppercase tracking-[0.2em] text-[#b5a68d] font-bold bg-[#f9f8f5]">
-                <th className="py-3 px-3">Stock & Sector</th>
-                <th className="py-3 px-3">Price</th>
-                <th className="py-3 px-3 text-center">SEPA Score</th>
-                <th className="py-3 px-3 text-center">200MA Trend Strength</th>
-                <th className="py-3 px-3">Pattern / Stage</th>
-                <th className="py-3 px-3 text-center">VCP Contraction Heatmap</th>
-                <th className="py-3 px-3">Pivot Entry</th>
-                <th className="py-3 px-3">Stop Loss</th>
-                <th className="py-3 px-3">Target (+20%)</th>
-                <th className="py-3 px-3 text-center">R/R</th>
-                <th className="py-3 px-3 text-right">Action</th>
+                {renderSortHeader('Stock & Sector', 'TICKER')}
+                {renderSortHeader('Price', 'PRICE')}
+                {renderSortHeader('Chg %', 'CHANGE_PERCENT')}
+                {renderSortHeader('RS Rating', 'RS_RATING', 'center')}
+                {renderSortHeader('SEPA Score', 'SEPA_SCORE', 'center')}
+                {renderSortHeader('200MA Trend', 'TREND_SLOPE', 'center')}
+                <th className="py-3 px-2.5">Pattern / Stage</th>
+                {renderSortHeader('VCP Heatmap', 'VCP_INTENSITY', 'center')}
+                <th className="py-3 px-2.5">Pivot Entry</th>
+                <th className="py-3 px-2.5">Stop Loss</th>
+                <th className="py-3 px-2.5">Target (+20%)</th>
+                <th className="py-3 px-2.5 text-center">R/R</th>
+                <th className="py-3 px-2.5 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#e5e4e1] text-xs">
               {filteredStocks.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-8 text-center text-gray-500 font-serif italic text-sm">
+                  <td colSpan={13} className="py-8 text-center text-gray-500 font-serif italic text-sm">
                     No growth setups match the selected search or SEPA filter criteria.
                   </td>
                 </tr>
@@ -381,7 +443,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                       }`}
                     >
                       {/* Ticker & Exchange */}
-                      <td className="py-3.5 px-3">
+                      <td className="py-3.5 px-2.5">
                         <div className="flex items-center space-x-2">
                           <span className="font-extrabold text-sm text-[#1a1a1a] font-mono">
                             {stock.ticker}
@@ -390,19 +452,23 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                             {stock.exchange}
                           </span>
                         </div>
-                        <div className="text-[11px] text-gray-600 truncate max-w-[160px] mt-0.5 font-sans">
+                        <div className="text-[11px] text-gray-600 truncate max-w-[150px] mt-0.5 font-sans">
                           {stock.name}
                         </div>
                       </td>
 
-                      {/* Price & Change */}
-                      <td className="py-3.5 px-3 font-mono">
-                        <div className="font-bold text-[#1a1a1a]">
+                      {/* Price */}
+                      <td className="py-3.5 px-2.5 font-mono">
+                        <div className="font-bold text-[#1a1a1a] text-sm">
                           {formatCurrency(stock.currentPrice, currency)}
                         </div>
+                      </td>
+
+                      {/* Daily Change % */}
+                      <td className="py-3.5 px-2.5 font-mono">
                         <div
-                          className={`text-[11px] font-bold ${
-                            stock.changePercent >= 0 ? 'text-green-700' : 'text-red-600'
+                          className={`text-xs font-bold ${
+                            stock.changePercent >= 0 ? 'text-emerald-700' : 'text-rose-600'
                           }`}
                         >
                           {stock.changePercent >= 0 ? '+' : ''}
@@ -410,8 +476,24 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                         </div>
                       </td>
 
+                      {/* RS Rating Column */}
+                      <td className="py-3.5 px-2.5 text-center font-mono">
+                        <span
+                          className={`inline-flex items-center space-x-1 px-2 py-0.5 text-xs font-bold border ${
+                            stock.rsRating >= 90
+                              ? 'bg-purple-950 text-amber-300 border-purple-600 font-black'
+                              : stock.rsRating >= 80
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                              : 'bg-gray-50 text-gray-700 border-gray-200'
+                          }`}
+                        >
+                          <Award className="w-3 h-3 text-amber-400" />
+                          <span>{stock.rsRating} RS</span>
+                        </span>
+                      </td>
+
                       {/* SEPA Score */}
-                      <td className="py-3.5 px-3 text-center">
+                      <td className="py-3.5 px-2.5 text-center">
                         <span
                           className={`inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-bold border ${
                             stock.trendScore === 8
@@ -425,7 +507,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                       </td>
 
                       {/* 200MA Trend Strength Meter Column */}
-                      <td className="py-3.5 px-3 text-center font-mono">
+                      <td className="py-3.5 px-2.5 text-center font-mono">
                         <div className="flex flex-col items-center space-y-1">
                           <span
                             className={`px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider border ${trendMeter.badgeBg} ${trendMeter.badgeText} ${trendMeter.badgeBorder} inline-flex items-center space-x-1`}
@@ -440,7 +522,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                           </span>
 
                           {/* Meter Fill Bar */}
-                          <div className="w-24 bg-gray-200 h-1.5 overflow-hidden border border-gray-300">
+                          <div className="w-20 bg-gray-200 h-1.5 overflow-hidden border border-gray-300">
                             <div
                               className={`h-full ${trendMeter.meterColor} transition-all duration-500`}
                               style={{ width: `${trendMeter.meterFillPercent}%` }}
@@ -455,7 +537,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                       </td>
 
                       {/* Pattern Type */}
-                      <td className="py-3.5 px-3">
+                      <td className="py-3.5 px-2.5">
                         <div className="font-bold text-[#1a1a1a]">
                           {stock.patternType}
                         </div>
@@ -465,7 +547,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                       </td>
 
                       {/* VCP Contraction Heatmap Column */}
-                      <td className="py-3.5 px-3 text-center font-mono">
+                      <td className="py-3.5 px-2.5 text-center font-mono">
                         <div className="flex flex-col items-center space-y-1">
                           <span
                             className={`px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${heatmap.badgeBg} ${heatmap.badgeText} ${heatmap.badgeBorder} inline-flex items-center space-x-1`}
@@ -475,7 +557,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                           </span>
 
                           {/* Progress Intensity Bar */}
-                          <div className="w-24 bg-gray-200 h-1.5 overflow-hidden border border-gray-300">
+                          <div className="w-20 bg-gray-200 h-1.5 overflow-hidden border border-gray-300">
                             <div
                               className={`h-full ${heatmap.barColor} transition-all duration-500`}
                               style={{ width: `${heatmap.score}%` }}
@@ -488,7 +570,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                       </td>
 
                       {/* Pivot Entry Price */}
-                      <td className="py-3.5 px-3 font-mono">
+                      <td className="py-3.5 px-2.5 font-mono">
                         <div className="font-bold text-[#1a1a1a] text-sm">
                           {formatCurrency(stock.pivotPrice, currency)}
                         </div>
@@ -498,7 +580,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                       </td>
 
                       {/* Stop Loss Exit Price */}
-                      <td className="py-3.5 px-3 font-mono">
+                      <td className="py-3.5 px-2.5 font-mono">
                         <div className="font-bold text-red-600">
                           {formatCurrency(stock.stopLossPrice, currency)}
                         </div>
@@ -508,7 +590,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                       </td>
 
                       {/* Profit Target 1 */}
-                      <td className="py-3.5 px-3 font-mono">
+                      <td className="py-3.5 px-2.5 font-mono">
                         <div className="font-bold text-emerald-700">
                           {formatCurrency(stock.target1Price, currency)}
                         </div>
@@ -518,14 +600,14 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                       </td>
 
                       {/* R/R Ratio */}
-                      <td className="py-3.5 px-3 text-center font-mono font-bold text-[#1a1a1a]">
+                      <td className="py-3.5 px-2.5 text-center font-mono font-bold text-[#1a1a1a]">
                         <span className="bg-white px-2 py-1 border border-[#e5e4e1]">
                           {stock.riskRewardRatio.toFixed(1)}x
                         </span>
                       </td>
 
                       {/* Action */}
-                      <td className="py-3.5 px-3 text-right">
+                      <td className="py-3.5 px-2.5 text-right">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();

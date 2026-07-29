@@ -13,7 +13,7 @@ export interface BackgroundCheckLog {
   currentPrice: number;
   targetPrice: number;
   targetType: string;
-  event: 'PIVOT_CROSSED' | 'STOP_LOSS_HIT' | 'PROXIMITY_WARNING' | 'TICK_CHECK';
+  event: 'PIVOT_CROSSED' | 'STOP_LOSS_HIT' | 'PROXIMITY_WARNING' | 'VOLATILITY_DRYUP_PRIMED' | 'TICK_CHECK';
   triggered: boolean;
 }
 
@@ -31,7 +31,7 @@ export function initializeLocalStorageAlerts(stocks: MinerviniTradeSetup[]): Pri
     console.error('Failed to read price alerts from localStorage:', e);
   }
 
-  // Create initial default pivot entry & stop loss alerts for provided stocks
+  // Create initial default pivot entry, stop loss, and VCP volatility dry-up alerts for provided stocks
   const initialAlerts: PriceAlert[] = stocks.slice(0, 4).flatMap((stock) => [
     {
       id: `alert-${stock.ticker}-pivot-${Date.now()}`,
@@ -58,6 +58,21 @@ export function initializeLocalStorageAlerts(stocks: MinerviniTradeSetup[]): Pri
       createdAt: new Date().toLocaleDateString(),
       exchange: stock.exchange,
       notes: `Hard Risk Stop Loss Level @ ${getCurrencySymbol(stock.exchange)}${stock.stopLossPrice}`,
+    },
+    {
+      id: `alert-${stock.ticker}-volatility-${Date.now()}`,
+      ticker: stock.ticker,
+      stockName: stock.name,
+      targetType: 'VOLATILITY_DRYUP',
+      targetPrice: stock.pivotPrice,
+      triggerProximityPercent: 1.5,
+      currentPrice: stock.currentPrice,
+      status: 'ACTIVE',
+      createdAt: new Date().toLocaleDateString(),
+      exchange: stock.exchange,
+      volatilityTightnessTargetPct: 5.0,
+      volatilityVolumeDryUpTargetPct: -50.0,
+      notes: `⚡ VCP Volatility Dry-Up Radar: Alert when 3-week price range tightens ≤ 5% with volume dry-up ≤ -50%`,
     },
   ]);
 

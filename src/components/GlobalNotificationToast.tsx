@@ -31,7 +31,7 @@ export interface ActiveToastNotification {
   alert: PriceAlert;
   previousPrice: number;
   currentPrice: number;
-  crossoverType: 'PIVOT_CROSSOVER' | 'STOP_LOSS_HIT' | 'PROXIMITY_ALERT';
+  crossoverType: 'PIVOT_CROSSOVER' | 'STOP_LOSS_HIT' | 'PROXIMITY_ALERT' | 'VOLATILITY_DRYUP';
   triggeredAt: string;
 }
 
@@ -171,7 +171,60 @@ export const GlobalNotificationToast: React.FC<GlobalNotificationToastProps> = (
           }
         }
 
-        // Check 3: Custom Above
+        // Check 3: Volatility Dry-Up Alert
+        if (alert.targetType === 'VOLATILITY_DRYUP') {
+          const targetTightness = alert.volatilityTightnessTargetPct || 5.0;
+          const targetDryUp = alert.volatilityVolumeDryUpTargetPct || -50.0;
+
+          // Check if matched stock has entered tight range & volume dryup
+          const currentTightness = stockMatch
+            ? Math.abs(stockMatch.contractions[stockMatch.contractions.length - 1]?.percentContraction || 4.2)
+            : 4.2;
+          const currentVolDryUp = stockMatch ? stockMatch.volumeDryUpPercent : -58;
+
+          const isPrimed = currentTightness <= targetTightness && currentVolDryUp <= targetDryUp;
+
+          if (isPrimed && alert.status === 'ACTIVE') {
+            hasUpdates = true;
+            playAlertChime();
+
+            // Send native browser notification
+            if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification(`⚡ VCP Volatility Alert Primed: ${alert.ticker}`, {
+                body: `${alert.ticker} (${alert.exchange}) entered tight VCP Volatility Dry-Up phase! Range Tightness: ${currentTightness.toFixed(1)}%, Volume Dry-Up: ${currentVolDryUp}%. Setup Primed!`,
+                icon: '/favicon.ico',
+              });
+            }
+
+            appendTrackerLog({
+              ticker: alert.ticker,
+              exchange: alert.exchange || 'NASDAQ',
+              previousPrice,
+              currentPrice: simulatedPrice,
+              targetPrice: alert.targetPrice,
+              targetType: alert.targetType,
+              event: 'VOLATILITY_DRYUP_PRIMED',
+              triggered: true,
+            });
+
+            newToast = {
+              alert: { ...alert, status: 'TRIGGERED' as const },
+              previousPrice,
+              currentPrice: simulatedPrice,
+              crossoverType: 'VOLATILITY_DRYUP',
+              triggeredAt: new Date().toLocaleTimeString(),
+            };
+
+            return {
+              ...alert,
+              currentPrice: simulatedPrice,
+              status: 'TRIGGERED' as const,
+              triggeredAt: new Date().toLocaleTimeString(),
+            };
+          }
+        }
+
+        // Check 4: Custom Above
         if (alert.targetType === 'CUSTOM_ABOVE' && simulatedPrice >= alert.targetPrice) {
           hasUpdates = true;
           playAlertChime();
@@ -247,11 +300,14 @@ export const GlobalNotificationToast: React.FC<GlobalNotificationToastProps> = (
 
   const currencySymbol = getCurrencySymbol(activeToast.alert.exchange);
   const isPivot = activeToast.crossoverType === 'PIVOT_CROSSOVER';
+  const isVolatility = activeToast.crossoverType === 'VOLATILITY_DRYUP';
 
   return (
     <div className="fixed top-5 right-5 z-50 max-w-md w-full animate-slide-down shadow-2xl">
       <div className={`p-4 border-2 ${
-        isPivot
+        isVolatility
+          ? 'bg-[#150d2a] text-white border-purple-400 shadow-purple-500/30'
+          : isPivot
           ? 'bg-[#131722] text-white border-amber-400 shadow-amber-500/20'
           : 'bg-rose-950 text-white border-rose-500 shadow-rose-500/20'
       }`}>
@@ -260,13 +316,13 @@ export const GlobalNotificationToast: React.FC<GlobalNotificationToastProps> = (
         <div className="flex items-start justify-between border-b border-white/10 pb-2 mb-3">
           <div className="flex items-center space-x-2">
             <div className={`w-7 h-7 flex items-center justify-center font-bold rounded-none ${
-              isPivot ? 'bg-amber-400 text-black' : 'bg-rose-500 text-white'
+              isVolatility ? 'bg-purple-500 text-white' : isPivot ? 'bg-amber-400 text-black' : 'bg-rose-500 text-white'
             }`}>
-              {isPivot ? <Target className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
+              {isVolatility ? <Activity className="w-4 h-4 text-amber-300" /> : isPivot ? <Target className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
             </div>
             <div>
               <span className="text-[10px] uppercase font-mono tracking-[0.2em] font-bold text-amber-400 block">
-                {isPivot ? '🎯 Pivot Entry Crossover' : '🚨 Stop Loss Hit Warning'}
+                {isVolatility ? '⚡ VCP Volatility Dry-Up Primed' : isPivot ? '🎯 Pivot Entry Crossover' : '🚨 Stop Loss Hit Warning'}
               </span>
               <h4 className="text-base font-mono font-black text-white leading-none">
                 {activeToast.alert.ticker} ({activeToast.alert.exchange || 'NASDAQ'})
@@ -282,21 +338,40 @@ export const GlobalNotificationToast: React.FC<GlobalNotificationToastProps> = (
           </button>
         </div>
 
-        {/* Crossover Price Detail */}
+        {/* Crossover Price / Volatility Detail */}
         <div className="bg-white/5 border border-white/10 p-3 mb-3 font-mono text-xs space-y-1.5">
-          <div className="flex justify-between items-center">
-            <span className="text-gray-300 text-[10px] uppercase font-bold">Target Level:</span>
-            <strong className="text-amber-300 font-bold">
-              {formatCurrency(activeToast.alert.targetPrice, currencySymbol)}
-            </strong>
-          </div>
+          {isVolatility ? (
+            <>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-300 text-[10px] uppercase font-bold">Setup Condition:</span>
+                <strong className="text-purple-300 font-bold">3-Wk Price Range Tightening & Volume Dry-Up</strong>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-300 text-[10px] uppercase font-bold">Contraction Status:</span>
+                <strong className="text-emerald-400 font-extrabold">≤ 5.0% Range (T3/T4 Primed)</strong>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-300 text-[10px] uppercase font-bold">Pivot Entry Price:</span>
+                <strong className="text-amber-300 font-bold">{formatCurrency(activeToast.alert.targetPrice, currencySymbol)}</strong>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-300 text-[10px] uppercase font-bold">Target Level:</span>
+                <strong className="text-amber-300 font-bold">
+                  {formatCurrency(activeToast.alert.targetPrice, currencySymbol)}
+                </strong>
+              </div>
 
-          <div className="flex justify-between items-center">
-            <span className="text-gray-300 text-[10px] uppercase font-bold">Crossed Price:</span>
-            <strong className="text-emerald-400 text-sm font-extrabold">
-              {formatCurrency(activeToast.currentPrice, currencySymbol)}
-            </strong>
-          </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-300 text-[10px] uppercase font-bold">Crossed Price:</span>
+                <strong className="text-emerald-400 text-sm font-extrabold">
+                  {formatCurrency(activeToast.currentPrice, currencySymbol)}
+                </strong>
+              </div>
+            </>
+          )}
 
           <div className="text-[10px] text-gray-300 border-t border-white/10 pt-1 flex justify-between">
             <span>Triggered At:</span>

@@ -62,7 +62,7 @@ export const PriceAlertSystem: React.FC<PriceAlertSystemProps> = ({
   const [customPrice, setCustomPrice] = useState<string>('');
   const [customProximity, setCustomProximity] = useState<number>(1.5);
   const [customNotes, setCustomNotes] = useState<string>('');
-  const [customTargetType, setCustomTargetType] = useState<'PIVOT_ENTRY' | 'STOP_LOSS' | 'CUSTOM_ABOVE' | 'CUSTOM_BELOW'>('PIVOT_ENTRY');
+  const [customTargetType, setCustomTargetType] = useState<'PIVOT_ENTRY' | 'STOP_LOSS' | 'CUSTOM_ABOVE' | 'CUSTOM_BELOW' | 'VOLATILITY_DRYUP'>('PIVOT_ENTRY');
 
   // Simulation state
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
@@ -179,6 +179,95 @@ export const PriceAlertSystem: React.FC<PriceAlertSystemProps> = ({
       createdAt: new Date().toLocaleDateString(),
       exchange: stock.exchange,
       notes: `Auto Pivot Entry Alert @ ${getCurrencySymbol(stock.exchange)}${stock.pivotPrice}`,
+    };
+
+    const updated = [newAlert, ...alerts];
+    setAlerts(updated);
+    saveStoredAlerts(updated);
+  };
+
+  // Instant Volatility Dry-Up Alert Simulator
+  const triggerSimulatedVolatilityAlert = () => {
+    const stock = selectedStock || stocks[0];
+    const stored = getStoredAlerts();
+
+    let targetAlert = stored.find((a) => a.ticker === stock.ticker && a.targetType === 'VOLATILITY_DRYUP');
+
+    if (!targetAlert) {
+      targetAlert = {
+        id: `alert-${stock.ticker}-volatility-${Date.now()}`,
+        ticker: stock.ticker,
+        stockName: stock.name,
+        targetType: 'VOLATILITY_DRYUP',
+        targetPrice: stock.pivotPrice,
+        triggerProximityPercent: 1.5,
+        currentPrice: stock.currentPrice,
+        status: 'ACTIVE',
+        createdAt: new Date().toLocaleDateString(),
+        exchange: stock.exchange,
+        volatilityTightnessTargetPct: 5.0,
+        volatilityVolumeDryUpTargetPct: -50.0,
+        notes: `Simulated VCP Volatility Dry-Up Primed Alert`,
+      };
+      stored.unshift(targetAlert);
+    }
+
+    const updatedAlerts = stored.map((a) => {
+      if (a.id === targetAlert!.id) {
+        return {
+          ...a,
+          status: 'TRIGGERED' as const,
+          triggeredAt: new Date().toLocaleTimeString(),
+        };
+      }
+      return a;
+    });
+
+    saveStoredAlerts(updatedAlerts);
+    appendTrackerLog({
+      ticker: stock.ticker,
+      exchange: stock.exchange,
+      previousPrice: stock.currentPrice,
+      currentPrice: stock.currentPrice,
+      targetPrice: stock.pivotPrice,
+      targetType: 'VOLATILITY_DRYUP',
+      event: 'VOLATILITY_DRYUP_PRIMED',
+      triggered: true,
+    });
+
+    playAlertChime();
+
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(`⚡ VCP Volatility Alert Primed: ${stock.ticker}`, {
+        body: `${stock.ticker} (${stock.exchange}) entered tight VCP Volatility Dry-Up phase! 3-Week Range Tightness: 3.8%, Volume Dry-Up: ${stock.volumeDryUpPercent}%. Setup Primed for Breakout!`,
+        icon: '/favicon.ico',
+      });
+    }
+
+    window.dispatchEvent(new CustomEvent('minervini_alerts_updated'));
+  };
+
+  // Quick-Add Volatility Alert for Stock
+  const handleAddVolatilityAlert = (stock: MinerviniTradeSetup) => {
+    const existing = alerts.find(
+      (a) => a.ticker === stock.ticker && a.targetType === 'VOLATILITY_DRYUP' && a.status === 'ACTIVE'
+    );
+    if (existing) return;
+
+    const newAlert: PriceAlert = {
+      id: `alert-${stock.ticker}-volatility-${Date.now()}`,
+      ticker: stock.ticker,
+      stockName: stock.name,
+      targetType: 'VOLATILITY_DRYUP',
+      targetPrice: stock.pivotPrice,
+      triggerProximityPercent: 1.5,
+      currentPrice: stock.currentPrice,
+      status: 'ACTIVE',
+      createdAt: new Date().toLocaleDateString(),
+      exchange: stock.exchange,
+      volatilityTightnessTargetPct: 5.0,
+      volatilityVolumeDryUpTargetPct: -50.0,
+      notes: `⚡ VCP Volatility Radar: Range tightening ≤ 5% with Volume Dry-Up ≤ -50%`,
     };
 
     const updated = [newAlert, ...alerts];
@@ -332,7 +421,16 @@ export const PriceAlertSystem: React.FC<PriceAlertSystemProps> = ({
               </h4>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Quick Volatility Alert Button */}
+              <button
+                onClick={() => handleAddVolatilityAlert(selectedStock)}
+                className="bg-purple-800 hover:bg-purple-900 text-white font-bold px-3.5 py-1.5 text-xs uppercase tracking-wider flex items-center space-x-1.5 transition-all shadow-xs"
+              >
+                <Activity className="w-3.5 h-3.5 text-amber-300" />
+                <span>Add Volatility Alert (Range ≤ 5%)</span>
+              </button>
+
               {/* Quick Pivot Entry Button */}
               <button
                 onClick={() => handleAddPivotAlert(selectedStock)}
@@ -353,28 +451,118 @@ export const PriceAlertSystem: React.FC<PriceAlertSystemProps> = ({
             </div>
           </div>
 
-          {/* Real-time LocalStorage Breakout Crossover Test Panel */}
+          {/* Real-time LocalStorage Breakout & Volatility Test Simulator Panel */}
           <div className="bg-white border border-[#e5e4e1] p-4 flex flex-wrap items-center justify-between gap-4 font-mono text-xs">
             <div className="flex items-center space-x-3">
               <Zap className="w-5 h-5 text-amber-500" />
               <div>
-                <span className="font-bold text-[#1a1a1a] block">LocalStorage Pivot Breakout Simulator</span>
+                <span className="font-bold text-[#1a1a1a] block">Real-Time Browser Notification Simulators</span>
                 <span className="text-gray-500 text-[11px] font-sans">
-                  Simulate a live price tick crossing {selectedStock.ticker} pivot entry ({getCurrencySymbol(selectedStock.exchange)}{selectedStock.pivotPrice}) to test the global notification toast.
+                  Test browser notification API and alert chime when {selectedStock.ticker} enters a tight Volatility Dry-Up phase or crosses pivot level.
                 </span>
               </div>
             </div>
 
-            <button
-              onClick={triggerSimulatedBreakout}
-              className="bg-[#1a1a1a] hover:bg-black text-amber-400 font-bold px-4 py-2 text-xs uppercase tracking-wider flex items-center space-x-1.5 transition-all border border-black shadow-xs"
-            >
-              <Play className="w-3.5 h-3.5 text-amber-400" />
-              <span>Test Pivot Entry Toast Trigger</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={triggerSimulatedVolatilityAlert}
+                className="bg-purple-900 hover:bg-purple-950 text-amber-300 font-bold px-3.5 py-2 text-xs uppercase tracking-wider flex items-center space-x-1.5 transition-all border border-purple-800 shadow-xs cursor-pointer"
+              >
+                <Activity className="w-3.5 h-3.5 text-amber-300" />
+                <span>Test Volatility Alert Trigger</span>
+              </button>
+
+              <button
+                onClick={triggerSimulatedBreakout}
+                className="bg-[#1a1a1a] hover:bg-black text-amber-400 font-bold px-3.5 py-2 text-xs uppercase tracking-wider flex items-center space-x-1.5 transition-all border border-black shadow-xs cursor-pointer"
+              >
+                <Play className="w-3.5 h-3.5 text-amber-400" />
+                <span>Test Pivot Entry Toast Trigger</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {/* VCP Volatility Dry-Up Alert Radar Banner */}
+      <div className="bg-[#150d2a] border border-purple-800 p-5 text-white space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-purple-800/60 pb-3">
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 bg-purple-950 border border-purple-500/50 flex items-center justify-center text-amber-300 font-bold">
+              <Activity className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-[10px] uppercase font-mono tracking-[0.2em] font-bold text-amber-400">
+                  VCP Volatility Dry-Up Radar
+                </span>
+                <span className="bg-purple-950 border border-purple-600/60 text-purple-200 text-[9px] px-2 py-0.5 font-bold uppercase font-mono">
+                  3-Week Contraction Engine
+                </span>
+              </div>
+              <h4 className="text-base font-serif font-black text-white mt-0.5">
+                Tightening Price Range & Volume Dry-Up Monitor
+              </h4>
+            </div>
+          </div>
+
+          <div className="text-xs font-mono text-purple-200">
+            <span>Automated alert triggers when price range contracts <strong className="text-amber-300">≤ 5.0%</strong> over 3 weeks</span>
+          </div>
+        </div>
+
+        {/* Live Stocks Volatility Dry-Up Status Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
+          {stocks.slice(0, 4).map((st, idx) => {
+            const lastContraction = st.contractions[st.contractions.length - 1];
+            const tightness = Math.abs(lastContraction?.percentContraction || 4.2);
+            const isPrimed = tightness <= 5.0 && st.volumeDryUpPercent <= -40;
+            const hasAlert = alerts.some((a) => a.ticker === st.ticker && a.targetType === 'VOLATILITY_DRYUP' && a.status === 'ACTIVE');
+
+            return (
+              <div key={st.id || `vcp-stock-${st.ticker}-${idx}`} className="bg-[#0e081f] border border-purple-900/80 p-3.5 space-y-2 relative group hover:border-purple-500 transition-all">
+                <div className="flex items-center justify-between border-b border-purple-900/60 pb-2">
+                  <span className="font-black text-sm text-white">{st.ticker}</span>
+                  <span className={`px-2 py-0.5 text-[9px] font-bold uppercase border ${
+                    isPrimed
+                      ? 'bg-emerald-950 text-emerald-300 border-emerald-600'
+                      : 'bg-purple-950 text-purple-300 border-purple-800'
+                  }`}>
+                    {isPrimed ? '🔥 PRIMED & READY' : '⏳ TIGHTENING'}
+                  </span>
+                </div>
+
+                <div className="space-y-1 text-[11px]">
+                  <div className="flex justify-between">
+                    <span className="text-purple-300/80">3-Wk Range Tightness:</span>
+                    <strong className="text-amber-300">{tightness.toFixed(1)}%</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-purple-300/80">Volume Dry-Up:</span>
+                    <strong className="text-emerald-400">{st.volumeDryUpPercent}%</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-purple-300/80">SEPA Score:</span>
+                    <strong className="text-white">{st.trendScore}/8</strong>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleAddVolatilityAlert(st)}
+                  disabled={hasAlert}
+                  className={`w-full py-1.5 text-[10px] font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                    hasAlert
+                      ? 'bg-purple-950 text-purple-400 border-purple-900 cursor-default'
+                      : 'bg-amber-400 hover:bg-amber-300 text-black border-amber-500 font-extrabold'
+                  }`}
+                >
+                  {hasAlert ? '✓ Volatility Alert Active' : 'Set Volatility Alert'}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Main View Mode Selector: Active Alerts vs Audit Logs */}
       <div className="flex items-center justify-between border-b border-[#e5e4e1] pb-2 font-mono text-xs">
@@ -430,8 +618,8 @@ export const PriceAlertSystem: React.FC<PriceAlertSystemProps> = ({
                 No background check logs recorded yet. The background system logs events automatically every 3.5s.
               </div>
             ) : (
-              logs.map((lg) => (
-                <div key={lg.id} className="p-3 flex items-center justify-between text-xs">
+              logs.map((lg, idx) => (
+                <div key={lg.id || `tracker-log-${lg.ticker}-${idx}`} className="p-3 flex items-center justify-between text-xs">
                   <div className="flex items-center space-x-3">
                     <span className="text-gray-400 text-[10px]">{lg.timestamp}</span>
                     <strong className="text-slate-900">{lg.ticker} ({lg.exchange})</strong>
@@ -474,6 +662,7 @@ export const PriceAlertSystem: React.FC<PriceAlertSystemProps> = ({
                   onChange={(e: any) => setCustomTargetType(e.target.value)}
                   className="w-full bg-white border border-[#e5e4e1] p-2 text-xs font-bold text-[#1a1a1a] focus:outline-none"
                 >
+                  <option value="VOLATILITY_DRYUP">⚡ VCP Volatility Dry-Up (Range ≤ 5.0%)</option>
                   <option value="PIVOT_ENTRY">Pivot Entry Level (Breakout)</option>
                   <option value="STOP_LOSS">Risk Stop Loss Level (Exit)</option>
                   <option value="CUSTOM_ABOVE">Crosses Above Custom Price</option>
@@ -579,13 +768,13 @@ export const PriceAlertSystem: React.FC<PriceAlertSystemProps> = ({
                   No price alerts set for this filter mode. Use quick setup above to add alerts.
                 </div>
               ) : (
-                filteredAlerts.map((alt) => {
+                filteredAlerts.map((alt, idx) => {
                   const currency = getCurrencySymbol(alt.exchange);
                   const isTriggered = alt.status === 'TRIGGERED';
 
                   return (
                     <div
-                      key={alt.id}
+                      key={alt.id || `alert-${alt.ticker}-${alt.targetType}-${idx}`}
                       className={`p-4 flex flex-wrap items-center justify-between gap-4 transition-all ${
                         isTriggered ? 'bg-amber-50/70 border-l-4 border-l-amber-500' : 'bg-white hover:bg-gray-50'
                       }`}
@@ -593,12 +782,20 @@ export const PriceAlertSystem: React.FC<PriceAlertSystemProps> = ({
                       <div className="flex items-center space-x-3">
                         <div
                           className={`w-9 h-9 flex items-center justify-center font-bold text-xs ${
-                            alt.targetType === 'PIVOT_ENTRY'
+                            alt.targetType === 'VOLATILITY_DRYUP'
+                              ? 'bg-purple-100 text-purple-900 border border-purple-300'
+                              : alt.targetType === 'PIVOT_ENTRY'
                               ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
                               : 'bg-rose-100 text-rose-900 border border-rose-300'
                           }`}
                         >
-                          {alt.targetType === 'PIVOT_ENTRY' ? <Target className="w-5 h-5" /> : <ShieldAlert className="w-5 h-5" />}
+                          {alt.targetType === 'VOLATILITY_DRYUP' ? (
+                            <Activity className="w-5 h-5 text-purple-700" />
+                          ) : alt.targetType === 'PIVOT_ENTRY' ? (
+                            <Target className="w-5 h-5" />
+                          ) : (
+                            <ShieldAlert className="w-5 h-5" />
+                          )}
                         </div>
 
                         <div>
