@@ -48,6 +48,56 @@ export const MinerviniVideoMasterclass: React.FC<MinerviniVideoMasterclassProps>
   const [quizAnswer, setQuizAnswer] = useState<number | null>(null);
   const [quizSubmitted, setQuizSubmitted] = useState<boolean>(false);
 
+  // Custom YouTube URL loader state
+  const [customUrlInput, setCustomUrlInput] = useState<string>('');
+
+  const extractYoutubeId = (url: string): string | null => {
+    if (!url) return null;
+    const match = url.match(/(?:v=|\/embed\/|\/1\/|\/v\/|https:\/\/youtu\.be\/|\/e\/|watch\?v=|\&v=)([^#\&\?]*)/);
+    if (match && match[1] && match[1].length === 11) {
+      return match[1];
+    }
+    if (url.trim().length === 11 && !url.includes('http')) {
+      return url.trim();
+    }
+    return null;
+  };
+
+  const handleLoadCustomUrl = (e: React.FormEvent) => {
+    e.preventDefault();
+    const ytId = extractYoutubeId(customUrlInput);
+    if (ytId) {
+      const isTargetVideo = ytId === 'j65mVPySzng';
+      const customLesson: MinerviniVideoLesson = {
+        id: `custom-yt-${Date.now()}`,
+        title: isTargetVideo
+          ? 'Mark Minervini Masterclass: Specific VCP Buy Points & Selling Rules'
+          : `Custom Minervini Video Lesson (${ytId})`,
+        duration: isTargetVideo ? '42:15' : 'Streamed Video',
+        youtubeId: ytId,
+        category: 'VCP_FOUNDATIONS',
+        summary: isTargetVideo
+          ? 'Mark Minervini masterclass detailing specific VCP buy points, volume contraction dry-up, 5-8% strict stop loss execution, and scaling profit targets.'
+          : 'User-imported trading strategy video. Embedded with SEPA risk management analysis and VCP pattern review.',
+        keyTimestamps: [
+          { time: '01:20', label: 'Stage 2 Uptrend & Trend Template Prerequisites' },
+          { time: '08:45', label: 'Anatomy of Volatility Contraction Pattern (VCP)' },
+          { time: '16:30', label: 'The Specific Buy Point: Pivot Highs & Dry-Up Volume' },
+          { time: '24:10', label: 'Risk Control: 5%-8% Max Loss & Breakeven Trigger' },
+          { time: '33:50', label: 'When to Sell: Scaling Out into Strength (+20% Target)' }
+        ],
+        takeaways: [
+          'Only buy stocks in a Stage 2 Uptrend passing all 8 SEPA Trend Template criteria.',
+          'Wait for price volatility and volume to contract tight (VCP) before taking a position.',
+          'Execute hard stop losses at 5-8% max loss with zero hesitation.',
+          'Raise stop loss to breakeven once stock gains +8% to +10% to eliminate downside risk.'
+        ]
+      };
+      setActiveLesson(customLesson);
+      setCustomUrlInput('');
+    }
+  };
+
   const quizQuestion = {
     question: "What is the primary advantage of taking a '3C (Cheat)' Entry over waiting for a traditional VCP pivot breakout?",
     options: [
@@ -190,6 +240,28 @@ export const MinerviniVideoMasterclass: React.FC<MinerviniVideoMasterclassProps>
                 <span>Video Lesson Playlist</span>
                 <span className="text-xs text-gray-500 font-normal">{MINERVINI_VIDEO_LESSONS.length} Lessons</span>
               </h3>
+
+              {/* Paste Any YouTube Link Form */}
+              <form onSubmit={handleLoadCustomUrl} className="space-y-1.5 pt-1">
+                <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider block">
+                  Paste YouTube Video URL:
+                </label>
+                <div className="flex items-center space-x-1.5">
+                  <input
+                    type="text"
+                    value={customUrlInput}
+                    onChange={(e) => setCustomUrlInput(e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    className="flex-1 text-xs bg-slate-50 border border-gray-300 rounded-md px-2.5 py-1.5 font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                  <button
+                    type="submit"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-md transition cursor-pointer shrink-0"
+                  >
+                    Load Video
+                  </button>
+                </div>
+              </form>
 
               {/* Category Filter */}
               <div className="flex flex-wrap gap-1.5 pb-2 border-b border-gray-100">

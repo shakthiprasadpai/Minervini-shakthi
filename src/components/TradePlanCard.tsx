@@ -3,6 +3,7 @@ import { MinerviniTradeSetup } from '../types';
 import { calculatePositionSize, calculateBreakoutProbability, formatCurrency, formatVolume, getCurrencySymbol } from '../utils/sepaCalculator';
 import { exportTradePlansToCsv } from '../utils/csvExport';
 import { ExitSignals } from './ExitSignals';
+import { BreakoutProbabilityEngine } from './BreakoutProbabilityEngine';
 import { Target, ShieldAlert, ArrowUpRight, Droplets, DollarSign, Calculator, Layers, Flame, Zap, Sparkles, TrendingUp, BarChart3, ShieldCheck, FileText, Save, Check, Trash2, Clock, StickyNote, FileSpreadsheet, LogOut, AlertTriangle, ArrowRightCircle, Sliders, CheckCircle2, RefreshCw } from 'lucide-react';
 
 interface TradePlanCardProps {
@@ -251,13 +252,13 @@ export const TradePlanCard: React.FC<TradePlanCardProps> = ({ stock }) => {
 
       </div>
 
-      {/* Dynamic Risk-Reward Ratio Engine & User-Defined RRR Target Calculator */}
+      {/* Dynamic Risk-Reward Ratio Engine & Visual Upside vs. Stop Loss Calculator */}
       <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-5 space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e5e4e1] pb-3">
           <div className="flex items-center space-x-2">
             <Calculator className="w-4 h-4 text-[#1a1a1a]" />
             <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-[#1a1a1a]">
-              Risk-Reward Ratio (RRR) Target Calculator & Engine
+              Visual Risk / Reward Ratio (RRR) Calculator & Potential Upside Engine
             </h4>
           </div>
           <div className="flex items-center space-x-2">
@@ -271,24 +272,25 @@ export const TradePlanCard: React.FC<TradePlanCardProps> = ({ stock }) => {
                 : 'bg-red-100 text-red-900 border border-red-300'
             }`}>
               {dynamicCustomRRRatio >= 5.0
-                ? '🚀 CHAMPION GRADE (>= 5:1)'
+                ? '🚀 CHAMPION GRADE (>= 5:1 R/R)'
                 : dynamicCustomRRRatio >= 3.0
-                ? '🟢 MINERVINI STANDARD (>= 3:1)'
+                ? '🟢 MINERVINI STANDARD (>= 3:1 R/R)'
                 : dynamicCustomRRRatio >= 2.0
-                ? '🟡 ACCEPTABLE MINIMUM (>= 2:1)'
-                : '🔴 SUBPAR RISK-REWARD (< 2:1)'}
+                ? '🟡 ACCEPTABLE MINIMUM (>= 2:1 R/R)'
+                : '🔴 SUBPAR RISK-REWARD (< 2:1 R/R)'}
             </span>
           </div>
         </div>
 
-        {/* Quick RRR Preset Buttons */}
-        <div className="space-y-2 bg-white p-4 border border-[#e5e4e1]">
+        {/* Quick RRR Preset Buttons & Slider */}
+        <div className="space-y-3 bg-white p-4 border border-[#e5e4e1]">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[#b5a68d]">
-              Select Desired Risk-Reward Ratio (RRR) Preset:
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#b5a68d] flex items-center space-x-1">
+              <Sliders className="w-3.5 h-3.5 text-slate-800" />
+              <span>Select Desired Risk-Reward Ratio (RRR) Target Preset:</span>
             </span>
-            <span className="text-xs font-mono font-bold text-[#1a1a1a]">
-              Active Ratio: 1 : {desiredRRR.toFixed(1)}
+            <span className="text-xs font-mono font-bold text-[#1a1a1a] bg-emerald-50 border border-emerald-200 px-2.5 py-0.5">
+              Active Ratio: <strong className="text-emerald-800 text-sm">1 : {desiredRRR.toFixed(1)}</strong>
             </span>
           </div>
           
@@ -309,9 +311,9 @@ export const TradePlanCard: React.FC<TradePlanCardProps> = ({ stock }) => {
             ))}
           </div>
 
-          <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono">
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono border-t border-gray-100">
             <div className="flex items-center space-x-2 w-full sm:w-auto">
-              <span className="text-[10px] uppercase font-bold text-gray-500 whitespace-nowrap">Custom RRR:</span>
+              <span className="text-[10px] uppercase font-bold text-gray-500 whitespace-nowrap">Custom RRR Slider:</span>
               <input
                 type="range"
                 min="1.0"
@@ -389,21 +391,127 @@ export const TradePlanCard: React.FC<TradePlanCardProps> = ({ stock }) => {
 
         </div>
 
-        {/* Visual Progress / Ratio Comparison Bar */}
-        <div className="space-y-1.5 pt-1 font-mono text-xs">
-          <div className="flex justify-between text-[11px]">
-            <span className="text-red-700 font-bold">Risk (1.0 Unit = {formatCurrency(riskPerShare, currencySymbol)})</span>
-            <span className="text-emerald-700 font-bold">Reward ({dynamicCustomRRRatio.toFixed(2)} Units = {formatCurrency(rewardCustom, currencySymbol)})</span>
+        {/* Visual Upside Potential vs Defined Downside Risk Comparison Breakdown */}
+        <div className="bg-white border border-[#e5e4e1] p-4 space-y-4 font-mono">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e5e4e1] pb-2">
+            <span className="text-[11px] font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
+              <TrendingUp className="w-4 h-4 text-emerald-600" />
+              <span>Potential Upside vs Defined Stop Loss Risk Matrix ({posSize.shareQuantity.toLocaleString()} shares)</span>
+            </span>
+            <span className="text-[10px] text-gray-500 font-sans">
+              Quantifying dollar return per $1 dollar risked
+            </span>
           </div>
-          <div className="w-full bg-gray-200 h-3 flex overflow-hidden rounded">
-            <div className="bg-red-600 h-full text-[9px] text-white font-bold flex items-center justify-center" style={{ width: `${Math.min(30, (1 / (1 + dynamicCustomRRRatio)) * 100)}%` }}>
-              1R
+
+          {/* 3 Metric Upside Cards vs Risk */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            
+            {/* Downside Risk Card */}
+            <div className="bg-red-50/50 border border-red-200 p-3 space-y-1.5">
+              <div className="flex justify-between items-center text-red-700 text-[10px] uppercase font-bold">
+                <span className="flex items-center space-x-1">
+                  <ShieldAlert className="w-3.5 h-3.5 text-red-600" />
+                  <span>Defined Stop Loss Risk</span>
+                </span>
+                <span className="bg-red-100 text-red-800 px-1.5 py-0.5 border border-red-300 text-[9px]">1.0x (1R)</span>
+              </div>
+              <div>
+                <span className="text-2xl font-black text-red-600 block">
+                  -{formatCurrency(posSize.riskAmount, currencySymbol)}
+                </span>
+                <span className="text-[11px] text-red-700 block font-bold">
+                  -{riskPercentFromPivot.toFixed(1)}% Downside ({formatCurrency(riskPerShare, currencySymbol)}/sh)
+                </span>
+              </div>
+              <p className="text-[10px] text-gray-600 font-sans border-t border-red-200 pt-1">
+                Max account loss capped at <strong>{riskPercent}%</strong> of portfolio capital.
+              </p>
             </div>
-            <div className="bg-emerald-600 h-full text-[9px] text-white font-bold flex items-center justify-center transition-all duration-300" style={{ width: `${Math.max(70, (dynamicCustomRRRatio / (1 + dynamicCustomRRRatio)) * 100)}%` }}>
-              {dynamicCustomRRRatio.toFixed(1)}R
+
+            {/* Target 1 Upside Card */}
+            <div className="bg-emerald-50/50 border border-emerald-200 p-3 space-y-1.5">
+              <div className="flex justify-between items-center text-emerald-800 text-[10px] uppercase font-bold">
+                <span className="flex items-center space-x-1">
+                  <Target className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Target 1 Potential Upside</span>
+                </span>
+                <span className="bg-emerald-100 text-emerald-900 px-1.5 py-0.5 border border-emerald-300 text-[9px] font-black">
+                  {dynamicRRRatioT1.toFixed(1)}x ({dynamicRRRatioT1.toFixed(1)}R)
+                </span>
+              </div>
+              <div>
+                <span className="text-2xl font-black text-emerald-700 block">
+                  +{formatCurrency(rewardT1 * posSize.shareQuantity, currencySymbol)}
+                </span>
+                <span className="text-[11px] text-emerald-800 block font-bold">
+                  +{stock.target1Percent}% Upside ({formatCurrency(rewardT1, currencySymbol)}/sh)
+                </span>
+              </div>
+              <p className="text-[10px] text-gray-600 font-sans border-t border-emerald-200 pt-1">
+                50% partial scale-out target price at <strong className="text-emerald-800">{formatCurrency(stock.target1Price, currencySymbol)}</strong>.
+              </p>
+            </div>
+
+            {/* Target 2 / Custom Upside Card */}
+            <div className="bg-purple-50/50 border border-purple-200 p-3 space-y-1.5">
+              <div className="flex justify-between items-center text-purple-900 text-[10px] uppercase font-bold">
+                <span className="flex items-center space-x-1">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Target 2 / Custom Upside</span>
+                </span>
+                <span className="bg-purple-100 text-purple-900 px-1.5 py-0.5 border border-purple-300 text-[9px] font-black">
+                  {dynamicCustomRRRatio.toFixed(1)}x ({dynamicCustomRRRatio.toFixed(1)}R)
+                </span>
+              </div>
+              <div>
+                <span className="text-2xl font-black text-purple-900 block">
+                  +{formatCurrency(rewardCustom * posSize.shareQuantity, currencySymbol)}
+                </span>
+                <span className="text-[11px] text-purple-900 block font-bold">
+                  +{(((customTargetPrice - pivotEntry) / pivotEntry) * 100).toFixed(1)}% Upside ({formatCurrency(rewardCustom, currencySymbol)}/sh)
+                </span>
+              </div>
+              <p className="text-[10px] text-gray-600 font-sans border-t border-purple-200 pt-1">
+                Target exit price set at <strong className="text-purple-900">{formatCurrency(customTargetPrice, currencySymbol)}</strong>.
+              </p>
+            </div>
+
+          </div>
+
+          {/* Visual Progress / Ratio Comparison Bar */}
+          <div className="space-y-1.5 pt-1 font-mono text-xs">
+            <div className="flex justify-between text-[11px]">
+              <span className="text-red-700 font-bold">Downside Risk: {formatCurrency(posSize.riskAmount, currencySymbol)} (-1.0R)</span>
+              <span className="text-emerald-700 font-bold">Target 1 Upside: +{formatCurrency(rewardT1 * posSize.shareQuantity, currencySymbol)} (+{dynamicRRRatioT1.toFixed(1)}R)</span>
+              <span className="text-purple-900 font-bold">Custom Upside: +{formatCurrency(rewardCustom * posSize.shareQuantity, currencySymbol)} (+{dynamicCustomRRRatio.toFixed(1)}R)</span>
+            </div>
+            <div className="w-full bg-gray-200 h-4 flex overflow-hidden rounded border border-gray-300">
+              <div
+                className="bg-red-600 h-full text-[10px] text-white font-bold flex items-center justify-center transition-all"
+                style={{ width: `${Math.min(25, (1 / (1 + dynamicCustomRRRatio)) * 100)}%` }}
+                title={`Max Downside Risk: ${formatCurrency(posSize.riskAmount, currencySymbol)}`}
+              >
+                1R Risk
+              </div>
+              <div
+                className="bg-emerald-600 h-full text-[10px] text-white font-bold flex items-center justify-center transition-all border-l border-white/30"
+                style={{ width: `${Math.min(45, (dynamicRRRatioT1 / (1 + dynamicCustomRRRatio)) * 100)}%` }}
+                title={`Target 1 Reward: +${formatCurrency(rewardT1 * posSize.shareQuantity, currencySymbol)}`}
+              >
+                {dynamicRRRatioT1.toFixed(1)}R T1
+              </div>
+              <div
+                className="bg-purple-700 h-full text-[10px] text-white font-bold flex items-center justify-center transition-all border-l border-white/30"
+                style={{ width: `${Math.max(30, (dynamicCustomRRRatio / (1 + dynamicCustomRRRatio)) * 100)}%` }}
+                title={`Custom Target Reward: +${formatCurrency(rewardCustom * posSize.shareQuantity, currencySymbol)}`}
+              >
+                {dynamicCustomRRRatio.toFixed(1)}R Custom Upside
+              </div>
             </div>
           </div>
+
         </div>
+
       </div>
 
       {/* Volume Contraction Analysis Box */}
@@ -791,6 +899,9 @@ export const TradePlanCard: React.FC<TradePlanCardProps> = ({ stock }) => {
 
       {/* Mark Minervini Exit Signals Component */}
       <ExitSignals stock={stock} />
+
+      {/* Breakout Success Probability Engine */}
+      <BreakoutProbabilityEngine stock={stock} />
 
       {/* Trade Insights & Post-Mortem Notes (Saved to Local Storage) */}
       <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-5 space-y-3">

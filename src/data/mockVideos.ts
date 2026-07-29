@@ -2,6 +2,49 @@ import { MinerviniVideoLesson } from '../types';
 
 export const MINERVINI_VIDEO_LESSONS: MinerviniVideoLesson[] = [
   {
+    id: 'minervini-video-j4qer8lij-w',
+    title: 'Mark Minervini SEPA Masterclass: Volatility Contraction Pattern & Breakout Execution',
+    duration: '38:10',
+    youtubeId: 'J4qER8LiJ-w',
+    category: 'VCP_FOUNDATIONS',
+    summary: 'Essential Mark Minervini SEPA masterclass covering Volatility Contraction Pattern (VCP) identification, institutional supply absorption, low-cheat entries, 5-8% strict risk limits, and exit strategies.',
+    keyTimestamps: [
+      { time: '00:45', label: 'Overview of SEPA & Stage 2 Growth Stock Identification' },
+      { time: '06:15', label: 'VCP Volatility Squeeze Mechanics & Supply Contractions' },
+      { time: '14:20', label: 'Volume Dry-Up (VDU) & Terminal Pivot Squeeze' },
+      { time: '22:10', label: 'Specific Buy Point Execution & Stop Loss Management' },
+      { time: '31:40', label: 'Selling into Strength & Breakeven Stop Adjustment' }
+    ],
+    takeaways: [
+      'Look for progressive contractions where each pullback is shallower than the last.',
+      'Volume must dry up dramatically near the pivot point before breakout execution.',
+      'Always enforce strict 5-8% stop losses to protect portfolio capital.',
+      'Raise stop loss to breakeven once the stock reaches an 8-10% gain.'
+    ]
+  },
+  {
+    id: 'minervini-video-featured',
+    title: 'Mark Minervini Masterclass: Specific VCP Buy Points & Selling Rules',
+    duration: '42:15',
+    youtubeId: 'j65mVPySzng',
+    category: 'VCP_FOUNDATIONS',
+    summary: 'Comprehensive Mark Minervini masterclass covering specific VCP buy points, institutional volume dry-up, strict 5-8% loss limits, breakeven backstop adjustments, and profit-locking strategies.',
+    keyTimestamps: [
+      { time: '01:20', label: 'Stage 2 Uptrend & Trend Template Prerequisites' },
+      { time: '08:45', label: 'Anatomy of Volatility Contraction Pattern (VCP)' },
+      { time: '16:30', label: 'The Specific Buy Point: Pivot Highs & Dry-Up Volume' },
+      { time: '24:10', label: 'Risk Control: 5%-8% Max Loss & Breakeven Trigger' },
+      { time: '33:50', label: 'When to Sell: Scaling Out into Strength (+20% Target)' }
+    ],
+    takeaways: [
+      'Only buy stocks in a Stage 2 Uptrend passing all 8 SEPA Trend Template criteria.',
+      'Wait for price volatility and volume to contract tight (VCP) before taking a position.',
+      'Execute hard stop losses at 5-8% max loss with zero hesitation.',
+      'Raise stop loss to breakeven once stock gains +8% to +10% to eliminate downside risk.',
+      'Sell 50% of position into strength at +15% to +20% gain, trailing the remaining runner along 20d SMA.'
+    ]
+  },
+  {
     id: 'minervini-video-1',
     title: 'The 3C Pattern & Low Cheat Early Entry Masterclass',
     duration: '28:45',
