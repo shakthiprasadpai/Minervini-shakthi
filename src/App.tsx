@@ -19,6 +19,7 @@ import { ObsidianIntegration } from './components/ObsidianIntegration';
 import { PocketPivotScanner } from './components/PocketPivotScanner';
 import { VcpPatternScanner } from './components/VcpPatternScanner';
 import { TradeJournal } from './components/TradeJournal';
+import { BigMoneyTracker } from './components/BigMoneyTracker';
 import { GlobalNotificationToast } from './components/GlobalNotificationToast';
 import { MOCK_STOCKS } from './data/mockStocks';
 import { MinerviniTradeSetup } from './types';
@@ -239,6 +240,15 @@ export default function App() {
                 {/* Trade Plan & Position Size Card */}
                 <TradePlanCard stock={selectedStock} />
 
+                {/* 'Big Money' Institutional Volume Spike Tracker */}
+                <BigMoneyTracker
+                  stock={selectedStock}
+                  onViewChart={(stock) => {
+                    setSelectedStock(stock);
+                    setActiveTab('chart');
+                  }}
+                />
+
                 {/* Live Google Search Grounded Financial Headlines Module */}
                 <TickerNewsGrounding stock={selectedStock} />
 
@@ -266,6 +276,9 @@ export default function App() {
               
               {/* Chart Component */}
               <VcpChart stock={selectedStock} />
+
+              {/* 'Big Money' Institutional Volume Spike Tracker */}
+              <BigMoneyTracker stock={selectedStock} />
 
               {/* Live Google Search Grounded Financial Headlines Module */}
               <TickerNewsGrounding stock={selectedStock} />

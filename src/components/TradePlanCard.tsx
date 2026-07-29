@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MinerviniTradeSetup } from '../types';
 import { calculatePositionSize, calculateBreakoutProbability, formatCurrency, formatVolume, getCurrencySymbol } from '../utils/sepaCalculator';
 import { exportTradePlansToCsv } from '../utils/csvExport';
-import { Target, ShieldAlert, ArrowUpRight, Droplets, DollarSign, Calculator, Layers, Flame, Zap, Sparkles, TrendingUp, BarChart3, ShieldCheck, FileText, Save, Check, Trash2, Clock, StickyNote, FileSpreadsheet } from 'lucide-react';
+import { Target, ShieldAlert, ArrowUpRight, Droplets, DollarSign, Calculator, Layers, Flame, Zap, Sparkles, TrendingUp, BarChart3, ShieldCheck, FileText, Save, Check, Trash2, Clock, StickyNote, FileSpreadsheet, LogOut, AlertTriangle, ArrowRightCircle, Sliders, CheckCircle2, RefreshCw } from 'lucide-react';
 
 interface TradePlanCardProps {
   stock: MinerviniTradeSetup;
@@ -13,6 +13,14 @@ export const TradePlanCard: React.FC<TradePlanCardProps> = ({ stock }) => {
   const [riskPercent, setRiskPercent] = useState<number>(1.0); // 1% account risk default
   const [desiredRRR, setDesiredRRR] = useState<number>(3.0); // User-defined RRR target (e.g. 1:2, 1:3)
   const [customStopPrice, setCustomStopPrice] = useState<number>(stock.stopLossPrice);
+
+  // Exit Strategy Scenario Simulator State
+  const [currentTradeStage, setCurrentTradeStage] = useState<'JUST_ENTERED' | 'IN_PROFIT_8' | 'HIT_TARGET1' | 'EXTENDED_30' | 'THREATENED'>('JUST_ENTERED');
+  const [customCurrentPrice, setCustomCurrentPrice] = useState<number>(stock.currentPrice);
+
+  useEffect(() => {
+    setCustomCurrentPrice(stock.currentPrice);
+  }, [stock.currentPrice, stock.ticker]);
 
   // User Trade Insights & Post-Mortem Notes state with LocalStorage persistence
   const [notes, setNotes] = useState<string>('');
@@ -779,6 +787,261 @@ export const TradePlanCard: React.FC<TradePlanCardProps> = ({ stock }) => {
           </div>
         </div>
       )}
+
+      {/* Mark Minervini SEPA Exit Strategy & Sell Rules Matrix */}
+      <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-5 space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e5e4e1] pb-3">
+          <div className="flex items-center space-x-2">
+            <LogOut className="w-4 h-4 text-purple-700" />
+            <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-[#1a1a1a]">
+              Mark Minervini SEPA Exit Strategy & Selling Rules Protocol
+            </h4>
+          </div>
+          <span className="text-[10px] font-mono text-purple-900 bg-purple-100 border border-purple-300 font-bold px-2.5 py-0.5 uppercase">
+            Capital Preservation & Profit Locking Rules
+          </span>
+        </div>
+
+        {/* 4 Pillars of Minervini Exit Strategy Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs font-mono">
+          
+          {/* Pillar 1: Initial Hard Stop Loss */}
+          <div className="bg-white border border-rose-200 p-4 space-y-2 relative group hover:border-rose-400 transition-all shadow-2xs">
+            <div className="flex items-center justify-between border-b border-rose-100 pb-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 flex items-center space-x-1">
+                <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
+                <span>1. Initial Hard Stop</span>
+              </span>
+              <span className="text-[10px] font-bold text-rose-900 bg-rose-50 px-1.5 py-0.5 border border-rose-200">
+                MAX -{riskPercentFromPivot.toFixed(1)}%
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500 text-[10px] uppercase block font-bold">Hard Exit Price:</span>
+              <span className="text-2xl font-black text-rose-700 font-mono">
+                {formatCurrency(currentStopLoss, currencySymbol)}
+              </span>
+            </div>
+            <p className="text-[10px] text-gray-600 font-sans leading-tight pt-1 border-t border-rose-100">
+              <strong>Non-Negotiable Rule:</strong> Cut loss immediately if price hits this level. Maximum total account loss capped at <strong className="text-rose-700">{formatCurrency(posSize.riskAmount, currencySymbol)}</strong>.
+            </p>
+          </div>
+
+          {/* Pillar 2: Breakeven Stop Adjustment */}
+          <div className="bg-white border border-blue-200 p-4 space-y-2 relative group hover:border-blue-400 transition-all shadow-2xs">
+            <div className="flex items-center justify-between border-b border-blue-100 pb-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 flex items-center space-x-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
+                <span>2. Breakeven Backstop</span>
+              </span>
+              <span className="text-[10px] font-bold text-blue-900 bg-blue-50 px-1.5 py-0.5 border border-blue-200">
+                +8% to +10% Gain
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500 text-[10px] uppercase block font-bold">Move Stop to Pivot:</span>
+              <span className="text-2xl font-black text-blue-800 font-mono">
+                {formatCurrency(pivotEntry, currencySymbol)}
+              </span>
+            </div>
+            <p className="text-[10px] text-gray-600 font-sans leading-tight pt-1 border-t border-blue-100">
+              <strong>Risk-Free Trigger:</strong> When stock advances to <strong className="text-blue-800">{formatCurrency(pivotEntry * 1.08, currencySymbol)} (+8%)</strong>, automatically raise stop loss to entry price. Never let a good gain turn into a loss.
+            </p>
+          </div>
+
+          {/* Pillar 3: Partial Profit Scale-Out */}
+          <div className="bg-white border border-emerald-200 p-4 space-y-2 relative group hover:border-emerald-400 transition-all shadow-2xs">
+            <div className="flex items-center justify-between border-b border-emerald-100 pb-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 flex items-center space-x-1">
+                <Target className="w-3.5 h-3.5 text-emerald-600" />
+                <span>3. Scale Out 50%</span>
+              </span>
+              <span className="text-[10px] font-bold text-emerald-900 bg-emerald-50 px-1.5 py-0.5 border border-emerald-200">
+                Target 1 (+{stock.target1Percent}%)
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500 text-[10px] uppercase block font-bold">Sell Half ({Math.floor(posSize.shareQuantity * 0.5).toLocaleString()} sh) at:</span>
+              <span className="text-2xl font-black text-emerald-700 font-mono">
+                {formatCurrency(stock.target1Price, currencySymbol)}
+              </span>
+            </div>
+            <p className="text-[10px] text-gray-600 font-sans leading-tight pt-1 border-t border-emerald-100">
+              <strong>Sell Into Strength:</strong> Lock in <strong className="text-emerald-700">{formatCurrency((stock.target1Price - pivotEntry) * Math.floor(posSize.shareQuantity * 0.5), currencySymbol)}</strong> realized profit on half position.
+            </p>
+          </div>
+
+          {/* Pillar 4: Trailing Stop Runner */}
+          <div className="bg-white border border-purple-200 p-4 space-y-2 relative group hover:border-purple-400 transition-all shadow-2xs">
+            <div className="flex items-center justify-between border-b border-purple-100 pb-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 flex items-center space-x-1">
+                <TrendingUp className="w-3.5 h-3.5 text-purple-600" />
+                <span>4. Trailing Runner (50%)</span>
+              </span>
+              <span className="text-[10px] font-bold text-purple-900 bg-purple-50 px-1.5 py-0.5 border border-purple-200">
+                20D SMA Trail
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500 text-[10px] uppercase block font-bold">Estimated 20d SMA Level:</span>
+              <span className="text-2xl font-black text-purple-900 font-mono">
+                {formatCurrency(stock.sma50 ? stock.sma50 : pivotEntry * 1.03, currencySymbol)}
+              </span>
+            </div>
+            <p className="text-[10px] text-gray-600 font-sans leading-tight pt-1 border-t border-purple-100">
+              <strong>Let Winners Run:</strong> Trail remaining 50% shares along the 20-day SMA or 10-day EMA until a decisive close below moving average.
+            </p>
+          </div>
+
+        </div>
+
+        {/* Interactive Exit Strategy Scenario Simulator */}
+        <div className="bg-white border border-[#e5e4e1] p-4 space-y-3 font-mono">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e5e4e1] pb-2">
+            <div className="flex items-center space-x-2">
+              <Sliders className="w-4 h-4 text-purple-700" />
+              <span className="text-xs font-bold uppercase text-[#1a1a1a]">
+                Interactive Trade State Scenario Simulator ({stock.ticker})
+              </span>
+            </div>
+            <span className="text-[10px] text-gray-500">
+              Select current trade stage to generate instant execution instructions
+            </span>
+          </div>
+
+          {/* Trade Stage Selector Buttons */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[10px] font-bold">
+            <button
+              type="button"
+              onClick={() => setCurrentTradeStage('JUST_ENTERED')}
+              className={`p-2 border uppercase cursor-pointer text-center transition-all ${
+                currentTradeStage === 'JUST_ENTERED'
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                  : 'bg-[#f9f8f5] text-slate-700 border-[#e5e4e1] hover:bg-slate-200'
+              }`}
+            >
+              1. Just Entered at Pivot
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentTradeStage('IN_PROFIT_8')}
+              className={`p-2 border uppercase cursor-pointer text-center transition-all ${
+                currentTradeStage === 'IN_PROFIT_8'
+                  ? 'bg-blue-800 text-white border-blue-800 shadow-xs'
+                  : 'bg-[#f9f8f5] text-blue-900 border-[#e5e4e1] hover:bg-blue-100'
+              }`}
+            >
+              2. In Profit (+8% to +10%)
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentTradeStage('HIT_TARGET1')}
+              className={`p-2 border uppercase cursor-pointer text-center transition-all ${
+                currentTradeStage === 'HIT_TARGET1'
+                  ? 'bg-emerald-800 text-white border-emerald-800 shadow-xs'
+                  : 'bg-[#f9f8f5] text-emerald-900 border-[#e5e4e1] hover:bg-emerald-100'
+              }`}
+            >
+              3. Hit Target 1 (+15%-20%)
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentTradeStage('EXTENDED_30')}
+              className={`p-2 border uppercase cursor-pointer text-center transition-all ${
+                currentTradeStage === 'EXTENDED_30'
+                  ? 'bg-purple-900 text-white border-purple-900 shadow-xs'
+                  : 'bg-[#f9f8f5] text-purple-900 border-[#e5e4e1] hover:bg-purple-100'
+              }`}
+            >
+              4. Extended / Climax (+30%+)
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentTradeStage('THREATENED')}
+              className={`p-2 border uppercase cursor-pointer text-center transition-all ${
+                currentTradeStage === 'THREATENED'
+                  ? 'bg-rose-800 text-white border-rose-800 shadow-xs'
+                  : 'bg-[#f9f8f5] text-rose-900 border-[#e5e4e1] hover:bg-rose-100'
+              }`}
+            >
+              5. Threatened / Pullback
+            </button>
+          </div>
+
+          {/* Dynamic Step-by-Step Action Guidance Box */}
+          <div className="p-3.5 bg-[#f9f8f5] border border-[#e5e4e1] text-xs font-sans space-y-2">
+            {currentTradeStage === 'JUST_ENTERED' && (
+              <div className="space-y-1">
+                <div className="font-bold font-mono text-slate-900 uppercase text-[11px] flex items-center space-x-1.5">
+                  <ArrowRightCircle className="w-4 h-4 text-slate-700" />
+                  <span>Protocol: Initial Position Protection</span>
+                </div>
+                <p className="text-gray-700 text-xs">
+                  • Place hard GTC stop loss order at <strong className="font-mono text-rose-700 font-bold">{formatCurrency(currentStopLoss, currencySymbol)} (-{riskPercentFromPivot.toFixed(1)}%)</strong> with your broker immediately upon execution.
+                  <br />
+                  • If breakout fails within 2-3 days without volume follow-through, prepare to scratch the trade near breakeven.
+                </p>
+              </div>
+            )}
+
+            {currentTradeStage === 'IN_PROFIT_8' && (
+              <div className="space-y-1">
+                <div className="font-bold font-mono text-blue-900 uppercase text-[11px] flex items-center space-x-1.5">
+                  <ArrowRightCircle className="w-4 h-4 text-blue-700" />
+                  <span>Protocol: Raise Stop to Breakeven (Backstop Rule)</span>
+                </div>
+                <p className="text-gray-700 text-xs">
+                  • Stock has reached <strong className="font-mono text-blue-800 font-bold">{formatCurrency(pivotEntry * 1.08, currencySymbol)} (+8.0%)</strong>. Raise your hard stop loss order to <strong className="font-mono text-slate-900 font-bold">{formatCurrency(pivotEntry, currencySymbol)}</strong>.
+                  <br />
+                  • This converts {stock.ticker} into a <strong>zero-risk trade</strong>. You can no longer lose principal capital.
+                </p>
+              </div>
+            )}
+
+            {currentTradeStage === 'HIT_TARGET1' && (
+              <div className="space-y-1">
+                <div className="font-bold font-mono text-emerald-900 uppercase text-[11px] flex items-center space-x-1.5">
+                  <ArrowRightCircle className="w-4 h-4 text-emerald-700" />
+                  <span>Protocol: Scale Out 50% Profit & Trail Runner</span>
+                </div>
+                <p className="text-gray-700 text-xs">
+                  • Stock hit Target 1 at <strong className="font-mono text-emerald-800 font-bold">{formatCurrency(stock.target1Price, currencySymbol)} (+{stock.target1Percent}%)</strong>. Sell <strong className="font-mono font-bold text-emerald-800">{Math.floor(posSize.shareQuantity * 0.5).toLocaleString()} shares</strong> into strength.
+                  <br />
+                  • Move stop loss on remaining <strong className="font-mono font-bold text-slate-900">{Math.ceil(posSize.shareQuantity * 0.5).toLocaleString()} shares</strong> to the 10-day EMA or 20-day SMA to ride the trend.
+                </p>
+              </div>
+            )}
+
+            {currentTradeStage === 'EXTENDED_30' && (
+              <div className="space-y-1">
+                <div className="font-bold font-mono text-purple-900 uppercase text-[11px] flex items-center space-x-1.5">
+                  <ArrowRightCircle className="w-4 h-4 text-purple-700" />
+                  <span>Protocol: Climax Top / Parabolic Exit Signal</span>
+                </div>
+                <p className="text-gray-700 text-xs">
+                  • Stock is up <strong className="font-mono text-purple-900 font-bold">+{stock.target2Percent}%+</strong> from pivot entry. Look for climax sell signals: 3-5 consecutive exhaustion gap-ups, widest daily spread bar, or heavy volume reversal bar.
+                  <br />
+                  • Tighten trailing stop aggressively to the 10-day EMA or previous day's low to lock in maximum capital gains.
+                </p>
+              </div>
+            )}
+
+            {currentTradeStage === 'THREATENED' && (
+              <div className="space-y-1">
+                <div className="font-bold font-mono text-rose-900 uppercase text-[11px] flex items-center space-x-1.5">
+                  <AlertTriangle className="w-4 h-4 text-rose-700" />
+                  <span>Protocol: Pullback Defense & 50-Day Moving Average Rule</span>
+                </div>
+                <p className="text-gray-700 text-xs">
+                  • If price drops toward <strong className="font-mono text-rose-700 font-bold">{formatCurrency(currentStopLoss, currencySymbol)}</strong>, honor your stop loss with zero hesitation or emotion.
+                  <br />
+                  • <strong>50-day SMA Breakdown:</strong> If price breaks below 50d SMA on volume &gt;150% above average, exit entire position immediately.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Trade Insights & Post-Mortem Notes (Saved to Local Storage) */}
       <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-5 space-y-3">

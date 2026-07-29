@@ -176,7 +176,7 @@ export type EmotionalState =
   | 'REGRETFUL'
   | 'PATIENT';
 
-export type TradeStatus = 'PLANNING' | 'ACTIVE_TRADE' | 'CLOSED_WIN' | 'CLOSED_LOSS' | 'SCRATCHED';
+export type TradeStatus = 'PLANNING' | 'ACTIVE_TRADE' | 'OPEN' | 'CLOSED_WIN' | 'CLOSED_LOSS' | 'STOPPED_OUT' | 'SCRATCHED';
 
 export interface TradeJournalNote {
   id: string;

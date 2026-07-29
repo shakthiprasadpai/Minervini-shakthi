@@ -6,10 +6,15 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
+  BarChart,
+  Bar,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip
+  Tooltip,
+  Legend,
+  ReferenceLine
 } from 'recharts';
 import {
   BookMarked,
@@ -41,7 +46,11 @@ import {
   Camera,
   Eye,
   Maximize2,
-  Target
+  Target,
+  Tag,
+  Calculator,
+  Layers,
+  Bookmark
 } from 'lucide-react';
 
 interface TradeJournalProps {
@@ -50,6 +59,28 @@ interface TradeJournalProps {
   onSelectStock?: (stock: MinerviniTradeSetup) => void;
   onViewChart?: (stock: MinerviniTradeSetup) => void;
 }
+
+export interface SetupTagPreset {
+  id: string;
+  name: string;
+  icon: string;
+  badgeClass: string;
+  category: 'Minervini VCP' | 'Breakout Patterns' | 'Entry Tactics' | 'Base Formations';
+}
+
+export const SETUP_TAG_PRESETS: SetupTagPreset[] = [
+  { id: 'vcp3', name: 'VCP (3 Contractions)', icon: '🌀', badgeClass: 'bg-purple-100 text-purple-900 border-purple-300', category: 'Minervini VCP' },
+  { id: 'vcp4', name: 'VCP (4 Contractions)', icon: '🌀', badgeClass: 'bg-indigo-100 text-indigo-900 border-indigo-300', category: 'Minervini VCP' },
+  { id: 'pocket_pivot', name: 'Pocket Pivot', icon: '⚡', badgeClass: 'bg-amber-100 text-amber-900 border-amber-300', category: 'Entry Tactics' },
+  { id: 'pivot_breakout', name: 'Pivot Breakout', icon: '🚀', badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300', category: 'Breakout Patterns' },
+  { id: 'high_tight_flag', name: 'High Tight Flag', icon: '🚩', badgeClass: 'bg-blue-100 text-blue-900 border-blue-300', category: 'Breakout Patterns' },
+  { id: 'cup_handle', name: 'Cup with Handle', icon: '☕', badgeClass: 'bg-cyan-100 text-cyan-900 border-cyan-300', category: 'Base Formations' },
+  { id: 'cheat_entry', name: '3C Cheat Entry', icon: '🎯', badgeClass: 'bg-teal-100 text-teal-900 border-teal-300', category: 'Entry Tactics' },
+  { id: 'pivot_pullback', name: 'Pivot Pullback', icon: '🔄', badgeClass: 'bg-sky-100 text-sky-900 border-sky-300', category: 'Entry Tactics' },
+  { id: 'flat_base', name: 'Flat Base Breakout', icon: '📊', badgeClass: 'bg-rose-100 text-rose-900 border-rose-300', category: 'Base Formations' },
+  { id: 'double_bottom', name: 'Double Bottom', icon: '📈', badgeClass: 'bg-slate-100 text-slate-900 border-slate-300', category: 'Base Formations' },
+  { id: 'ipo_base', name: 'IPO Base Breakout', icon: '🌟', badgeClass: 'bg-orange-100 text-orange-900 border-orange-300', category: 'Breakout Patterns' },
+];
 
 const EMOTIONAL_STATES: { state: EmotionalState; label: string; color: string; icon: string }[] = [
   { state: 'DISCIPLINED', label: 'Disciplined', color: 'bg-emerald-100 text-emerald-900 border-emerald-300', icon: '🛡️' },
@@ -63,12 +94,22 @@ const EMOTIONAL_STATES: { state: EmotionalState; label: string; color: string; i
   { state: 'REGRETFUL', label: 'Regretful', color: 'bg-gray-200 text-gray-800 border-gray-400', icon: '💭' },
 ];
 
-const TRADE_STATUSES: { status: TradeStatus; label: string; badge: string }[] = [
-  { status: 'PLANNING', label: 'Planning Setups', badge: 'bg-gray-100 text-gray-800 border-gray-300' },
-  { status: 'ACTIVE_TRADE', label: 'Active Position', badge: 'bg-blue-100 text-blue-900 border-blue-300' },
-  { status: 'CLOSED_WIN', label: 'Closed Win (+)', badge: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
-  { status: 'CLOSED_LOSS', label: 'Closed Loss (-)', badge: 'bg-rose-100 text-rose-900 border-rose-300' },
-  { status: 'SCRATCHED', label: 'Scratched / Breakeven', badge: 'bg-amber-100 text-amber-900 border-amber-300' },
+export interface TradeStatusInfo {
+  status: TradeStatus;
+  label: string;
+  badge: string;
+  icon: string;
+  category: 'ACTIVE' | 'COMPLETED' | 'PLANNING';
+}
+
+export const TRADE_STATUSES: TradeStatusInfo[] = [
+  { status: 'OPEN', label: 'Open Position', badge: 'bg-emerald-100 text-emerald-950 border-emerald-400 font-bold', icon: '🟢', category: 'ACTIVE' },
+  { status: 'ACTIVE_TRADE', label: 'Active Trade', badge: 'bg-blue-100 text-blue-950 border-blue-400 font-bold', icon: '⚡', category: 'ACTIVE' },
+  { status: 'CLOSED_WIN', label: 'Closed (Win)', badge: 'bg-green-100 text-green-950 border-green-400 font-bold', icon: '🏆', category: 'COMPLETED' },
+  { status: 'CLOSED_LOSS', label: 'Closed (Loss)', badge: 'bg-red-100 text-red-950 border-red-400 font-bold', icon: '🔻', category: 'COMPLETED' },
+  { status: 'STOPPED_OUT', label: 'Stopped Out', badge: 'bg-rose-200 text-rose-950 border-rose-500 font-bold ring-1 ring-rose-300', icon: '🛑', category: 'COMPLETED' },
+  { status: 'PLANNING', label: 'Planning Setup', badge: 'bg-slate-100 text-slate-800 border-slate-300 font-bold', icon: '📋', category: 'PLANNING' },
+  { status: 'SCRATCHED', label: 'Scratched / Breakeven', badge: 'bg-amber-100 text-amber-950 border-amber-400 font-bold', icon: '⚖️', category: 'COMPLETED' },
 ];
 
 export const TradeJournal: React.FC<TradeJournalProps> = ({
@@ -83,7 +124,9 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
 
   const [selectedTickerFilter, setSelectedTickerFilter] = useState<string>('ALL');
   const [selectedEmotionFilter, setSelectedEmotionFilter] = useState<string>('ALL');
-  const [selectedOutcomeFilter, setSelectedOutcomeFilter] = useState<'ALL' | 'WIN' | 'LOSS'>('ALL');
+  const [selectedOutcomeFilter, setSelectedOutcomeFilter] = useState<string>('ALL');
+  const [selectedSetupFilter, setSelectedSetupFilter] = useState<string>('ALL');
+  const [strategyChartMetric, setStrategyChartMetric] = useState<'netPnl' | 'gainsVsLosses' | 'winRate'>('netPnl');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [journalViewMode, setJournalViewMode] = useState<'grid' | 'grouped'>('grid');
 
@@ -287,29 +330,48 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
     new Set([...stocks.map((s) => s.ticker), ...journalNotes.map((n) => n.ticker)])
   );
 
-  // Filtered notes keyed by ticker / emotion / outcome / search query
+  // Extract all setup types/tags for filter dropdown
+  const allSetupTypes = Array.from(
+    new Set([
+      ...SETUP_TAG_PRESETS.map((p) => p.name),
+      ...journalNotes.map((n) => n.setupType),
+    ])
+  ).filter(Boolean);
+
+  // Filtered notes keyed by ticker / emotion / outcome / setup tag / search query
   const filteredNotes = journalNotes.filter((note) => {
     const matchesTicker = selectedTickerFilter === 'ALL' || note.ticker.toUpperCase() === selectedTickerFilter.toUpperCase();
     const matchesEmotion = selectedEmotionFilter === 'ALL' || note.emotionalState === selectedEmotionFilter;
     const matchesOutcome =
       selectedOutcomeFilter === 'ALL' ||
+      (selectedOutcomeFilter === 'ACTIVE' && (note.tradeStatus === 'OPEN' || note.tradeStatus === 'ACTIVE_TRADE')) ||
+      (selectedOutcomeFilter === 'COMPLETED' && (note.tradeStatus === 'CLOSED_WIN' || note.tradeStatus === 'CLOSED_LOSS' || note.tradeStatus === 'STOPPED_OUT' || note.tradeStatus === 'SCRATCHED')) ||
       (selectedOutcomeFilter === 'WIN' && note.tradeStatus === 'CLOSED_WIN') ||
-      (selectedOutcomeFilter === 'LOSS' && note.tradeStatus === 'CLOSED_LOSS');
+      (selectedOutcomeFilter === 'LOSS' && (note.tradeStatus === 'CLOSED_LOSS' || note.tradeStatus === 'STOPPED_OUT')) ||
+      (selectedOutcomeFilter === 'STOPPED_OUT' && note.tradeStatus === 'STOPPED_OUT') ||
+      (selectedOutcomeFilter === 'PLANNING' && note.tradeStatus === 'PLANNING') ||
+      (selectedOutcomeFilter === 'SCRATCHED' && note.tradeStatus === 'SCRATCHED') ||
+      note.tradeStatus === selectedOutcomeFilter;
+    const matchesSetup =
+      selectedSetupFilter === 'ALL' ||
+      note.setupType.toLowerCase().includes(selectedSetupFilter.toLowerCase());
     const matchesSearch =
       !searchQuery ||
       note.ticker.toLowerCase().includes(searchQuery.toLowerCase()) ||
       note.stockName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       note.notes.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      note.keyLesson.toLowerCase().includes(searchQuery.toLowerCase());
+      note.keyLesson.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      note.setupType.toLowerCase().includes(searchQuery.toLowerCase());
 
-    return matchesTicker && matchesEmotion && matchesOutcome && matchesSearch;
+    return matchesTicker && matchesEmotion && matchesOutcome && matchesSetup && matchesSearch;
   });
 
   // Calculate statistics (reflecting filteredNotes)
   const totalNotes = filteredNotes.length;
   const winNotes = React.useMemo(() => filteredNotes.filter((n) => n.tradeStatus === 'CLOSED_WIN'), [filteredNotes]);
-  const lossNotes = React.useMemo(() => filteredNotes.filter((n) => n.tradeStatus === 'CLOSED_LOSS'), [filteredNotes]);
-  const activeNotes = React.useMemo(() => filteredNotes.filter((n) => n.tradeStatus === 'OPEN_ACTIVE'), [filteredNotes]);
+  const lossNotes = React.useMemo(() => filteredNotes.filter((n) => n.tradeStatus === 'CLOSED_LOSS' || n.tradeStatus === 'STOPPED_OUT'), [filteredNotes]);
+  const activeNotes = React.useMemo(() => filteredNotes.filter((n) => n.tradeStatus === 'OPEN' || n.tradeStatus === 'ACTIVE_TRADE'), [filteredNotes]);
+  const stoppedOutNotes = React.useMemo(() => filteredNotes.filter((n) => n.tradeStatus === 'STOPPED_OUT'), [filteredNotes]);
   const winCount = winNotes.length;
   const lossCount = lossNotes.length;
   const closedCount = winCount + lossCount;
@@ -570,6 +632,114 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
     }).filter(item => item.total > 0);
   }, [filteredNotes]);
 
+  // Strategy Performance Analysis by Setup Tag (reflecting journalNotes)
+  const strategyPerformanceStats = React.useMemo(() => {
+    const map: Record<
+      string,
+      {
+        tag: string;
+        total: number;
+        wins: number;
+        losses: number;
+        scratched: number;
+        grossGains: number;
+        grossLosses: number;
+      }
+    > = {};
+
+    journalNotes.forEach((n) => {
+      const tag = n.setupType ? n.setupType.trim() : 'Unspecified Setup';
+      if (!map[tag]) {
+        map[tag] = {
+          tag,
+          total: 0,
+          wins: 0,
+          losses: 0,
+          scratched: 0,
+          grossGains: 0,
+          grossLosses: 0,
+        };
+      }
+
+      map[tag].total += 1;
+      let pnl = 0;
+      if (n.entryPrice !== undefined && n.exitPrice !== undefined && n.entryPrice > 0) {
+        pnl = ((n.exitPrice - n.entryPrice) / n.entryPrice) * 100;
+      } else if (n.tradeStatus === 'CLOSED_WIN') {
+        pnl = 8.5;
+      } else if (n.tradeStatus === 'CLOSED_LOSS') {
+        pnl = -4.0;
+      }
+
+      if (n.tradeStatus === 'CLOSED_WIN') {
+        map[tag].wins += 1;
+        map[tag].grossGains += pnl;
+      } else if (n.tradeStatus === 'CLOSED_LOSS') {
+        map[tag].losses += 1;
+        map[tag].grossLosses += Math.abs(pnl);
+      } else if (n.tradeStatus === 'SCRATCHED') {
+        map[tag].scratched += 1;
+      }
+    });
+
+    return Object.values(map)
+      .map((item) => {
+        const closed = item.wins + item.losses;
+        const winRate = closed > 0 ? Math.round((item.wins / closed) * 100) : 0;
+        const avgWinPct = item.wins > 0 ? item.grossGains / item.wins : 0;
+        const avgLossPct = item.losses > 0 ? item.grossLosses / item.losses : 0;
+        const profitFactor =
+          item.grossLosses > 0
+            ? item.grossGains / item.grossLosses
+            : item.grossGains > 0
+            ? 99.9
+            : 0;
+        const netPnlPct = item.grossGains - item.grossLosses;
+
+        const winDec = closed > 0 ? item.wins / closed : 0;
+        const lossDec = closed > 0 ? item.losses / closed : 0;
+        const expectancyPct = (winDec * avgWinPct) - (lossDec * avgLossPct);
+
+        const preset = SETUP_TAG_PRESETS.find(
+          (p) => p.name.toLowerCase() === item.tag.toLowerCase() || item.tag.toLowerCase().includes(p.name.toLowerCase())
+        );
+
+        return {
+          ...item,
+          preset,
+          winRate,
+          avgWinPct: Number(avgWinPct.toFixed(2)),
+          avgLossPct: Number(avgLossPct.toFixed(2)),
+          profitFactor: Number(profitFactor.toFixed(2)),
+          netPnlPct: Number(netPnlPct.toFixed(2)),
+          expectancyPct: Number(expectancyPct.toFixed(2)),
+        };
+      })
+      .sort((a, b) => b.winRate - a.winRate || b.total - a.total);
+  }, [journalNotes]);
+
+  // Strategy Chart Data formatted for Recharts Bar Chart
+  const strategyChartData = React.useMemo(() => {
+    return [...strategyPerformanceStats].map((strat) => ({
+      tag: strat.tag,
+      shortTag: strat.tag.length > 16 ? strat.tag.substring(0, 14) + '…' : strat.tag,
+      netPnlPct: Number(strat.netPnlPct.toFixed(2)),
+      expectancyPct: Number(strat.expectancyPct.toFixed(2)),
+      grossGains: Number(strat.grossGains.toFixed(2)),
+      grossLosses: Number(strat.grossLosses.toFixed(2)),
+      winRate: strat.winRate,
+      total: strat.total,
+      wins: strat.wins,
+      losses: strat.losses,
+      profitFactor: strat.profitFactor,
+      preset: strat.preset,
+    })).sort((a, b) => {
+      if (strategyChartMetric === 'netPnl') return b.netPnlPct - a.netPnlPct;
+      if (strategyChartMetric === 'winRate') return b.winRate - a.winRate;
+      return b.grossGains - a.grossGains;
+    });
+  }, [strategyPerformanceStats, strategyChartMetric]);
+
   // Cumulative Performance Data calculation over time with sentiment correlation (reflecting filteredNotes)
   const sentimentScoreMap: Record<EmotionalState, number> = {
     DISCIPLINED: 5,
@@ -779,6 +949,91 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
               <Star className="w-3.5 h-3.5 text-amber-500 fill-current inline" />
             </strong>
             <span className="text-[9px] font-mono text-gray-500 block">{totalNotes} Journaled</span>
+          </div>
+        </div>
+
+        {/* System Viability & Mathematical Expectancy Deep-Dive Banner */}
+        <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-4 font-mono space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e5e4e1] pb-2">
+            <div className="flex items-center space-x-2">
+              <Calculator className="w-4 h-4 text-emerald-700" />
+              <span className="text-xs font-bold uppercase tracking-wider text-[#1a1a1a]">
+                System Viability & Mathematical Expectancy Engine
+              </span>
+            </div>
+            <span className={`text-[10px] font-bold px-2.5 py-0.5 border uppercase ${
+              summaryOutcomeStats.expectancyPct >= 2.0
+                ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                : summaryOutcomeStats.expectancyPct > 0
+                ? 'bg-blue-100 text-blue-900 border-blue-300'
+                : summaryOutcomeStats.expectancyPct === 0
+                ? 'bg-amber-100 text-amber-900 border-amber-300'
+                : 'bg-rose-100 text-rose-900 border-rose-300'
+            }`}>
+              {summaryOutcomeStats.expectancyPct >= 2.0
+                ? '🟢 Exceptional Edge (High System Viability)'
+                : summaryOutcomeStats.expectancyPct > 0
+                ? '🔵 Positive Edge (Viable Trading System)'
+                : summaryOutcomeStats.expectancyPct === 0
+                ? '🟡 Breakeven System (Zero Edge)'
+                : '🔴 Negative Expectancy (Capital Destruction)'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+            {/* Component 1: Win Contribution */}
+            <div className="bg-white border border-emerald-200 p-3 space-y-1">
+              <span className="text-[10px] uppercase font-bold text-emerald-800 block">
+                1. Win Contribution (WinRate × AvgProfit)
+              </span>
+              <div className="text-lg font-bold text-emerald-700">
+                +{( (closedCount > 0 ? winCount / closedCount : 0) * summaryOutcomeStats.avgWinPct ).toFixed(2)}%
+              </div>
+              <p className="text-[10px] text-gray-500 font-sans">
+                Win Rate: <strong>{winRate}%</strong> ({winCount}/{closedCount || 1}) × Avg Gain: <strong className="text-emerald-700">+{summaryOutcomeStats.avgWinPct}%</strong>
+              </p>
+            </div>
+
+            {/* Component 2: Loss Contribution */}
+            <div className="bg-white border border-rose-200 p-3 space-y-1">
+              <span className="text-[10px] uppercase font-bold text-rose-800 block">
+                2. Loss Contribution (LossRate × AvgLoss)
+              </span>
+              <div className="text-lg font-bold text-rose-700">
+                -{( (closedCount > 0 ? lossCount / closedCount : 0) * summaryOutcomeStats.avgLossPct ).toFixed(2)}%
+              </div>
+              <p className="text-[10px] text-gray-500 font-sans">
+                Loss Rate: <strong>{closedCount > 0 ? Math.round((lossCount / closedCount) * 100) : 0}%</strong> ({lossCount}/{closedCount || 1}) × Avg Loss: <strong className="text-rose-700">-{summaryOutcomeStats.avgLossPct}%</strong>
+              </p>
+            </div>
+
+            {/* Component 3: Net System Expectancy */}
+            <div className="bg-white border border-purple-200 p-3 space-y-1">
+              <span className="text-[10px] uppercase font-bold text-purple-900 block">
+                3. Net Expectancy / Trade
+              </span>
+              <div className={`text-lg font-black ${summaryOutcomeStats.expectancyPct >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                {summaryOutcomeStats.expectancyPct >= 0 ? `+${summaryOutcomeStats.expectancyPct}%` : `${summaryOutcomeStats.expectancyPct}%`}
+              </div>
+              <p className="text-[10px] text-gray-500 font-sans">
+                Formula: <strong className="font-mono text-purple-900">(WinRate × AvgProfit) - (LossRate × AvgLoss)</strong>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between text-[11px] bg-white border border-[#e5e4e1] px-3 py-2 text-gray-700 gap-2">
+            <span className="flex items-center space-x-1.5">
+              <span>💡</span>
+              <span>
+                <strong>100-Trade Projection:</strong> Executing 100 trades with this exact statistical edge projects a cumulative return of{' '}
+                <strong className={summaryOutcomeStats.expectancyPct >= 0 ? 'text-emerald-700 font-bold' : 'text-rose-700 font-bold'}>
+                  {summaryOutcomeStats.expectancyPct >= 0 ? `+${(summaryOutcomeStats.expectancyPct * 100).toFixed(1)}%` : `${(summaryOutcomeStats.expectancyPct * 100).toFixed(1)}%`}
+                </strong>.
+              </span>
+            </span>
+            <span className="text-gray-500 font-mono text-[10px]">
+              Win/Loss Ratio: <strong className="text-indigo-800">{summaryOutcomeStats.winLossRatio}x</strong> | Profit Factor: <strong className="text-blue-800">{summaryOutcomeStats.profitFactor}x</strong>
+            </span>
           </div>
         </div>
       </div>
@@ -1209,9 +1464,366 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
         </div>
       </div>
 
+      {/* Strategy Performance Matrix by Setup Tag */}
+      <div className="bg-white border border-[#e5e4e1] p-6 space-y-5">
+        <div className="flex flex-wrap items-center justify-between border-b border-[#e5e4e1] pb-3 gap-2">
+          <div className="flex items-center space-x-2">
+            <Tag className="w-5 h-5 text-purple-600" />
+            <h3 className="text-base font-serif font-black text-[#1a1a1a]">
+              Strategy Performance Matrix by Setup Tag
+            </h3>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">
+              Categorized Strategy Edge ({strategyPerformanceStats.length} Setups)
+            </span>
+            {selectedSetupFilter !== 'ALL' && (
+              <button
+                onClick={() => setSelectedSetupFilter('ALL')}
+                className="text-[10px] font-mono font-bold text-purple-700 bg-purple-50 px-2 py-0.5 border border-purple-200 hover:bg-purple-100 transition-all flex items-center space-x-1 cursor-pointer"
+              >
+                <span>Clear Setup Filter ({selectedSetupFilter})</span>
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <p className="text-xs text-gray-600 font-sans">
+          Track win rate, profit factor, average gains, and net realized P&L per setup tag (e.g. VCP, Pocket Pivot, Breakout) to double down on your highest edge setups and eliminate underperforming tactics. Click any strategy card or chart bar below to isolate its trades in the journal.
+        </p>
+
+        {/* Recharts Bar Chart Visual: Cumulative P&L Breakdown by Setup Tag */}
+        <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-5 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e5e4e1] pb-3">
+            <div className="space-y-0.5">
+              <h4 className="text-xs font-mono font-bold text-[#1a1a1a] uppercase tracking-wider flex items-center space-x-1.5">
+                <BarChart2 className="w-4 h-4 text-purple-600" />
+                <span>Strategy Edge & Cumulative P&L Visualizer</span>
+              </h4>
+              <p className="text-[11px] text-gray-500 font-mono">
+                Comparing net realized cumulative P&L (%) and setup performance metrics across tags
+              </p>
+            </div>
+
+            {/* Metric Mode Selector Pills */}
+            <div className="flex flex-wrap items-center gap-1 bg-white border border-[#e5e4e1] p-1 font-mono text-[10px] font-bold">
+              <button
+                type="button"
+                onClick={() => setStrategyChartMetric('netPnl')}
+                className={`px-2.5 py-1 uppercase transition-all cursor-pointer ${
+                  strategyChartMetric === 'netPnl'
+                    ? 'bg-purple-900 text-white shadow-xs'
+                    : 'text-gray-600 hover:text-black hover:bg-gray-100'
+                }`}
+              >
+                Net Realized P&L (%)
+              </button>
+              <button
+                type="button"
+                onClick={() => setStrategyChartMetric('gainsVsLosses')}
+                className={`px-2.5 py-1 uppercase transition-all cursor-pointer ${
+                  strategyChartMetric === 'gainsVsLosses'
+                    ? 'bg-purple-900 text-white shadow-xs'
+                    : 'text-gray-600 hover:text-black hover:bg-gray-100'
+                }`}
+              >
+                Gains vs Losses (%)
+              </button>
+              <button
+                type="button"
+                onClick={() => setStrategyChartMetric('winRate')}
+                className={`px-2.5 py-1 uppercase transition-all cursor-pointer ${
+                  strategyChartMetric === 'winRate'
+                    ? 'bg-purple-900 text-white shadow-xs'
+                    : 'text-gray-600 hover:text-black hover:bg-gray-100'
+                }`}
+              >
+                Win Rate (%)
+              </button>
+            </div>
+          </div>
+
+          {/* Top Strategy Highlight Banner */}
+          {strategyChartData.length > 0 && (
+            <div className="bg-purple-50/80 border border-purple-200 px-3.5 py-2 flex flex-wrap items-center justify-between text-xs font-mono gap-2">
+              <div className="flex items-center space-x-2">
+                <Award className="w-4 h-4 text-amber-600 shrink-0" />
+                <span className="text-gray-700">
+                  Most Profitable Strategy:{' '}
+                  <strong className="text-purple-950 font-bold underline">
+                    {strategyChartData[0]?.tag}
+                  </strong>
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-[11px]">
+                <span className="text-emerald-700 font-bold">
+                  Net Realized: {strategyChartData[0]?.netPnlPct >= 0 ? `+${strategyChartData[0]?.netPnlPct}%` : `${strategyChartData[0]?.netPnlPct}%`}
+                </span>
+                <span className="text-gray-600">
+                  Win Rate: <strong>{strategyChartData[0]?.winRate}%</strong> ({strategyChartData[0]?.wins}W / {strategyChartData[0]?.losses}L)
+                </span>
+                <span className="text-purple-800 font-bold">
+                  Profit Factor: {strategyChartData[0]?.profitFactor > 90 ? '∞' : `${strategyChartData[0]?.profitFactor}x`}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Recharts Bar Chart Container */}
+          <div className="h-64 w-full">
+            {strategyChartData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-xs text-gray-500 font-mono">
+                No setup tags available for chart visualization.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={strategyChartData}
+                  margin={{ top: 15, right: 20, left: -10, bottom: 25 }}
+                  onClick={(state: any) => {
+                    if (state && state.activePayload && state.activePayload.length > 0) {
+                      const clickedTag = state.activePayload[0].payload.tag;
+                      setSelectedSetupFilter(selectedSetupFilter.toLowerCase() === clickedTag.toLowerCase() ? 'ALL' : clickedTag);
+                    }
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e4e1" />
+                  <XAxis
+                    dataKey="shortTag"
+                    tick={{ fill: '#4b5563', fontSize: 11, fontFamily: 'monospace' }}
+                    interval={0}
+                    angle={-12}
+                    textAnchor="end"
+                  />
+                  <YAxis
+                    tick={{ fill: '#4b5563', fontSize: 11, fontFamily: 'monospace' }}
+                    tickFormatter={(val) => `${val}%`}
+                  />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-[#1a1a1a] text-white p-3 border border-purple-500 shadow-xl font-mono text-xs space-y-1.5 max-w-xs z-50">
+                            <div className="flex items-center justify-between border-b border-gray-700 pb-1 gap-2">
+                              <span className="font-bold text-amber-400 text-sm flex items-center space-x-1">
+                                <span>{data.preset?.icon || '🏷️'}</span>
+                                <span className="truncate">{data.tag}</span>
+                              </span>
+                              <span className="text-[10px] text-gray-400 uppercase">
+                                {data.total} Trades
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] pt-1">
+                              <div>
+                                <span className="text-gray-400 block">Net Realized P&L:</span>
+                                <span className={`font-bold ${data.netPnlPct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                  {data.netPnlPct >= 0 ? `+${data.netPnlPct}%` : `${data.netPnlPct}%`}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-gray-400 block">Win Rate:</span>
+                                <span className="font-bold text-blue-300">
+                                  {data.winRate}% ({data.wins}W / {data.losses}L)
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-gray-400 block">Gross Gains:</span>
+                                <span className="font-bold text-emerald-400">+{data.grossGains}%</span>
+                              </div>
+                              <div>
+                                <span className="text-gray-400 block">Gross Losses:</span>
+                                <span className="font-bold text-rose-400">-{data.grossLosses}%</span>
+                              </div>
+                              <div>
+                                <span className="text-gray-400 block">Profit Factor:</span>
+                                <span className="font-bold text-purple-300">
+                                  {data.profitFactor > 90 ? '∞' : `${data.profitFactor}x`}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-[9px] text-purple-300 uppercase pt-1 border-t border-gray-800 text-center">
+                              💡 Click bar to isolate trades in journal
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <ReferenceLine y={0} stroke="#9ca3af" strokeWidth={1.5} />
+                  {strategyChartMetric === 'netPnl' && (
+                    <Bar dataKey="netPnlPct" name="Net Realized P&L (%)" radius={[4, 4, 0, 0]} cursor="pointer">
+                      {strategyChartData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={
+                            selectedSetupFilter.toLowerCase() === entry.tag.toLowerCase()
+                              ? '#7e22ce'
+                              : entry.netPnlPct >= 0
+                              ? '#10b981'
+                              : '#f43f5e'
+                          }
+                        />
+                      ))}
+                    </Bar>
+                  )}
+                  {strategyChartMetric === 'gainsVsLosses' && (
+                    <>
+                      <Legend
+                        verticalAlign="top"
+                        align="right"
+                        wrapperStyle={{ fontSize: 11, fontFamily: 'monospace' }}
+                      />
+                      <Bar dataKey="grossGains" name="Gross Gains (%)" fill="#10b981" radius={[4, 4, 0, 0]} cursor="pointer" />
+                      <Bar dataKey="grossLosses" name="Gross Losses (%)" fill="#f43f5e" radius={[4, 4, 0, 0]} cursor="pointer" />
+                    </>
+                  )}
+                  {strategyChartMetric === 'winRate' && (
+                    <Bar dataKey="winRate" name="Win Rate (%)" radius={[4, 4, 0, 0]} cursor="pointer">
+                      {strategyChartData.map((entry, index) => (
+                        <Cell
+                          key={`cell-win-${index}`}
+                          fill={
+                            selectedSetupFilter.toLowerCase() === entry.tag.toLowerCase()
+                              ? '#7e22ce'
+                              : entry.winRate >= 60
+                              ? '#059669'
+                              : entry.winRate >= 45
+                              ? '#2563eb'
+                              : '#e11d48'
+                          }
+                        />
+                      ))}
+                    </Bar>
+                  )}
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        {/* Strategy Performance Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {strategyPerformanceStats.map((strat) => {
+            const isSelected = selectedSetupFilter.toLowerCase() === strat.tag.toLowerCase();
+            const preset = strat.preset;
+            const badgeStyle = preset ? preset.badgeClass : 'bg-purple-100 text-purple-900 border-purple-300';
+            const icon = preset ? preset.icon : '🏷️';
+            const isTopStrategy = strategyPerformanceStats[0]?.tag === strat.tag && strat.total >= 1 && strat.winRate >= 50;
+
+            return (
+              <div
+                key={strat.tag}
+                onClick={() => setSelectedSetupFilter(isSelected ? 'ALL' : strat.tag)}
+                className={`p-4 border transition-all cursor-pointer space-y-3 relative flex flex-col justify-between ${
+                  isSelected
+                    ? 'bg-purple-50/80 border-purple-500 shadow-md ring-2 ring-purple-400'
+                    : 'bg-[#f9f8f5] border-[#e5e4e1] hover:border-purple-300 hover:bg-white'
+                }`}
+              >
+                {isTopStrategy && (
+                  <span className="absolute -top-2.5 right-3 text-[9px] font-mono font-bold uppercase tracking-wider bg-amber-400 text-amber-950 px-2 py-0.5 border border-amber-500 shadow-xs flex items-center space-x-1">
+                    <Award className="w-3 h-3 text-amber-900 fill-current" />
+                    <span>Top Performing Edge</span>
+                  </span>
+                )}
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[10px] font-mono font-bold px-2 py-0.5 border uppercase flex items-center space-x-1 ${badgeStyle}`}>
+                      <span>{icon}</span>
+                      <span className="truncate max-w-[130px]">{strat.tag}</span>
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-gray-500">
+                      {strat.total} {strat.total === 1 ? 'Trade' : 'Trades'}
+                    </span>
+                  </div>
+
+                  {/* Main Metric: Win Rate & Profit Factor */}
+                  <div className="flex items-baseline justify-between pt-1">
+                    <div>
+                      <span className="text-[9px] font-mono uppercase text-gray-500 block">Win Rate</span>
+                      <span className={`text-xl font-mono font-black ${
+                        strat.winRate >= 60 ? 'text-emerald-700' : strat.winRate >= 45 ? 'text-blue-700' : 'text-rose-700'
+                      }`}>
+                        {strat.winRate}%
+                      </span>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-[9px] font-mono uppercase text-gray-500 block">Profit Factor</span>
+                      <span className="text-sm font-mono font-bold text-gray-900">
+                        {strat.profitFactor > 90 ? '∞' : `${strat.profitFactor}x`}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Visual Win/Loss Bar */}
+                  <div className="w-full bg-gray-200 h-1.5 rounded overflow-hidden flex">
+                    <div className="bg-emerald-500 h-full" style={{ width: `${strat.winRate}%` }} />
+                    <div className="bg-rose-500 h-full" style={{ width: `${100 - strat.winRate}%` }} />
+                  </div>
+                </div>
+
+                {/* Sub Stats */}
+                <div className="grid grid-cols-3 gap-1 text-[10px] font-mono pt-2 border-t border-[#e5e4e1] bg-white/60 p-2">
+                  <div>
+                    <span className="text-gray-500 block">Avg W/L:</span>
+                    <span className="font-bold text-[#1a1a1a]">
+                      <span className="text-emerald-700">+{strat.avgWinPct}%</span> / <span className="text-rose-700">-{strat.avgLossPct}%</span>
+                    </span>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-gray-500 block">Expectancy:</span>
+                    <span className={`font-bold ${strat.expectancyPct >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                      {strat.expectancyPct >= 0 ? `+${strat.expectancyPct}%` : `${strat.expectancyPct}%`}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-gray-500 block">Net P&L:</span>
+                    <span className={`font-bold ${strat.netPnlPct >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                      {strat.netPnlPct >= 0 ? `+${strat.netPnlPct}%` : `${strat.netPnlPct}%`}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-[9px] font-mono text-purple-700 font-bold uppercase text-center pt-1">
+                  {isSelected ? '✓ Currently Filtering Journal' : 'Click to Filter Journal'}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Filter Toolbar */}
       <div className="bg-white border border-[#e5e4e1] p-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
+
+          {/* Setup Tag Filter Dropdown */}
+          <div className="flex items-center space-x-2 text-xs font-mono">
+            <span className="text-purple-700 uppercase text-[10px] font-bold flex items-center space-x-1">
+              <Tag className="w-3 h-3" />
+              <span>Setup Tag:</span>
+            </span>
+            <select
+              value={selectedSetupFilter}
+              onChange={(e) => setSelectedSetupFilter(e.target.value)}
+              className="bg-[#f9f8f5] border border-purple-200 p-2 text-xs font-bold text-[#1a1a1a] focus:outline-none"
+            >
+              <option value="ALL">All Setup Tags ({allSetupTypes.length})</option>
+              {allSetupTypes.map((st) => {
+                const count = journalNotes.filter((n) => n.setupType.toLowerCase().includes(st.toLowerCase())).length;
+                return (
+                  <option key={st} value={st}>
+                    🏷️ {st} ({count} trades)
+                  </option>
+                );
+              })}
+            </select>
+          </div>
           
           {/* Ticker Filter Dropdown */}
           <div className="flex items-center space-x-2 text-xs font-mono">
@@ -1250,37 +1862,83 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
             </select>
           </div>
 
-          {/* Trade Outcome Filter (All, Winners, Losers) */}
-          <div className="flex items-center space-x-1 bg-[#f9f8f5] border border-[#e5e4e1] p-1">
+          {/* Trade Status & Outcome Filter Pills */}
+          <div className="flex flex-wrap items-center gap-1 bg-[#f9f8f5] border border-[#e5e4e1] p-1 font-mono">
             <button
               onClick={() => setSelectedOutcomeFilter('ALL')}
-              className={`px-3 py-1 text-[10px] font-bold uppercase transition-all cursor-pointer ${
+              className={`px-2.5 py-1 text-[10px] font-bold uppercase transition-all cursor-pointer flex items-center space-x-1 ${
                 selectedOutcomeFilter === 'ALL'
                   ? 'bg-[#1a1a1a] text-white shadow-xs'
-                  : 'text-gray-600 hover:text-black'
+                  : 'text-gray-600 hover:text-black hover:bg-gray-100'
               }`}
             >
-              All Trades
+              <span>All ({journalNotes.length})</span>
             </button>
+
+            <button
+              onClick={() => setSelectedOutcomeFilter('ACTIVE')}
+              className={`px-2.5 py-1 text-[10px] font-bold uppercase transition-all cursor-pointer flex items-center space-x-1 ${
+                selectedOutcomeFilter === 'ACTIVE'
+                  ? 'bg-emerald-800 text-white shadow-xs'
+                  : 'text-emerald-900 hover:bg-emerald-100'
+              }`}
+            >
+              <span>🟢 Active / Open ({journalNotes.filter((n) => n.tradeStatus === 'OPEN' || n.tradeStatus === 'ACTIVE_TRADE').length})</span>
+            </button>
+
+            <button
+              onClick={() => setSelectedOutcomeFilter('COMPLETED')}
+              className={`px-2.5 py-1 text-[10px] font-bold uppercase transition-all cursor-pointer flex items-center space-x-1 ${
+                selectedOutcomeFilter === 'COMPLETED'
+                  ? 'bg-indigo-900 text-white shadow-xs'
+                  : 'text-indigo-900 hover:bg-indigo-100'
+              }`}
+            >
+              <span>🏁 Completed ({journalNotes.filter((n) => n.tradeStatus === 'CLOSED_WIN' || n.tradeStatus === 'CLOSED_LOSS' || n.tradeStatus === 'STOPPED_OUT' || n.tradeStatus === 'SCRATCHED').length})</span>
+            </button>
+
             <button
               onClick={() => setSelectedOutcomeFilter('WIN')}
-              className={`px-3 py-1 text-[10px] font-bold uppercase transition-all cursor-pointer ${
+              className={`px-2.5 py-1 text-[10px] font-bold uppercase transition-all cursor-pointer flex items-center space-x-1 ${
                 selectedOutcomeFilter === 'WIN'
-                  ? 'bg-emerald-700 text-white shadow-xs'
-                  : 'text-gray-600 hover:text-black'
+                  ? 'bg-green-700 text-white shadow-xs'
+                  : 'text-green-800 hover:bg-green-100'
               }`}
             >
-              Winners
+              <span>🏆 Winners ({journalNotes.filter((n) => n.tradeStatus === 'CLOSED_WIN').length})</span>
             </button>
+
             <button
               onClick={() => setSelectedOutcomeFilter('LOSS')}
-              className={`px-3 py-1 text-[10px] font-bold uppercase transition-all cursor-pointer ${
+              className={`px-2.5 py-1 text-[10px] font-bold uppercase transition-all cursor-pointer flex items-center space-x-1 ${
                 selectedOutcomeFilter === 'LOSS'
-                  ? 'bg-rose-700 text-white shadow-xs'
-                  : 'text-gray-600 hover:text-black'
+                  ? 'bg-red-700 text-white shadow-xs'
+                  : 'text-red-800 hover:bg-red-100'
               }`}
             >
-              Losers
+              <span>🔻 Losers ({journalNotes.filter((n) => n.tradeStatus === 'CLOSED_LOSS').length})</span>
+            </button>
+
+            <button
+              onClick={() => setSelectedOutcomeFilter('STOPPED_OUT')}
+              className={`px-2.5 py-1 text-[10px] font-bold uppercase transition-all cursor-pointer flex items-center space-x-1 ${
+                selectedOutcomeFilter === 'STOPPED_OUT'
+                  ? 'bg-rose-900 text-white ring-1 ring-rose-400 shadow-xs'
+                  : 'text-rose-900 hover:bg-rose-100'
+              }`}
+            >
+              <span>🛑 Stopped Out ({journalNotes.filter((n) => n.tradeStatus === 'STOPPED_OUT').length})</span>
+            </button>
+
+            <button
+              onClick={() => setSelectedOutcomeFilter('PLANNING')}
+              className={`px-2.5 py-1 text-[10px] font-bold uppercase transition-all cursor-pointer flex items-center space-x-1 ${
+                selectedOutcomeFilter === 'PLANNING'
+                  ? 'bg-slate-800 text-white shadow-xs'
+                  : 'text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              <span>📋 Planning ({journalNotes.filter((n) => n.tradeStatus === 'PLANNING').length})</span>
             </button>
           </div>
 
@@ -1368,6 +2026,12 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
                       const currency = getCurrencySymbol(note.exchange);
                       const matchingStock = stocks.find((s) => s.ticker.toUpperCase() === note.ticker.toUpperCase());
 
+                      const tagPreset = SETUP_TAG_PRESETS.find(
+                        (p) => p.name.toLowerCase() === note.setupType.toLowerCase() || note.setupType.toLowerCase().includes(p.name.toLowerCase())
+                      );
+                      const tagBadgeStyle = tagPreset ? tagPreset.badgeClass : 'bg-purple-100 text-purple-900 border-purple-300';
+                      const tagIcon = tagPreset ? tagPreset.icon : '🏷️';
+
                       return (
                         <div
                           key={note.id}
@@ -1376,26 +2040,39 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
                           <div className="space-y-3">
                             
                             {/* Ticker Header & Badges */}
-                            <div className="flex items-center justify-between border-b border-[#e5e4e1] pb-3">
+                            <div className="flex items-start justify-between border-b border-[#e5e4e1] pb-3 gap-2">
                               <div className="flex items-center space-x-3">
-                                <div className="w-11 h-11 bg-[#1a1a1a] text-white flex flex-col items-center justify-center font-mono">
+                                <div className="w-11 h-11 bg-[#1a1a1a] text-white flex flex-col items-center justify-center font-mono shrink-0">
                                   <span className="text-sm font-bold">{note.ticker}</span>
                                   <span className="text-[8px] text-gray-300 uppercase">{note.exchange}</span>
                                 </div>
                                 <div>
-                                  <h4 className="text-base font-serif font-black text-[#1a1a1a] flex items-center space-x-2">
-                                    <span>{note.stockName}</span>
+                                  <h4 className="text-base font-serif font-black text-[#1a1a1a]">
+                                    {note.stockName}
                                   </h4>
-                                  <span className="text-[10px] font-mono text-gray-500 block">
-                                    Logged on {note.date} &bull; Setup: <strong className="text-[#1a1a1a]">{note.setupType}</strong>
-                                  </span>
+                                  <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                    <span className="text-[10px] font-mono text-gray-500">Logged {note.date}</span>
+                                    <button
+                                      onClick={() => setSelectedSetupFilter(note.setupType)}
+                                      className={`text-[9px] font-mono font-bold px-2 py-0.5 border uppercase flex items-center space-x-1 transition-all hover:scale-105 cursor-pointer ${tagBadgeStyle}`}
+                                      title={`Click to filter trades by setup tag: ${note.setupType}`}
+                                    >
+                                      <span>{tagIcon}</span>
+                                      <span>{note.setupType}</span>
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
 
                               {/* Trade Status Badge */}
-                              <span className={`text-[10px] font-mono font-bold px-2.5 py-1 uppercase border ${statusObj.badge}`}>
-                                {statusObj.label}
-                              </span>
+                              <button
+                                onClick={() => setSelectedOutcomeFilter(selectedOutcomeFilter === note.tradeStatus ? 'ALL' : note.tradeStatus)}
+                                className={`text-[10px] font-mono font-bold px-2.5 py-1 uppercase border shrink-0 flex items-center space-x-1 transition-all hover:scale-105 cursor-pointer ${statusObj.badge}`}
+                                title={`Click to filter trades by status: ${statusObj.label}`}
+                              >
+                                <span>{statusObj.icon}</span>
+                                <span>{statusObj.label}</span>
+                              </button>
                             </div>
 
                             {/* Emotional State & Execution Rating */}
@@ -1546,6 +2223,12 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
               const currency = getCurrencySymbol(note.exchange);
               const matchingStock = stocks.find((s) => s.ticker.toUpperCase() === note.ticker.toUpperCase());
 
+              const tagPreset = SETUP_TAG_PRESETS.find(
+                (p) => p.name.toLowerCase() === note.setupType.toLowerCase() || note.setupType.toLowerCase().includes(p.name.toLowerCase())
+              );
+              const tagBadgeStyle = tagPreset ? tagPreset.badgeClass : 'bg-purple-100 text-purple-900 border-purple-300';
+              const tagIcon = tagPreset ? tagPreset.icon : '🏷️';
+
               return (
                 <div
                   key={note.id}
@@ -1554,26 +2237,39 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
                   <div className="space-y-3">
                     
                     {/* Ticker Header & Badges */}
-                    <div className="flex items-center justify-between border-b border-[#e5e4e1] pb-3">
+                    <div className="flex items-start justify-between border-b border-[#e5e4e1] pb-3 gap-2">
                       <div className="flex items-center space-x-3">
-                        <div className="w-11 h-11 bg-[#1a1a1a] text-white flex flex-col items-center justify-center font-mono">
+                        <div className="w-11 h-11 bg-[#1a1a1a] text-white flex flex-col items-center justify-center font-mono shrink-0">
                           <span className="text-sm font-bold">{note.ticker}</span>
                           <span className="text-[8px] text-gray-300 uppercase">{note.exchange}</span>
                         </div>
                         <div>
-                          <h4 className="text-base font-serif font-black text-[#1a1a1a] flex items-center space-x-2">
-                            <span>{note.stockName}</span>
+                          <h4 className="text-base font-serif font-black text-[#1a1a1a]">
+                            {note.stockName}
                           </h4>
-                          <span className="text-[10px] font-mono text-gray-500 block">
-                            Logged on {note.date} &bull; Setup: <strong className="text-[#1a1a1a]">{note.setupType}</strong>
-                          </span>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                            <span className="text-[10px] font-mono text-gray-500">Logged {note.date}</span>
+                            <button
+                              onClick={() => setSelectedSetupFilter(note.setupType)}
+                              className={`text-[9px] font-mono font-bold px-2 py-0.5 border uppercase flex items-center space-x-1 transition-all hover:scale-105 cursor-pointer ${tagBadgeStyle}`}
+                              title={`Click to filter trades by setup tag: ${note.setupType}`}
+                            >
+                              <span>{tagIcon}</span>
+                              <span>{note.setupType}</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
 
                       {/* Trade Status Badge */}
-                      <span className={`text-[10px] font-mono font-bold px-2.5 py-1 uppercase border ${statusObj.badge}`}>
-                        {statusObj.label}
-                      </span>
+                      <button
+                        onClick={() => setSelectedOutcomeFilter(selectedOutcomeFilter === note.tradeStatus ? 'ALL' : note.tradeStatus)}
+                        className={`text-[10px] font-mono font-bold px-2.5 py-1 uppercase border shrink-0 flex items-center space-x-1 transition-all hover:scale-105 cursor-pointer ${statusObj.badge}`}
+                        title={`Click to filter trades by status: ${statusObj.label}`}
+                      >
+                        <span>{statusObj.icon}</span>
+                        <span>{statusObj.label}</span>
+                      </button>
                     </div>
 
                     {/* Emotional State & Execution Rating */}
@@ -1762,23 +2458,50 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
                   </select>
                 </div>
 
-                {/* Setup Type */}
-                <div>
-                  <label className="block text-[10px] uppercase tracking-wider text-gray-600 font-bold mb-1">
-                    Setup / Pattern Type
-                  </label>
-                  <select
-                    value={formSetupType}
-                    onChange={(e) => setFormSetupType(e.target.value)}
-                    className="w-full bg-[#f9f8f5] border border-[#e5e4e1] p-2.5 text-xs font-bold text-[#1a1a1a] focus:outline-none"
-                  >
-                    <option value="VCP (3 Contractions)">VCP (3 Contractions)</option>
-                    <option value="VCP (4 Contractions)">VCP (4 Contractions)</option>
-                    <option value="High Tight Flag">High Tight Flag</option>
-                    <option value="Cup with Handle">Cup with Handle</option>
-                    <option value="Pivot Pullback">Pivot Pullback</option>
-                    <option value="3C Cheat Entry">3C Cheat Entry</option>
-                  </select>
+                {/* Setup / Strategy Tagging */}
+                <div className="space-y-2 bg-[#f9f8f5] p-3 border border-[#e5e4e1] sm:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[10px] uppercase tracking-wider text-gray-700 font-bold flex items-center space-x-1">
+                      <Tag className="w-3.5 h-3.5 text-purple-600" />
+                      <span>Setup Strategy Tag / Pattern Type</span>
+                    </label>
+                    <span className="text-[10px] font-mono text-gray-500">
+                      Click pill or type custom setup tag below
+                    </span>
+                  </div>
+
+                  {/* Preset Tag Pills */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    {SETUP_TAG_PRESETS.map((preset) => {
+                      const isSelected = formSetupType.toLowerCase() === preset.name.toLowerCase();
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => setFormSetupType(preset.name)}
+                          className={`text-[10px] font-mono font-bold px-2 py-1 border transition-all flex items-center space-x-1 cursor-pointer ${
+                            isSelected
+                              ? 'bg-purple-900 text-white border-purple-950 ring-1 ring-purple-400 shadow-xs'
+                              : `${preset.badgeClass} hover:opacity-90`
+                          }`}
+                        >
+                          <span>{preset.icon}</span>
+                          <span>{preset.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Custom Setup Tag Input */}
+                  <div className="pt-1">
+                    <input
+                      type="text"
+                      placeholder="Or type custom setup tag (e.g. Base-on-Base Breakout, Pocket Pivot)..."
+                      value={formSetupType}
+                      onChange={(e) => setFormSetupType(e.target.value)}
+                      className="w-full bg-white border border-[#e5e4e1] p-2 text-xs font-bold text-[#1a1a1a] focus:outline-none font-mono"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1795,7 +2518,7 @@ export const TradeJournal: React.FC<TradeJournalProps> = ({
                   >
                     {TRADE_STATUSES.map((st) => (
                       <option key={st.status} value={st.status}>
-                        {st.label}
+                        {st.icon} {st.label}
                       </option>
                     ))}
                   </select>
