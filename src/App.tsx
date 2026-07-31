@@ -21,6 +21,7 @@ import { VcpPatternScanner } from './components/VcpPatternScanner';
 import { TradeJournal } from './components/TradeJournal';
 import { BigMoneyTracker } from './components/BigMoneyTracker';
 import { GlobalNotificationToast } from './components/GlobalNotificationToast';
+import { HistoricalBacktestPanel } from './components/HistoricalBacktestPanel';
 import { MOCK_STOCKS } from './data/mockStocks';
 import { MinerviniTradeSetup } from './types';
 import { formatCurrency, formatVolume, getCurrencySymbol } from './utils/sepaCalculator';
@@ -239,6 +240,9 @@ export default function App() {
 
                 {/* Trade Plan & Position Size Card */}
                 <TradePlanCard stock={selectedStock} />
+
+                {/* Historical VCP Backtest & Win-Rate Summary Engine */}
+                <HistoricalBacktestPanel stock={selectedStock} />
 
                 {/* 'Big Money' Institutional Volume Spike Tracker */}
                 <BigMoneyTracker

@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { MinerviniTradeSetup } from '../types';
 import { evaluateTrendTemplate, formatCurrency, getCurrencySymbol } from '../utils/sepaCalculator';
 import { History, Calendar, CheckCircle2, XCircle, TrendingUp, ShieldCheck, Award } from 'lucide-react';
+import { BacktestWinRateSummaryCard } from './BacktestWinRateSummaryCard';
 
 interface HistoricalBacktestPanelProps {
   stock: MinerviniTradeSetup;
@@ -151,6 +152,9 @@ export const HistoricalBacktestPanel: React.FC<HistoricalBacktestPanelProps> = (
           </tbody>
         </table>
       </div>
+
+      {/* Backtest Win-Rate Summary Card */}
+      <BacktestWinRateSummaryCard stock={stock} className="p-0 border-none shadow-none" />
 
       {/* Summary Note */}
       <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-4 flex items-start space-x-3 text-xs text-gray-600 font-sans">
