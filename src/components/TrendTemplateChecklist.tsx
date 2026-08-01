@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MinerviniTradeSetup } from '../types';
 import { evaluateTrendTemplate } from '../utils/sepaCalculator';
-import { CheckCircle2, XCircle, ShieldCheck, AlertCircle, Info, Code, Copy, Check, ChevronDown, ChevronUp, Award, Zap, X } from 'lucide-react';
+import { evaluateRefinedSepaScreener } from '../utils/refinedSepaScreener';
+import { CheckCircle2, XCircle, ShieldCheck, AlertCircle, Info, Code, Copy, Check, ChevronDown, ChevronUp, Award, Zap, X, RotateCcw, Sparkles, ArrowUpRight } from 'lucide-react';
 import { PineScriptExporter, PINE_SCRIPT_CODE } from './PineScriptExporter';
 import { HistoricalBacktestPanel } from './HistoricalBacktestPanel';
 import { AutomatedScoreCard } from './AutomatedScoreCard';
@@ -60,9 +61,66 @@ interface TrendTemplateChecklistProps {
 }
 
 export const TrendTemplateChecklist: React.FC<TrendTemplateChecklistProps> = ({ stock }) => {
-  const { rules, passedCount } = evaluateTrendTemplate(stock);
+  // Local state tracking for manually marked/overridden rules
+  const [userOverrides, setUserOverrides] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem(`vcp_trend_checklist_${stock.ticker}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  // Re-sync overrides when stock.ticker changes
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`vcp_trend_checklist_${stock.ticker}`);
+      setUserOverrides(saved ? JSON.parse(saved) : {});
+    } catch {
+      setUserOverrides({});
+    }
+  }, [stock.ticker]);
+
+  const { rules: calculatedRules } = evaluateTrendTemplate(stock);
+
+  // Combine calculated rule output with user manual overrides
+  const rules = calculatedRules.map((rule) => {
+    const isOverridden = userOverrides[rule.id] !== undefined;
+    const passed = isOverridden ? userOverrides[rule.id] : rule.passed;
+    return {
+      ...rule,
+      passed,
+      isOverridden,
+      calculatedPassed: rule.passed
+    };
+  });
+
+  const passedCount = rules.filter((r) => r.passed).length;
   const isPerfectScore = passedCount === 8;
   const setupQualityScore = Math.round((passedCount / rules.length) * 100);
+  const overriddenCount = Object.keys(userOverrides).length;
+  const hasOverrides = overriddenCount > 0;
+
+  const toggleRulePassed = (ruleId: string, currentPassed: boolean) => {
+    setUserOverrides((prev) => {
+      const next = { ...prev, [ruleId]: !currentPassed };
+      try {
+        localStorage.setItem(`vcp_trend_checklist_${stock.ticker}`, JSON.stringify(next));
+      } catch (e) {
+        console.error(e);
+      }
+      return next;
+    });
+  };
+
+  const handleResetChecklist = () => {
+    setUserOverrides({});
+    try {
+      localStorage.removeItem(`vcp_trend_checklist_${stock.ticker}`);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const getQualityGrade = (score: number) => {
     if (score === 100) return { grade: 'A+', label: 'Institutional Stage 2', color: 'text-emerald-400 bg-emerald-950/80 border-emerald-500' };
@@ -103,6 +161,17 @@ export const TrendTemplateChecklist: React.FC<TrendTemplateChecklistProps> = ({ 
 
         {/* Action Buttons & Score Badge */}
         <div className="flex flex-wrap items-center gap-2">
+          {hasOverrides && (
+            <button
+              onClick={handleResetChecklist}
+              className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-xs font-mono font-bold uppercase tracking-wider flex items-center space-x-1.5 transition-all shadow-2xs cursor-pointer"
+              title="Reset all manual checklist overrides to calculated defaults"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
+              <span>Reset Checklist ({overriddenCount})</span>
+            </button>
+          )}
+
           <button
             onClick={() => setIsPineScriptModalOpen(true)}
             className="px-3 py-1.5 bg-[#1a1a1a] hover:bg-black text-amber-300 border border-amber-500/40 text-xs font-mono font-bold uppercase tracking-wider flex items-center space-x-1.5 transition-all shadow-xs cursor-pointer"
@@ -195,6 +264,34 @@ export const TrendTemplateChecklist: React.FC<TrendTemplateChecklistProps> = ({ 
       {/* Automated Setup Scorecard */}
       <AutomatedScoreCard stock={stock} />
 
+      {/* Checklist Toolbar Header */}
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#e5e4e1]">
+        <div className="flex items-center space-x-2">
+          <span className="font-serif font-bold text-xs uppercase tracking-wider text-[#1a1a1a]">
+            Interactive 8-Point Trend Template Rules ({passedCount}/8 Passed)
+          </span>
+          {hasOverrides && (
+            <span className="text-[10px] font-mono px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 font-bold uppercase tracking-wider">
+              {overriddenCount} {overriddenCount === 1 ? 'rule' : 'rules'} manually modified
+            </span>
+          )}
+        </div>
+
+        <button
+          onClick={handleResetChecklist}
+          disabled={!hasOverrides}
+          className={`px-3 py-1 text-xs font-mono font-bold uppercase tracking-wider flex items-center space-x-1.5 transition-all border ${
+            hasOverrides
+              ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-400 shadow-2xs cursor-pointer'
+              : 'bg-gray-100 text-gray-400 border-gray-200 opacity-60 cursor-not-allowed'
+          }`}
+          title={hasOverrides ? 'Reset all manual rule edits back to calculated defaults' : 'Checklist is currently matching calculated defaults'}
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          <span>Reset Checklist</span>
+        </button>
+      </div>
+
       {/* Rules List */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {rules.map((rule) => (
@@ -203,21 +300,31 @@ export const TrendTemplateChecklist: React.FC<TrendTemplateChecklistProps> = ({ 
             className={`p-4 border transition-all ${
               rule.passed
                 ? 'bg-[#f9f8f5] border-[#e5e4e1] hover:border-gray-400'
-                : 'bg-red-50/30 border-red-200'
+                : 'bg-red-50/30 border-red-200 hover:border-red-300'
             }`}
           >
             <div className="flex items-start justify-between space-x-2">
               <div className="flex items-start space-x-3">
-                {rule.passed ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-700 mt-0.5 shrink-0" />
-                ) : (
-                  <XCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
-                )}
+                {/* Clickable Pass/Fail Status Circle */}
+                <button
+                  type="button"
+                  onClick={() => toggleRulePassed(rule.id, rule.passed)}
+                  className="mt-0.5 shrink-0 focus:outline-none cursor-pointer group"
+                  title={rule.passed ? "Click to toggle rule as Failed" : "Click to toggle rule as Passed"}
+                >
+                  {rule.passed ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-700 group-hover:scale-110 transition-transform" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-600 group-hover:scale-110 transition-transform" />
+                  )}
+                </button>
+
                 <div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <h4 className="text-xs font-bold text-[#1a1a1a] leading-tight">
                       {rule.title}
                     </h4>
+
                     <button
                       type="button"
                       id={`info-rule-${rule.id}`}
@@ -228,18 +335,46 @@ export const TrendTemplateChecklist: React.FC<TrendTemplateChecklistProps> = ({ 
                     >
                       <Info className="w-3.5 h-3.5 text-amber-600" />
                     </button>
+
+                    {rule.isOverridden && (
+                      <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 uppercase tracking-wider">
+                        Manual Override
+                      </span>
+                    )}
                   </div>
                   <p className="text-[11px] text-gray-600 mt-1 line-clamp-2 leading-relaxed">
                     {rule.description}
                   </p>
                 </div>
               </div>
+
+              {/* Manual Override Checkbox Toggle */}
+              <div className="flex items-center shrink-0">
+                <label
+                  className="flex items-center space-x-1.5 cursor-pointer text-[10px] font-mono text-gray-600 hover:text-black select-none bg-white/80 px-2 py-1 border border-gray-200 hover:border-gray-400 transition-colors"
+                  title="Toggle manual pass/fail state for this rule"
+                >
+                  <input
+                    type="checkbox"
+                    checked={rule.passed}
+                    onChange={() => toggleRulePassed(rule.id, rule.passed)}
+                    className="h-3.5 w-3.5 text-emerald-600 rounded-none border-gray-300 focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <span className={`font-bold uppercase text-[9px] ${rule.passed ? 'text-emerald-700' : 'text-red-600'}`}>
+                    {rule.passed ? 'PASSED' : 'FAILED'}
+                  </span>
+                </label>
+              </div>
             </div>
 
             {/* Math Breakdown Row */}
             <div className="mt-3 pt-2 border-t border-[#e5e4e1] flex items-center justify-between text-[11px] font-mono">
-              <span className="text-gray-500">Actual: <strong className={rule.passed ? 'text-green-700 font-bold' : 'text-red-600 font-bold'}>{rule.actualValueStr}</strong></span>
-              <span className="text-gray-500">Target: <span className="text-[#1a1a1a]">{rule.requiredConditionStr}</span></span>
+              <span className="text-gray-500">
+                Actual: <strong className={rule.passed ? 'text-green-700 font-bold' : 'text-red-600 font-bold'}>{rule.actualValueStr}</strong>
+              </span>
+              <span className="text-gray-500">
+                Target: <span className="text-[#1a1a1a]">{rule.requiredConditionStr}</span>
+              </span>
             </div>
           </div>
         ))}
@@ -347,6 +482,44 @@ export const TrendTemplateChecklist: React.FC<TrendTemplateChecklistProps> = ({ 
           </div>
         )}
       </div>
+
+      {/* Enhanced 18-Point SEPA Strategy Evaluation Summary */}
+      {(() => {
+        const refinedRes = evaluateRefinedSepaScreener(stock);
+        return (
+          <div className="bg-[#10141d] text-white border border-[#232936] p-5 space-y-4 rounded-none">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 pb-3">
+              <div className="flex items-center space-x-2">
+                <Sparkles className="w-5 h-5 text-amber-400" />
+                <h4 className="text-sm font-serif font-black text-white">
+                  Refined 18-Point SEPA Strategy Assessment
+                </h4>
+              </div>
+
+              <div className="px-3 py-1 bg-amber-400 text-black font-mono font-bold text-xs uppercase tracking-wider">
+                Refined Score: {refinedRes.passedCount} / 18 ({refinedRes.scorePercent}%)
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-[10px] font-mono">
+              {Object.entries(refinedRes.improvementAreaScores).map(([k, item]) => (
+                <div
+                  key={k}
+                  className={`p-2 border text-center font-bold ${
+                    item.passed ? 'bg-emerald-950/80 border-emerald-600 text-emerald-200' : 'bg-rose-950/60 border-rose-800 text-rose-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-center space-x-1 mb-1">
+                    {item.passed ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : <XCircle className="w-3 h-3 text-rose-400" />}
+                    <span>{item.passed ? 'PASSED' : 'REJECTED'}</span>
+                  </div>
+                  <span className="block truncate">{item.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Footer Info Box */}
       <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-4 flex items-start space-x-3 text-xs text-gray-600">

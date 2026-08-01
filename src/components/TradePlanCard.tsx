@@ -4,6 +4,7 @@ import { calculatePositionSize, calculateBreakoutProbability, formatCurrency, fo
 import { exportTradePlansToCsv } from '../utils/csvExport';
 import { ExitSignals } from './ExitSignals';
 import { BreakoutProbabilityEngine } from './BreakoutProbabilityEngine';
+import { RuleBasedEntryExitPanel } from './RuleBasedEntryExitPanel';
 import { Target, ShieldAlert, ArrowUpRight, Droplets, DollarSign, Calculator, Layers, Flame, Zap, Sparkles, TrendingUp, BarChart3, ShieldCheck, FileText, Save, Check, Trash2, Clock, StickyNote, FileSpreadsheet, LogOut, AlertTriangle, ArrowRightCircle, Sliders, CheckCircle2, RefreshCw } from 'lucide-react';
 
 function getArcPath(cx: number, cy: number, r: number, startAngleDeg: number, endAngleDeg: number) {
@@ -1717,6 +1718,9 @@ export const TradePlanCard: React.FC<TradePlanCardProps> = ({ stock }) => {
           </div>
         </div>
       )}
+
+      {/* Rule-Based Persistent Entry & Exit Signals Engine */}
+      <RuleBasedEntryExitPanel stock={stock} />
 
       {/* Mark Minervini Exit Signals Component */}
       <ExitSignals stock={stock} />

@@ -81,6 +81,24 @@ export interface MinerviniTradeSetup {
   // Minervini Analysis Summary
   sepaNotes: string;
 
+  // Refined SEPA Fundamental & Technical Screener Metrics
+  salesGrowth3Y?: number; // e.g. 24.5%
+  profitGrowth3Y?: number; // e.g. 32.0%
+  qtrSalesGrowthYoY?: number; // e.g. 28.4%
+  qtrProfitGrowthYoY?: number; // e.g. 41.2%
+  salesLatestQtr?: number; // e.g. $1,250M
+  salesPrecedingQtr?: number; // e.g. $980M (Acceleration > 20%)
+  roce?: number; // Return on Capital Employed e.g. 22.5%
+  roe?: number; // Return on Equity e.g. 25.8%
+  debtToEquity?: number; // e.g. 0.18
+  npmLastYear?: number; // Net Profit Margin last year e.g. 14.2%
+  npmLatestQtr?: number; // NPM latest quarter e.g. 16.5%
+  npmPrecedingQtr?: number; // NPM preceding quarter e.g. 13.8% (Margin expansion)
+  pegRatio?: number; // Price/Earnings to Growth ratio e.g. 0.85
+  rsi14?: number; // 14-period Relative Strength Index e.g. 62.4
+  volume50dAvg?: number; // 50-day average daily volume
+  currentVolume?: number; // Latest volume or breakout volume
+
   // 3C Cheat Entry Breakdown
   has3CCheatEntry?: boolean;
   cheatEntryPrice?: number;

@@ -4,6 +4,8 @@ import { formatCurrency, calculateTrendStrengthMeter, getCurrencySymbol } from '
 import { exportTradePlansToCsv } from '../utils/csvExport';
 import { SectorStrengthView } from './SectorStrengthView';
 import { SectorPerformanceWidget } from './SectorPerformanceWidget';
+import { RefinedSepaScreenerModal } from './RefinedSepaScreenerModal';
+import { evaluateRefinedSepaScreener } from '../utils/refinedSepaScreener';
 import {
   Search,
   Droplets,
@@ -136,6 +138,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
   const [highlightRows, setHighlightRows] = useState<boolean>(true);
   const [sortBy, setSortBy] = useState<SortField>('VCP_INTENSITY');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [isRefinedModalOpen, setIsRefinedModalOpen] = useState<boolean>(false);
 
   const handleSort = (field: SortField) => {
     if (sortBy === field) {
@@ -218,7 +221,8 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
   });
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
       
       {/* Sector Performance Summary Widget */}
       <SectorPerformanceWidget
@@ -290,6 +294,15 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                 <span>Sector Strength</span>
               </button>
             </div>
+
+            <button
+              onClick={() => setIsRefinedModalOpen(true)}
+              className="bg-[#10141d] hover:bg-black text-amber-300 px-3 py-1.5 text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 border border-amber-500/40 shadow-xs transition-all cursor-pointer group"
+              title="Open Refined 18-Point Mark Minervini SEPA Strategy Screener Analysis"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 group-hover:rotate-12 transition-transform" />
+              <span>Refined SEPA Screener (18-Point)</span>
+            </button>
 
             <button
               onClick={() => exportTradePlansToCsv(filteredStocks)}
@@ -504,16 +517,29 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
 
                       {/* SEPA Score */}
                       <td className="py-3.5 px-2.5 text-center">
-                        <span
-                          className={`inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-bold border ${
-                            stock.trendScore === 8
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                              : 'bg-amber-50 text-amber-800 border-amber-300'
-                          }`}
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>{stock.trendScore}/8</span>
-                        </span>
+                        <div className="flex flex-col items-center space-y-1">
+                          <span
+                            className={`inline-flex items-center space-x-1 px-2.5 py-0.5 text-xs font-bold border ${
+                              stock.trendScore === 8
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                : 'bg-amber-50 text-amber-800 border-amber-300'
+                            }`}
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>{stock.trendScore}/8</span>
+                          </span>
+
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsRefinedModalOpen(true);
+                            }}
+                            className="text-[9px] font-mono px-1.5 py-0.5 bg-[#10141d] text-amber-300 border border-amber-500/40 hover:border-amber-400 font-bold uppercase tracking-wider cursor-pointer"
+                            title="Click to view 18-Point Refined SEPA Screener Evaluation"
+                          >
+                            18-Pt: {evaluateRefinedSepaScreener(stock).passedCount}/18
+                          </span>
+                        </div>
                       </td>
 
                       {/* 200MA Trend Strength Meter Column */}
@@ -785,6 +811,15 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
 
     </div>
     </div>
+
+      {/* Refined 18-Point SEPA Strategy Screener Analysis Modal */}
+      <RefinedSepaScreenerModal
+        isOpen={isRefinedModalOpen}
+        onClose={() => setIsRefinedModalOpen(false)}
+        stocks={stocks}
+        onSelectStock={onSelectStock}
+      />
+    </>
   );
 };
 
