@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { BookOpen, ShieldCheck, TrendingUp, Droplets, Target, ShieldAlert, Award, Layers, Sliders } from 'lucide-react';
+import { BookOpen, ShieldCheck, TrendingUp, Droplets, Target, ShieldAlert, Award, Layers, Sliders, Zap } from 'lucide-react';
 import { TrendTemplateTutor } from './TrendTemplateTutor';
+import { ThinkTradeChampionModule } from './ThinkTradeChampionModule';
 
 export const EducationalGuide: React.FC = () => {
-  const [guideTab, setGuideTab] = useState<'playbook' | 'tutor'>('playbook');
+  const [guideTab, setGuideTab] = useState<'playbook' | 'champion' | 'tutor'>('playbook');
 
   return (
     <div className="bg-white border border-[#e5e4e1] p-8 shadow-xs space-y-8 text-[#1a1a1a]">
@@ -25,7 +26,7 @@ export const EducationalGuide: React.FC = () => {
         <div className="flex items-center space-x-2 bg-[#f9f8f5] p-1 border border-[#e5e4e1] font-mono text-xs">
           <button
             onClick={() => setGuideTab('playbook')}
-            className={`px-4 py-2 font-bold uppercase tracking-wider transition cursor-pointer flex items-center space-x-1.5 ${
+            className={`px-3 py-1.5 font-bold uppercase tracking-wider transition cursor-pointer flex items-center space-x-1.5 ${
               guideTab === 'playbook'
                 ? 'bg-[#1a1a1a] text-amber-300 shadow-xs'
                 : 'text-gray-700 hover:text-black'
@@ -36,8 +37,20 @@ export const EducationalGuide: React.FC = () => {
           </button>
 
           <button
+            onClick={() => setGuideTab('champion')}
+            className={`px-3 py-1.5 font-bold uppercase tracking-wider transition cursor-pointer flex items-center space-x-1.5 ${
+              guideTab === 'champion'
+                ? 'bg-[#1a1a1a] text-amber-300 shadow-xs'
+                : 'text-gray-700 hover:text-black'
+            }`}
+          >
+            <Zap className="w-4 h-4 text-amber-400" />
+            <span>Think & Trade Like a Champion</span>
+          </button>
+
+          <button
             onClick={() => setGuideTab('tutor')}
-            className={`px-4 py-2 font-bold uppercase tracking-wider transition cursor-pointer flex items-center space-x-1.5 ${
+            className={`px-3 py-1.5 font-bold uppercase tracking-wider transition cursor-pointer flex items-center space-x-1.5 ${
               guideTab === 'tutor'
                 ? 'bg-[#1a1a1a] text-amber-300 shadow-xs'
                 : 'text-gray-700 hover:text-black'
@@ -51,6 +64,8 @@ export const EducationalGuide: React.FC = () => {
 
       {guideTab === 'tutor' ? (
         <TrendTemplateTutor />
+      ) : guideTab === 'champion' ? (
+        <ThinkTradeChampionModule />
       ) : (
         <>
 
