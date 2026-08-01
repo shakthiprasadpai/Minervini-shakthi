@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MinerviniTradeSetup } from '../types';
-import { formatCurrency, calculateTrendStrengthMeter, getCurrencySymbol } from '../utils/sepaCalculator';
+import { formatCurrency, calculateTrendStrengthMeter, getCurrencySymbol, calculateTrendReadinessScore, calculateDailyPivotPoints, calculateDailyVolatilityMetrics } from '../utils/sepaCalculator';
 import { exportTradePlansToCsv } from '../utils/csvExport';
 import { SectorStrengthView } from './SectorStrengthView';
 import { SectorPerformanceWidget } from './SectorPerformanceWidget';
@@ -428,7 +428,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                 {renderSortHeader('Price', 'PRICE')}
                 {renderSortHeader('Chg %', 'CHANGE_PERCENT')}
                 {renderSortHeader('RS Rating', 'RS_RATING', 'center')}
-                {renderSortHeader('SEPA Score', 'SEPA_SCORE', 'center')}
+                {renderSortHeader('Trend Readiness', 'SEPA_SCORE', 'center')}
                 {renderSortHeader('200MA Trend', 'TREND_SLOPE', 'center')}
                 <th className="py-3 px-2.5">Pattern / Stage</th>
                 {renderSortHeader('VCP Heatmap', 'VCP_INTENSITY', 'center')}
@@ -515,31 +515,33 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                         </span>
                       </td>
 
-                      {/* SEPA Score */}
+                      {/* Trend Readiness Score Column */}
                       <td className="py-3.5 px-2.5 text-center">
-                        <div className="flex flex-col items-center space-y-1">
-                          <span
-                            className={`inline-flex items-center space-x-1 px-2.5 py-0.5 text-xs font-bold border ${
-                              stock.trendScore === 8
-                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                                : 'bg-amber-50 text-amber-800 border-amber-300'
-                            }`}
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>{stock.trendScore}/8</span>
-                          </span>
+                        {(() => {
+                          const readiness = calculateTrendReadinessScore(stock);
+                          return (
+                            <div className="flex flex-col items-center space-y-1">
+                              <span
+                                className={`inline-flex items-center space-x-1 px-2.5 py-0.5 text-xs font-bold border ${readiness.badgeBg} ${readiness.badgeBorder}`}
+                                title={`Trend Readiness: ${readiness.readinessLabel} (${readiness.passedCount} of 8 Trend Template Rules Passed)`}
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>{readiness.passedCount}/8 ({readiness.scorePercent}%)</span>
+                              </span>
 
-                          <span
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setIsRefinedModalOpen(true);
-                            }}
-                            className="text-[9px] font-mono px-1.5 py-0.5 bg-[#10141d] text-amber-300 border border-amber-500/40 hover:border-amber-400 font-bold uppercase tracking-wider cursor-pointer"
-                            title="Click to view 18-Point Refined SEPA Screener Evaluation"
-                          >
-                            18-Pt: {evaluateRefinedSepaScreener(stock).passedCount}/18
-                          </span>
-                        </div>
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIsRefinedModalOpen(true);
+                                }}
+                                className="text-[9px] font-mono px-1.5 py-0.5 bg-[#10141d] text-amber-300 border border-amber-500/40 hover:border-amber-400 font-bold uppercase tracking-wider cursor-pointer"
+                                title="Click to view 18-Point Refined SEPA Screener Evaluation"
+                              >
+                                18-Pt: {evaluateRefinedSepaScreener(stock).passedCount}/18
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* 200MA Trend Strength Meter Column */}
@@ -605,14 +607,34 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                         </div>
                       </td>
 
-                      {/* Pivot Entry Price */}
+                      {/* Pivot Entry Price & Daily Pivots / Volatility */}
                       <td className="py-3.5 px-2.5 font-mono">
-                        <div className="font-bold text-[#1a1a1a] text-sm">
-                          {formatCurrency(stock.pivotPrice, currency)}
-                        </div>
-                        <div className="text-[10px] text-gray-500">
-                          Buy: {currency}{stock.pivotPrice.toFixed(0)}-{currency}{stock.buyZoneMax.toFixed(0)}
-                        </div>
+                        {(() => {
+                          const pivotCalc = calculateDailyPivotPoints(stock);
+                          const volCalc = calculateDailyVolatilityMetrics(stock);
+                          return (
+                            <div className="space-y-1">
+                              <div className="font-bold text-[#1a1a1a] text-sm flex items-center justify-between">
+                                <span>{formatCurrency(stock.pivotPrice, currency)}</span>
+                                <span
+                                  className="text-[9px] px-1 py-0.2 bg-amber-100 text-amber-900 border border-amber-300 font-bold"
+                                  title={`Floor Pivot (P): ${currency}${pivotCalc.p.toFixed(2)} | TC: ${currency}${pivotCalc.tc.toFixed(2)} | BC: ${currency}${pivotCalc.bc.toFixed(2)}`}
+                                >
+                                  P: {currency}{pivotCalc.p.toFixed(0)}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between text-[10px]">
+                                <span className="text-gray-500">Buy: {currency}{stock.pivotPrice.toFixed(0)}-{currency}{stock.buyZoneMax.toFixed(0)}</span>
+                                <span
+                                  className={`font-bold text-[9px] ${volCalc.atr14Percent <= 3.5 ? 'text-emerald-700' : 'text-amber-700'}`}
+                                  title={`Daily 14-day ATR: ${currency}${volCalc.atr14.toFixed(2)} (${volCalc.atr14Percent}% of Price)`}
+                                >
+                                  ATR: {volCalc.atr14Percent}%
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Stop Loss Exit Price */}

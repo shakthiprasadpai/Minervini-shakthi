@@ -99,6 +99,29 @@ export interface MinerviniTradeSetup {
   volume50dAvg?: number; // 50-day average daily volume
   currentVolume?: number; // Latest volume or breakout volume
 
+  // Daily Floor Pivot & Central Pivot Range (CPR)
+  dailyPivotP?: number; // Central Floor Pivot
+  dailyPivotR1?: number; // Resistance 1
+  dailyPivotR2?: number; // Resistance 2
+  dailyPivotR3?: number; // Resistance 3
+  dailyPivotS1?: number; // Support 1
+  dailyPivotS2?: number; // Support 2
+  dailyPivotS3?: number; // Support 3
+  cprTC?: number; // Central Pivot Range Top Central
+  cprBC?: number; // Central Pivot Range Bottom Central
+  cprWidthPercent?: number; // Central Pivot Range Width % (Tight CPR indicator)
+  cprStatus?: 'NARROW_TIGHT_CPR' | 'BALANCED_CPR' | 'WIDE_RANGE_CPR';
+
+  // Daily Volatility & ATR Metrics
+  atr14?: number; // 14-day Average True Range in $
+  atr14Percent?: number; // 14-day ATR as % of price
+  atr5dTo20dRatio?: number; // 5-day ATR / 20-day ATR (Volatility Contraction Ratio)
+  dailyHigh?: number;
+  dailyLow?: number;
+  dailyRangePercent?: number; // (High - Low) / Close * 100%
+  volatilityStatus?: 'ULTRA_TIGHT_COIL' | 'MODERATE_COMPRESSION' | 'EXPANDING_VOLATILITY' | 'HIGH_CHAOS';
+  volatilityScore?: number; // 0 to 100 Volatility Compression Score
+
   // 3C Cheat Entry Breakdown
   has3CCheatEntry?: boolean;
   cheatEntryPrice?: number;

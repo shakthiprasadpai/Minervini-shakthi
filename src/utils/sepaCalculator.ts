@@ -95,6 +95,65 @@ export function evaluateTrendTemplate(setup: {
   return { rules, passedCount };
 }
 
+export interface TrendReadinessScoreResult {
+  passedCount: number;
+  totalCount: number;
+  scorePercent: number;
+  readinessLabel: string;
+  badgeBg: string;
+  badgeText: string;
+  badgeBorder: string;
+  rules: TrendTemplateRule[];
+}
+
+export function calculateTrendReadinessScore(setup: {
+  currentPrice: number;
+  sma50: number;
+  sma150: number;
+  sma200: number;
+  sma200_1mo_ago: number;
+  high52w: number;
+  low52w: number;
+  rsRating: number;
+}): TrendReadinessScoreResult {
+  const { rules, passedCount } = evaluateTrendTemplate(setup);
+  const totalCount = rules.length;
+  const scorePercent = Math.round((passedCount / totalCount) * 100);
+
+  let readinessLabel = 'Low Trend Readiness';
+  let badgeBg = 'bg-rose-50 text-rose-800 border-rose-300';
+  let badgeText = 'text-rose-800';
+  let badgeBorder = 'border-rose-300';
+
+  if (passedCount === 8) {
+    readinessLabel = 'Perfect Stage 2 Leader';
+    badgeBg = 'bg-emerald-950 text-amber-300 border-amber-500 font-bold';
+    badgeText = 'text-amber-300';
+    badgeBorder = 'border-amber-500';
+  } else if (passedCount >= 6) {
+    readinessLabel = 'High Trend Readiness';
+    badgeBg = 'bg-emerald-50 text-emerald-800 border-emerald-300';
+    badgeText = 'text-emerald-800';
+    badgeBorder = 'border-emerald-300';
+  } else if (passedCount >= 4) {
+    readinessLabel = 'Moderate Trend Readiness';
+    badgeBg = 'bg-amber-50 text-amber-800 border-amber-300';
+    badgeText = 'text-amber-800';
+    badgeBorder = 'border-amber-300';
+  }
+
+  return {
+    passedCount,
+    totalCount,
+    scorePercent,
+    readinessLabel,
+    badgeBg,
+    badgeText,
+    badgeBorder,
+    rules
+  };
+}
+
 export function calculatePositionSize(
   accountCapital: number,
   riskTolerancePercent: number, // e.g. 1% of account
@@ -336,5 +395,220 @@ export function calculateTrendStrengthMeter(stock: MinerviniTradeSetup): TrendSt
       description: `200MA sloping downward (${slopePercent.toFixed(2)}%/mo). Fails Minervini Trend Template Rule 3.`
     };
   }
+}
+
+export interface DailyPivotResult {
+  p: number; // Floor Pivot Point
+  r1: number;
+  s1: number;
+  r2: number;
+  s2: number;
+  r3: number;
+  s3: number;
+  tc: number; // Central Pivot Range (Top)
+  bc: number; // Central Pivot Range (Bottom)
+  cprWidthPct: number;
+  cprStatus: 'NARROW_TIGHT_CPR' | 'BALANCED_CPR' | 'WIDE_RANGE_CPR';
+  cprStatusLabel: string;
+  proximityToPivotPct: number; // % distance from floor pivot P
+  vcpPivotPrice: number; // SEPA VCP Pivot Entry
+  buyZoneMax: number; // Pivot + 2% or 5%
+  vcpPivotProximityPct: number; // % distance from VCP pivot
+  vcpPivotStatus: 'BREAKOUT_ACTIVE' | 'IN_BUY_ZONE' | 'COILING_AT_PIVOT' | 'SETTING_UP' | 'EXTENDED';
+}
+
+export function calculateDailyPivotPoints(stock: MinerviniTradeSetup): DailyPivotResult {
+  const priceHistory = stock.priceHistory || [];
+  const latestPt = priceHistory.length > 0 ? priceHistory[priceHistory.length - 1] : null;
+
+  const high = stock.dailyHigh ?? (latestPt?.high ?? stock.currentPrice * 1.02);
+  const low = stock.dailyLow ?? (latestPt?.low ?? stock.currentPrice * 0.98);
+  const close = stock.currentPrice;
+
+  // Floor Pivot Calculations
+  const p = (high + low + close) / 3;
+  const r1 = (2 * p) - low;
+  const s1 = (2 * p) - high;
+  const r2 = p + (high - low);
+  const s2 = p - (high - low);
+  const r3 = high + 2 * (p - low);
+  const s3 = low - 2 * (high - p);
+
+  // Central Pivot Range (CPR)
+  const bc = (high + low) / 2;
+  const tc = (p - bc) + p;
+  const cprWidthPct = p > 0 ? (Math.abs(tc - bc) / p) * 100 : 0;
+
+  let cprStatus: 'NARROW_TIGHT_CPR' | 'BALANCED_CPR' | 'WIDE_RANGE_CPR' = 'BALANCED_CPR';
+  let cprStatusLabel = 'Balanced CPR Range';
+
+  if (cprWidthPct <= 0.45) {
+    cprStatus = 'NARROW_TIGHT_CPR';
+    cprStatusLabel = 'Narrow Coiling CPR (Potential Explosive Move)';
+  } else if (cprWidthPct > 1.2) {
+    cprStatus = 'WIDE_RANGE_CPR';
+    cprStatusLabel = 'Wide Range CPR (Choppy/Consolidation)';
+  }
+
+  const proximityToPivotPct = p > 0 ? ((close - p) / p) * 100 : 0;
+
+  // SEPA VCP Pivot
+  const vcpPivotPrice = stock.pivotPrice;
+  const buyZoneMax = stock.buyZoneMax || (vcpPivotPrice * 1.02);
+  const vcpPivotProximityPct = vcpPivotPrice > 0 ? ((close - vcpPivotPrice) / vcpPivotPrice) * 100 : 0;
+
+  let vcpPivotStatus: DailyPivotResult['vcpPivotStatus'] = 'SETTING_UP';
+  if (close > buyZoneMax * 1.03) {
+    vcpPivotStatus = 'EXTENDED';
+  } else if (close > vcpPivotPrice && close <= buyZoneMax) {
+    vcpPivotStatus = 'IN_BUY_ZONE';
+  } else if (close > buyZoneMax) {
+    vcpPivotStatus = 'BREAKOUT_ACTIVE';
+  } else if (vcpPivotProximityPct >= -2.0) {
+    vcpPivotStatus = 'COILING_AT_PIVOT';
+  }
+
+  return {
+    p: Number(p.toFixed(2)),
+    r1: Number(r1.toFixed(2)),
+    s1: Number(s1.toFixed(2)),
+    r2: Number(r2.toFixed(2)),
+    s2: Number(s2.toFixed(2)),
+    r3: Number(r3.toFixed(2)),
+    s3: Number(s3.toFixed(2)),
+    tc: Number(tc.toFixed(2)),
+    bc: Number(bc.toFixed(2)),
+    cprWidthPct: Number(cprWidthPct.toFixed(2)),
+    cprStatus,
+    cprStatusLabel,
+    proximityToPivotPct: Number(proximityToPivotPct.toFixed(2)),
+    vcpPivotPrice: Number(vcpPivotPrice.toFixed(2)),
+    buyZoneMax: Number(buyZoneMax.toFixed(2)),
+    vcpPivotProximityPct: Number(vcpPivotProximityPct.toFixed(2)),
+    vcpPivotStatus
+  };
+}
+
+export interface DailyVolatilityResult {
+  dailyHigh: number;
+  dailyLow: number;
+  dailyRange: number;
+  dailyRangePercent: number; // (High - Low) / Close * 100%
+  atr14: number; // 14-day Average True Range in $
+  atr14Percent: number; // ATR as % of current price
+  volatilityContractionRatio: number; // 5d ATR / 20d ATR
+  volatilityStatus: 'ULTRA_TIGHT_COIL' | 'MODERATE_COMPRESSION' | 'EXPANDING_VOLATILITY' | 'HIGH_CHAOS';
+  volatilityLabel: string;
+  badgeBg: string;
+  badgeText: string;
+  badgeBorder: string;
+  volatilityCompressionScore: number; // 0 - 100
+  dryUpPercent: number;
+}
+
+export function calculateDailyVolatilityMetrics(stock: MinerviniTradeSetup): DailyVolatilityResult {
+  const priceHistory = stock.priceHistory || [];
+  const close = stock.currentPrice;
+
+  let atr14 = stock.atr14 || 0;
+  let atr14Percent = stock.atr14Percent || 0;
+  let vcr = stock.atr5dTo20dRatio || 0.75;
+
+  if (priceHistory.length > 0) {
+    const latestPt = priceHistory[priceHistory.length - 1];
+    const high = stock.dailyHigh ?? latestPt.high;
+    const low = stock.dailyLow ?? latestPt.low;
+
+    // Calculate ATR over history if not explicitly provided
+    let totalTr14 = 0;
+    const count = Math.min(14, priceHistory.length);
+    for (let i = priceHistory.length - count; i < priceHistory.length; i++) {
+      const pt = priceHistory[i];
+      const prevC = i > 0 ? priceHistory[i - 1].close : pt.close;
+      const tr = Math.max(pt.high - pt.low, Math.abs(pt.high - prevC), Math.abs(pt.low - prevC));
+      totalTr14 += tr;
+    }
+    const computedAtr14 = count > 0 ? totalTr14 / count : (high - low);
+    atr14 = computedAtr14;
+    atr14Percent = close > 0 ? (computedAtr14 / close) * 100 : 0;
+
+    // Estimate 5-day vs 20-day ATR ratio (VCR)
+    let totalTr5 = 0;
+    const count5 = Math.min(5, priceHistory.length);
+    for (let i = priceHistory.length - count5; i < priceHistory.length; i++) {
+      const pt = priceHistory[i];
+      const prevC = i > 0 ? priceHistory[i - 1].close : pt.close;
+      totalTr5 += Math.max(pt.high - pt.low, Math.abs(pt.high - prevC), Math.abs(pt.low - prevC));
+    }
+    const atr5 = count5 > 0 ? totalTr5 / count5 : computedAtr14;
+
+    vcr = computedAtr14 > 0 ? atr5 / computedAtr14 : 0.75;
+  } else {
+    atr14 = stock.currentPrice * 0.028;
+    atr14Percent = 2.8;
+  }
+
+  const high = stock.dailyHigh ?? (close * 1.018);
+  const low = stock.dailyLow ?? (close * 0.985);
+  const dailyRange = high - low;
+  const dailyRangePercent = close > 0 ? (dailyRange / close) * 100 : 0;
+
+  // Compression Score calculation
+  // Low ATR% + Low VCR + High Dry-up % = High Compression Score (0-100)
+  const dryUp = stock.volumeDryUpPercent || 50;
+  const atrScore = Math.max(0, Math.min(40, (6 - atr14Percent) * 8));
+  const vcrScore = Math.max(0, Math.min(30, (1.2 - vcr) * 35));
+  const dryScore = Math.max(0, Math.min(30, (dryUp / 100) * 30));
+
+  const volatilityCompressionScore = Math.round(Math.min(100, atrScore + vcrScore + dryScore));
+
+  let volatilityStatus: DailyVolatilityResult['volatilityStatus'] = 'MODERATE_COMPRESSION';
+  let volatilityLabel = 'Moderate Volatility Compression';
+  let badgeBg = 'bg-teal-50 text-teal-800 border-teal-300';
+  let badgeText = 'text-teal-800';
+  let badgeBorder = 'border-teal-300';
+
+  if (atr14Percent <= 3.2 && vcr <= 0.65) {
+    volatilityStatus = 'ULTRA_TIGHT_COIL';
+    volatilityLabel = 'Ultra-Tight Volatility Coil (VCP Squeeze)';
+    badgeBg = 'bg-emerald-950 text-amber-300 border-amber-500 font-bold';
+    badgeText = 'text-amber-300';
+    badgeBorder = 'border-amber-500';
+  } else if (atr14Percent <= 4.5) {
+    volatilityStatus = 'MODERATE_COMPRESSION';
+    volatilityLabel = 'Moderate Volatility Tightening';
+    badgeBg = 'bg-emerald-50 text-emerald-800 border-emerald-300';
+    badgeText = 'text-emerald-800';
+    badgeBorder = 'border-emerald-300';
+  } else if (atr14Percent <= 7.0) {
+    volatilityStatus = 'EXPANDING_VOLATILITY';
+    volatilityLabel = 'Expanding Daily Range';
+    badgeBg = 'bg-amber-50 text-amber-800 border-amber-300';
+    badgeText = 'text-amber-800';
+    badgeBorder = 'border-amber-300';
+  } else {
+    volatilityStatus = 'HIGH_CHAOS';
+    volatilityLabel = 'High Volatility / Wide Spreads';
+    badgeBg = 'bg-rose-50 text-rose-800 border-rose-300';
+    badgeText = 'text-rose-800';
+    badgeBorder = 'border-rose-300';
+  }
+
+  return {
+    dailyHigh: Number(high.toFixed(2)),
+    dailyLow: Number(low.toFixed(2)),
+    dailyRange: Number(dailyRange.toFixed(2)),
+    dailyRangePercent: Number(dailyRangePercent.toFixed(2)),
+    atr14: Number(atr14.toFixed(2)),
+    atr14Percent: Number(atr14Percent.toFixed(2)),
+    volatilityContractionRatio: Number(vcr.toFixed(2)),
+    volatilityStatus,
+    volatilityLabel,
+    badgeBg,
+    badgeText,
+    badgeBorder,
+    volatilityCompressionScore,
+    dryUpPercent: dryUp
+  };
 }
 
