@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Navbar } from './components/Navbar';
+import { Navbar, AppNavTab } from './components/Navbar';
 import { ScreenerTable } from './components/ScreenerTable';
 import { VcpChart } from './components/VcpChart';
 import { TrendTemplateChecklist } from './components/TrendTemplateChecklist';
@@ -23,6 +23,9 @@ import { BigMoneyTracker } from './components/BigMoneyTracker';
 import { GlobalNotificationToast } from './components/GlobalNotificationToast';
 import { HistoricalBacktestPanel } from './components/HistoricalBacktestPanel';
 import { BreakoutProbabilityEngine } from './components/BreakoutProbabilityEngine';
+import { SectorStrengthView } from './components/SectorStrengthView';
+import { PatternVisualsLibrary } from './components/PatternVisualsLibrary';
+import { ExportTradeData } from './components/ExportTradeData';
 import { MOCK_STOCKS } from './data/mockStocks';
 import { MinerviniTradeSetup } from './types';
 import { formatCurrency, formatVolume, getCurrencySymbol, calculateBreakoutProbability } from './utils/sepaCalculator';
@@ -31,7 +34,7 @@ import { TrendingUp, ShieldCheck, Target, Droplets, ArrowUpRight, Flame, BarChar
 export default function App() {
   const [stocksList, setStocksList] = useState<MinerviniTradeSetup[]>(MOCK_STOCKS);
   const [selectedStock, setSelectedStock] = useState<MinerviniTradeSetup>(MOCK_STOCKS[0]);
-  const [activeTab, setActiveTab] = useState<'screener' | 'chart' | 'calculator' | 'custom' | 'playbook' | 'portfolio' | 'earnings' | 'masterclass' | 'obsidian' | 'pocket_pivot' | 'vcp_scanner' | 'journal'>('screener');
+  const [activeTab, setActiveTab] = useState<AppNavTab>('screener');
   const [isObsidian, setIsObsidian] = useState<boolean>(true); // Default to Obsidian Dark theme for luxury feel
 
   useEffect(() => {
@@ -491,6 +494,76 @@ export default function App() {
                   setActiveTab('chart');
                 }}
               />
+            </motion.div>
+          )}
+
+          {/* TAB: SECTOR HEAT MAP */}
+          {activeTab === 'sector_heatmap' && (
+            <motion.div
+              key="sector_heatmap"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="space-y-8"
+            >
+              <SectorStrengthView
+                stocks={stocksList}
+                onSelectStock={(stock) => setSelectedStock(stock)}
+                onViewChart={(stock) => {
+                  setSelectedStock(stock);
+                  setActiveTab('chart');
+                }}
+                onFilterBySector={(sec) => {
+                  setActiveTab('screener');
+                }}
+              />
+            </motion.div>
+          )}
+
+          {/* TAB: PRICE ALERT HISTORY */}
+          {activeTab === 'alert_history' && (
+            <motion.div
+              key="alert_history"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="space-y-8"
+            >
+              <PriceAlertSystem
+                stocks={stocksList}
+                selectedStock={selectedStock}
+                onSelectStock={(stock) => setSelectedStock(stock)}
+              />
+            </motion.div>
+          )}
+
+          {/* TAB: PATTERN VISUALS LIBRARY */}
+          {activeTab === 'pattern_library' && (
+            <motion.div
+              key="pattern_library"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="space-y-8"
+            >
+              <PatternVisualsLibrary />
+            </motion.div>
+          )}
+
+          {/* TAB: EXPORT TRADE DATA */}
+          {activeTab === 'export_data' && (
+            <motion.div
+              key="export_data"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="space-y-8"
+            >
+              <ExportTradeData stocks={stocksList} />
             </motion.div>
           )}
         </AnimatePresence>

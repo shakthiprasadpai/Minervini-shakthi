@@ -1,10 +1,28 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { TrendingUp, BarChart3, Calculator, BookOpen, SlidersHorizontal, Briefcase, Calendar, Video, Gem, Moon, Sun, Zap, Target, BookMarked } from 'lucide-react';
+import { TrendingUp, BarChart3, Calculator, BookOpen, SlidersHorizontal, Briefcase, Calendar, Video, Gem, Moon, Sun, Zap, Target, BookMarked, Layers, BellRing, Download, Sparkles } from 'lucide-react';
+
+export type AppNavTab = 
+  | 'screener' 
+  | 'chart' 
+  | 'calculator' 
+  | 'custom' 
+  | 'playbook' 
+  | 'portfolio' 
+  | 'earnings' 
+  | 'masterclass' 
+  | 'obsidian' 
+  | 'pocket_pivot' 
+  | 'vcp_scanner' 
+  | 'journal'
+  | 'sector_heatmap'
+  | 'alert_history'
+  | 'pattern_library'
+  | 'export_data';
 
 interface NavbarProps {
-  activeTab: 'screener' | 'chart' | 'calculator' | 'custom' | 'playbook' | 'portfolio' | 'earnings' | 'masterclass' | 'obsidian' | 'pocket_pivot' | 'vcp_scanner' | 'journal';
-  setActiveTab: (tab: 'screener' | 'chart' | 'calculator' | 'custom' | 'playbook' | 'portfolio' | 'earnings' | 'masterclass' | 'obsidian' | 'pocket_pivot' | 'vcp_scanner' | 'journal') => void;
+  activeTab: AppNavTab;
+  setActiveTab: (tab: AppNavTab) => void;
   selectedStockTicker: string;
   totalSetupsCount: number;
   tightVolumeCount: number;
@@ -288,6 +306,58 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <BookMarked className="w-3.5 h-3.5 text-emerald-600" />
               <span className="font-bold">Trade Journal</span>
+            </button>
+
+            <button
+              id="nav-tab-sector-heatmap"
+              onClick={() => setActiveTab('sector_heatmap')}
+              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
+                activeTab === 'sector_heatmap'
+                  ? 'border-purple-500 text-purple-400 font-bold'
+                  : 'border-transparent text-gray-500 hover:text-purple-400 hover:border-purple-300'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-purple-400" />
+              <span className="font-bold">Sector Heat Map</span>
+            </button>
+
+            <button
+              id="nav-tab-alert-history"
+              onClick={() => setActiveTab('alert_history')}
+              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
+                activeTab === 'alert_history'
+                  ? 'border-amber-400 text-amber-400 font-bold'
+                  : 'border-transparent text-gray-500 hover:text-amber-400 hover:border-amber-300'
+              }`}
+            >
+              <BellRing className="w-3.5 h-3.5 text-amber-400" />
+              <span className="font-bold">Price Alert History</span>
+            </button>
+
+            <button
+              id="nav-tab-pattern-library"
+              onClick={() => setActiveTab('pattern_library')}
+              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
+                activeTab === 'pattern_library'
+                  ? 'border-amber-400 text-amber-400 font-bold'
+                  : 'border-transparent text-gray-500 hover:text-amber-400 hover:border-amber-300'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+              <span className="font-bold">Pattern Visuals Library</span>
+            </button>
+
+            <button
+              id="nav-tab-export-data"
+              onClick={() => setActiveTab('export_data')}
+              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
+                activeTab === 'export_data'
+                  ? 'border-emerald-500 text-emerald-400 font-bold'
+                  : 'border-transparent text-gray-500 hover:text-emerald-400 hover:border-emerald-300'
+              }`}
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="font-bold">Export Trade Data</span>
             </button>
           </nav>
 

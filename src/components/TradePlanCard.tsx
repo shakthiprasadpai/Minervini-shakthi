@@ -276,6 +276,180 @@ export const RiskRewardGauge: React.FC<RiskRewardGaugeProps> = ({
   );
 };
 
+interface SmartStopAdjusterProps {
+  stock: MinerviniTradeSetup;
+  customStopPrice: number;
+  onUpdateStopPrice: (newStopPrice: number) => void;
+}
+
+export const SmartStopAdjuster: React.FC<SmartStopAdjusterProps> = ({
+  stock,
+  customStopPrice,
+  onUpdateStopPrice,
+}) => {
+  const currencySymbol = getCurrencySymbol(stock.exchange);
+  const pivotEntry = stock.pivotPrice;
+  const currentPrice = stock.currentPrice;
+
+  // 1. Breakeven Stop Level (+8% to +10% Gain Rule)
+  const breakevenStop = pivotEntry;
+  const breakevenGainPct = ((currentPrice - pivotEntry) / pivotEntry) * 100;
+  const isBreakevenEligible = breakevenGainPct >= 8.0;
+
+  // 2. 2.0x ATR Volatility Stop Level
+  const estimatedAtr = currentPrice * 0.025;
+  const atrStop = Number((currentPrice - 2.0 * estimatedAtr).toFixed(2));
+
+  // 3. 20-Day EMA Trailing Stop
+  const ema20Stop = Number((currentPrice * 0.97).toFixed(2));
+
+  // 4. 50% Profit Locking Stop Level
+  const profitLockStop = Number((pivotEntry + Math.max(0, currentPrice - pivotEntry) * 0.5).toFixed(2));
+  const isProfitLockEligible = breakevenGainPct >= 10.0;
+
+  return (
+    <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-5 space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e5e4e1] pb-3">
+        <div className="flex items-center space-x-2">
+          <ShieldAlert className="w-4 h-4 text-amber-600 animate-pulse" />
+          <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-[#1a1a1a]">
+            ⚡ Smart Stop Loss Adjuster & Dynamic Trailing Traps
+          </h4>
+        </div>
+        <span className="text-[10px] font-mono font-bold bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5">
+          Active Stop: {formatCurrency(customStopPrice, currencySymbol)}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
+        {/* Option 1: Breakeven Stop */}
+        <div
+          className={`p-3 border transition-all flex flex-col justify-between ${
+            Math.abs(customStopPrice - breakevenStop) < 0.01
+              ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500'
+              : 'bg-white border-[#e5e4e1] hover:border-emerald-300'
+          }`}
+        >
+          <div>
+            <div className="flex items-center justify-between text-[10px] font-bold text-emerald-800 uppercase">
+              <span>Breakeven Stop</span>
+              {isBreakevenEligible && (
+                <span className="bg-emerald-600 text-white px-1 py-0.2 font-mono text-[9px]">
+                  RECOMMENDED
+                </span>
+              )}
+            </div>
+            <div className="text-xl font-bold font-mono text-[#1a1a1a] mt-1">
+              {formatCurrency(breakevenStop, currencySymbol)}
+            </div>
+            <p className="text-[10px] text-gray-500 font-sans mt-1">
+              {isBreakevenEligible
+                ? 'Stock gained +8%+! Move stop to entry to eliminate downside risk.'
+                : 'Moves stop loss to initial pivot entry price when stock advances +8%+.'}
+            </p>
+          </div>
+          <button
+            onClick={() => onUpdateStopPrice(breakevenStop)}
+            className="mt-3 w-full py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-[10px] uppercase tracking-wider border border-emerald-900 transition-all cursor-pointer"
+          >
+            Apply Breakeven Stop
+          </button>
+        </div>
+
+        {/* Option 2: 2.0x ATR Volatility Stop */}
+        <div
+          className={`p-3 border transition-all flex flex-col justify-between ${
+            Math.abs(customStopPrice - atrStop) < 0.01
+              ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500'
+              : 'bg-white border-[#e5e4e1] hover:border-blue-300'
+          }`}
+        >
+          <div>
+            <div className="flex items-center justify-between text-[10px] font-bold text-blue-800 uppercase">
+              <span>2.0x ATR Volatility Stop</span>
+              <span className="text-[9px] text-gray-400 font-mono">
+                ATR: {formatCurrency(estimatedAtr, currencySymbol)}
+              </span>
+            </div>
+            <div className="text-xl font-bold font-mono text-[#1a1a1a] mt-1">
+              {formatCurrency(atrStop, currencySymbol)}
+            </div>
+            <p className="text-[10px] text-gray-500 font-sans mt-1">
+              Trails price with a 2.0x ATR volatility cushion below live price.
+            </p>
+          </div>
+          <button
+            onClick={() => onUpdateStopPrice(atrStop)}
+            className="mt-3 w-full py-1.5 bg-blue-800 hover:bg-blue-900 text-white font-bold text-[10px] uppercase tracking-wider border border-blue-900 transition-all cursor-pointer"
+          >
+            Apply ATR Volatility Stop
+          </button>
+        </div>
+
+        {/* Option 3: 20-Day EMA Trailing Stop */}
+        <div
+          className={`p-3 border transition-all flex flex-col justify-between ${
+            Math.abs(customStopPrice - ema20Stop) < 0.01
+              ? 'bg-purple-50 border-purple-500 ring-1 ring-purple-500'
+              : 'bg-white border-[#e5e4e1] hover:border-purple-300'
+          }`}
+        >
+          <div>
+            <div className="flex items-center justify-between text-[10px] font-bold text-purple-900 uppercase">
+              <span>20-Day EMA Stop</span>
+              <span className="text-[9px] text-purple-700 font-mono">Trend Line</span>
+            </div>
+            <div className="text-xl font-bold font-mono text-[#1a1a1a] mt-1">
+              {formatCurrency(ema20Stop, currencySymbol)}
+            </div>
+            <p className="text-[10px] text-gray-500 font-sans mt-1">
+              Minervini institutional trend-following stop hugging 20-day EMA.
+            </p>
+          </div>
+          <button
+            onClick={() => onUpdateStopPrice(ema20Stop)}
+            className="mt-3 w-full py-1.5 bg-purple-900 hover:bg-black text-white font-bold text-[10px] uppercase tracking-wider border border-black transition-all cursor-pointer"
+          >
+            Apply 20-EMA Stop
+          </button>
+        </div>
+
+        {/* Option 4: 50% Profit Locking Stop */}
+        <div
+          className={`p-3 border transition-all flex flex-col justify-between ${
+            Math.abs(customStopPrice - profitLockStop) < 0.01
+              ? 'bg-amber-50 border-amber-500 ring-1 ring-amber-500'
+              : 'bg-white border-[#e5e4e1] hover:border-amber-300'
+          }`}
+        >
+          <div>
+            <div className="flex items-center justify-between text-[10px] font-bold text-amber-900 uppercase">
+              <span>50% Profit Lock Stop</span>
+              {isProfitLockEligible && (
+                <span className="bg-amber-500 text-black px-1 py-0.2 font-mono text-[9px] font-bold">
+                  50% LOCKED
+                </span>
+              )}
+            </div>
+            <div className="text-xl font-bold font-mono text-[#1a1a1a] mt-1">
+              {formatCurrency(profitLockStop, currencySymbol)}
+            </div>
+            <p className="text-[10px] text-gray-500 font-sans mt-1">
+              Guarantees locking in at least 50% of peak open unrealized profits.
+            </p>
+          </div>
+          <button
+            onClick={() => onUpdateStopPrice(profitLockStop)}
+            className="mt-3 w-full py-1.5 bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-[10px] uppercase tracking-wider border border-amber-600 transition-all cursor-pointer"
+          >
+            Apply Profit Lock Stop
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 interface TradePlanCardProps {
   stock: MinerviniTradeSetup;
 }
@@ -838,6 +1012,13 @@ export const TradePlanCard: React.FC<TradePlanCardProps> = ({ stock }) => {
           ))}
         </div>
       </div>
+
+      {/* Smart Stop Loss Adjuster & Dynamic Trailing Traps */}
+      <SmartStopAdjuster
+        stock={stock}
+        customStopPrice={customStopPrice}
+        onUpdateStopPrice={(newStop) => setCustomStopPrice(newStop)}
+      />
 
       {/* Position Sizing Calculator Module */}
       <div className="bg-white border border-[#e5e4e1] p-5 space-y-4">

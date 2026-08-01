@@ -25,6 +25,7 @@ import {
   Zap,
   Activity,
   History,
+  TrendingUp,
   HardDrive,
   RefreshCw,
 } from 'lucide-react';
@@ -247,6 +248,98 @@ export const PriceAlertSystem: React.FC<PriceAlertSystemProps> = ({
     window.dispatchEvent(new CustomEvent('minervini_alerts_updated'));
   };
 
+  // Quick-Add 3:1 RRR Alert for Selected Stock
+  const handleAddRRRAlert = (stock: MinerviniTradeSetup, targetRatio: number = 3.0) => {
+    const existing = alerts.find(
+      (a) => a.ticker === stock.ticker && a.targetType === 'RISK_REWARD_RATIO' && a.status === 'ACTIVE'
+    );
+    if (existing) return;
+
+    const riskPerShare = stock.pivotPrice - stock.stopLossPrice;
+    const rrrTargetPrice = Number((stock.pivotPrice + (riskPerShare * targetRatio)).toFixed(2));
+
+    const newAlert: PriceAlert = {
+      id: `alert-${stock.ticker}-rrr-${Date.now()}`,
+      ticker: stock.ticker,
+      stockName: stock.name,
+      targetType: 'RISK_REWARD_RATIO',
+      targetPrice: rrrTargetPrice,
+      triggerProximityPercent: 1.5,
+      currentPrice: stock.currentPrice,
+      status: 'ACTIVE',
+      createdAt: new Date().toLocaleDateString(),
+      exchange: stock.exchange,
+      targetRRRatio: targetRatio,
+      notes: `🎯 Risk-to-Reward Milestone Alert: Trigger when stock reaches ${targetRatio}:1 RRR @ ${getCurrencySymbol(stock.exchange)}${rrrTargetPrice}`,
+    };
+
+    const updated = [newAlert, ...alerts];
+    setAlerts(updated);
+    saveStoredAlerts(updated);
+  };
+
+  // Instant Simulated 3:1 RRR Milestone Trigger
+  const triggerSimulatedRRRAlert = () => {
+    const stock = selectedStock || stocks[0];
+    const stored = getStoredAlerts();
+
+    let targetAlert = stored.find((a) => a.ticker === stock.ticker && a.targetType === 'RISK_REWARD_RATIO');
+
+    if (!targetAlert) {
+      const riskPerShare = stock.pivotPrice - stock.stopLossPrice;
+      const rrrTargetPrice = Number((stock.pivotPrice + (riskPerShare * 3.0)).toFixed(2));
+      targetAlert = {
+        id: `alert-${stock.ticker}-rrr-${Date.now()}`,
+        ticker: stock.ticker,
+        stockName: stock.name,
+        targetType: 'RISK_REWARD_RATIO',
+        targetPrice: rrrTargetPrice,
+        triggerProximityPercent: 1.5,
+        currentPrice: stock.currentPrice,
+        status: 'ACTIVE',
+        createdAt: new Date().toLocaleDateString(),
+        exchange: stock.exchange,
+        targetRRRatio: 3.0,
+        notes: `Simulated 3:1 RRR Milestone Reached @ ${rrrTargetPrice}`,
+      };
+      stored.unshift(targetAlert);
+    }
+
+    const updatedAlerts = stored.map((a) => {
+      if (a.id === targetAlert!.id) {
+        return {
+          ...a,
+          status: 'TRIGGERED' as const,
+          triggeredAt: new Date().toLocaleTimeString(),
+        };
+      }
+      return a;
+    });
+
+    saveStoredAlerts(updatedAlerts);
+    appendTrackerLog({
+      ticker: stock.ticker,
+      exchange: stock.exchange,
+      previousPrice: stock.currentPrice,
+      currentPrice: targetAlert.targetPrice,
+      targetPrice: targetAlert.targetPrice,
+      targetType: 'RISK_REWARD_RATIO',
+      event: 'PIVOT_CROSSED',
+      triggered: true,
+    });
+
+    playAlertChime();
+
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(`🎯 3:1 Risk-to-Reward Milestone Achieved: ${stock.ticker}`, {
+        body: `${stock.ticker} (${stock.exchange}) reached its 3:1 SEPA Risk-to-Reward target price of ${getCurrencySymbol(stock.exchange)}${targetAlert.targetPrice}! Scale out 50% profits & raise stop to breakeven!`,
+        icon: '/favicon.ico',
+      });
+    }
+
+    window.dispatchEvent(new CustomEvent('minervini_alerts_updated'));
+  };
+
   // Quick-Add Volatility Alert for Stock
   const handleAddVolatilityAlert = (stock: MinerviniTradeSetup) => {
     const existing = alerts.find(
@@ -448,6 +541,15 @@ export const PriceAlertSystem: React.FC<PriceAlertSystemProps> = ({
                 <ShieldAlert className="w-3.5 h-3.5" />
                 <span>Add Stop Alert ({getCurrencySymbol(selectedStock.exchange)}{selectedStock.stopLossPrice})</span>
               </button>
+
+              {/* Quick 3:1 RRR Target Alert Button */}
+              <button
+                onClick={() => handleAddRRRAlert(selectedStock, 3.0)}
+                className="bg-amber-700 hover:bg-amber-800 text-white font-bold px-3.5 py-1.5 text-xs uppercase tracking-wider flex items-center space-x-1.5 transition-all shadow-xs cursor-pointer"
+              >
+                <TrendingUp className="w-3.5 h-3.5 text-amber-200" />
+                <span>Add 3:1 RRR Alert</span>
+              </button>
             </div>
           </div>
 
@@ -458,7 +560,7 @@ export const PriceAlertSystem: React.FC<PriceAlertSystemProps> = ({
               <div>
                 <span className="font-bold text-[#1a1a1a] block">Real-Time Browser Notification Simulators</span>
                 <span className="text-gray-500 text-[11px] font-sans">
-                  Test browser notification API and alert chime when {selectedStock.ticker} enters a tight Volatility Dry-Up phase or crosses pivot level.
+                  Test browser notification API and alert chime when {selectedStock.ticker} enters a tight Volatility Dry-Up phase, hits 3:1 RRR target, or crosses pivot level.
                 </span>
               </div>
             </div>
@@ -469,7 +571,15 @@ export const PriceAlertSystem: React.FC<PriceAlertSystemProps> = ({
                 className="bg-purple-900 hover:bg-purple-950 text-amber-300 font-bold px-3.5 py-2 text-xs uppercase tracking-wider flex items-center space-x-1.5 transition-all border border-purple-800 shadow-xs cursor-pointer"
               >
                 <Activity className="w-3.5 h-3.5 text-amber-300" />
-                <span>Test Volatility Alert Trigger</span>
+                <span>Test Volatility Trigger</span>
+              </button>
+
+              <button
+                onClick={triggerSimulatedRRRAlert}
+                className="bg-amber-800 hover:bg-amber-900 text-white font-bold px-3.5 py-2 text-xs uppercase tracking-wider flex items-center space-x-1.5 transition-all border border-amber-900 shadow-xs cursor-pointer"
+              >
+                <TrendingUp className="w-3.5 h-3.5 text-amber-300" />
+                <span>Test 3:1 RRR Trigger</span>
               </button>
 
               <button

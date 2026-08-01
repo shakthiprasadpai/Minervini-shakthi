@@ -153,6 +153,7 @@ export const MyPortfolio: React.FC<MyPortfolioProps> = ({
   useEffect(() => {
     try {
       localStorage.setItem('minervini_sepa_portfolio', JSON.stringify(holdings));
+      window.dispatchEvent(new CustomEvent('minervini_portfolio_updated'));
     } catch (e) {
       console.error(e);
     }
