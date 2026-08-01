@@ -18,7 +18,32 @@ import {
   ReferenceDot,
   Cell
 } from 'recharts';
-import { Eye, EyeOff, Droplets, LineChart, Info, SlidersHorizontal, ArrowRight, Zap, TrendingDown, ShieldAlert, Sparkles, Target, Code, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Eye,
+  EyeOff,
+  Droplets,
+  LineChart,
+  Info,
+  SlidersHorizontal,
+  ArrowRight,
+  Zap,
+  TrendingDown,
+  ShieldAlert,
+  Sparkles,
+  Target,
+  Code,
+  ZoomIn,
+  ZoomOut,
+  ChevronLeft,
+  ChevronRight,
+  Activity,
+  TrendingUp,
+  BarChart3,
+  Sliders,
+  Layers,
+  ArrowUpRight,
+  ArrowDownRight
+} from 'lucide-react';
 
 interface VcpChartProps {
   stock: MinerviniTradeSetup;
@@ -39,6 +64,56 @@ export interface VcpNode {
   avgVolumeOnDate?: number;
 }
 
+export interface VolumeOscillatorPoint extends PricePoint {
+  shortVolSma: number;
+  longVolSma: number;
+  volOsc: number; // percentage difference
+  signalType: 'ACCUMULATION' | 'DISTRIBUTION' | 'DRY_UP';
+}
+
+export function calculateVolumeOscillatorData(
+  history: PricePoint[],
+  shortLen: number = 5,
+  longLen: number = 20
+): VolumeOscillatorPoint[] {
+  if (!history || history.length === 0) return [];
+
+  return history.map((point, idx) => {
+    const shortStart = Math.max(0, idx - shortLen + 1);
+    const shortSlice = history.slice(shortStart, idx + 1);
+    const shortVolSma = Math.round(
+      shortSlice.reduce((acc, p) => acc + p.volume, 0) / shortSlice.length
+    );
+
+    const longStart = Math.max(0, idx - longLen + 1);
+    const longSlice = history.slice(longStart, idx + 1);
+    const longVolSma = Math.round(
+      longSlice.reduce((acc, p) => acc + p.volume, 0) / longSlice.length
+    );
+
+    const volOsc = longVolSma > 0
+      ? Number((((shortVolSma - longVolSma) / longVolSma) * 100).toFixed(1))
+      : 0;
+
+    const isUpDay = point.close >= point.open;
+    let signalType: 'ACCUMULATION' | 'DISTRIBUTION' | 'DRY_UP' = 'DRY_UP';
+
+    if (volOsc > 0) {
+      signalType = isUpDay ? 'ACCUMULATION' : 'DISTRIBUTION';
+    } else {
+      signalType = 'DRY_UP';
+    }
+
+    return {
+      ...point,
+      shortVolSma,
+      longVolSma,
+      volOsc,
+      signalType,
+    };
+  });
+}
+
 export const VcpChart: React.FC<VcpChartProps> = ({ stock }) => {
   const [showSma50, setShowSma50] = useState(true);
   const [showSma150, setShowSma150] = useState(true);
@@ -48,6 +123,12 @@ export const VcpChart: React.FC<VcpChartProps> = ({ stock }) => {
   const [showStage2Bg, setShowStage2Bg] = useState(true);
   const [showLorentzianDots, setShowLorentzianDots] = useState(true);
   const [isPineModalOpen, setIsPineModalOpen] = useState(false);
+
+  // Volume Oscillator State
+  const [showVolumeOscillator, setShowVolumeOscillator] = useState(true);
+  const [volOscShortLen, setVolOscShortLen] = useState<number>(5);
+  const [volOscLongLen, setVolOscLongLen] = useState<number>(20);
+  const [volOscMode, setVolOscMode] = useState<'HISTOGRAM' | 'LINE' | 'BOTH'>('BOTH');
 
   // Interactive Node Selection state
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -93,6 +174,50 @@ export const VcpChart: React.FC<VcpChartProps> = ({ stock }) => {
     }
     return signals;
   }, [stock]);
+
+  // Calculate Volume Oscillator series
+  const volumeOscillatorFullData = useMemo(() => {
+    return calculateVolumeOscillatorData(stock.priceHistory || [], volOscShortLen, volOscLongLen);
+  }, [stock.priceHistory, volOscShortLen, volOscLongLen]);
+
+  const displayedVolumeOscData = useMemo(() => {
+    return calculateVolumeOscillatorData(displayedPriceHistory || [], volOscShortLen, volOscLongLen);
+  }, [displayedPriceHistory, volOscShortLen, volOscLongLen]);
+
+  // Volume Oscillator Institutional vs Retail Summary Stats (last 20 sessions)
+  const volOscSummaryStats = useMemo(() => {
+    const recent = volumeOscillatorFullData.slice(-20);
+    if (recent.length === 0) {
+      return {
+        latestVal: 0,
+        latestSignal: 'DRY_UP' as const,
+        accCount: 0,
+        distCount: 0,
+        dryCount: 0,
+        netBias: 0
+      };
+    }
+
+    const latest = recent[recent.length - 1];
+    let accCount = 0;
+    let distCount = 0;
+    let dryCount = 0;
+
+    recent.forEach((item) => {
+      if (item.signalType === 'ACCUMULATION') accCount++;
+      else if (item.signalType === 'DISTRIBUTION') distCount++;
+      else dryCount++;
+    });
+
+    return {
+      latestVal: latest.volOsc,
+      latestSignal: latest.signalType,
+      accCount,
+      distCount,
+      dryCount,
+      netBias: accCount - distCount
+    };
+  }, [volumeOscillatorFullData]);
 
   // Calculate min/max Y axis bounds for price
   const priceValues = stock.priceHistory.map((p) => p.close);
@@ -272,6 +397,19 @@ export const VcpChart: React.FC<VcpChartProps> = ({ stock }) => {
           >
             <Zap className="w-3 h-3 text-amber-200" />
             <span>Squeeze Overlay {showVolatilityOverlay ? 'ON' : 'OFF'}</span>
+          </button>
+
+          <button
+            onClick={() => setShowVolumeOscillator(!showVolumeOscillator)}
+            className={`px-3 py-1 border text-xs font-semibold uppercase tracking-wider font-mono transition-all flex items-center space-x-1 cursor-pointer ${
+              showVolumeOscillator
+                ? 'bg-cyan-800 text-white border-cyan-900 shadow-xs'
+                : 'bg-[#f9f8f5] text-gray-400 border-[#e5e4e1]'
+            }`}
+            title="Toggle Volume Oscillator (5D/20D MA Volume Difference)"
+          >
+            <Activity className="w-3.5 h-3.5 text-cyan-300" />
+            <span>Vol Osc {showVolumeOscillator ? 'ON' : 'OFF'}</span>
           </button>
         </div>
       </div>
@@ -791,6 +929,231 @@ export const VcpChart: React.FC<VcpChartProps> = ({ stock }) => {
         </div>
       </div>
 
+      {/* Volume Oscillator Subchart & Institutional Accumulation Intelligence */}
+      {showVolumeOscillator && (
+        <div className="pt-3 border-t border-[#e5e4e1] space-y-3 font-mono">
+          
+          {/* Header & Controls Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#f9f8f5] p-3 border border-[#e5e4e1]">
+            <div className="flex items-center space-x-2">
+              <Activity className="w-4 h-4 text-cyan-700" />
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-900">
+                    Volume Oscillator Indicator
+                  </span>
+                  <span className={`px-2 py-0.5 text-[9px] font-extrabold uppercase border ${
+                    volOscSummaryStats.latestSignal === 'ACCUMULATION'
+                      ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                      : volOscSummaryStats.latestSignal === 'DISTRIBUTION'
+                      ? 'bg-rose-100 text-rose-900 border-rose-300'
+                      : 'bg-amber-100 text-amber-900 border-amber-300'
+                  }`}>
+                    {volOscSummaryStats.latestVal >= 0 ? '+' : ''}{volOscSummaryStats.latestVal}% [
+                    {volOscSummaryStats.latestSignal === 'ACCUMULATION' ? 'INSTITUTIONAL ACCUMULATION' : volOscSummaryStats.latestSignal === 'DISTRIBUTION' ? 'RETAIL DISTRIBUTION' : 'VOLUME DRY-UP'}
+                    ]
+                  </span>
+                </div>
+                <p className="text-[10px] text-gray-500 font-sans">
+                  Measures short-term volume ({volOscShortLen}d MA) vs long-term volume ({volOscLongLen}d MA) momentum.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Settings & Mode Controls */}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              
+              {/* Short SMA Selector */}
+              <div className="flex items-center space-x-1 bg-white border border-[#e5e4e1] px-2 py-0.5">
+                <span className="text-[10px] text-gray-500">Short:</span>
+                <button
+                  onClick={() => setVolOscShortLen(5)}
+                  className={`px-1.5 py-0.5 text-[10px] font-bold cursor-pointer ${volOscShortLen === 5 ? 'bg-[#1a1a1a] text-white' : 'text-gray-600 hover:text-black'}`}
+                >
+                  5d
+                </button>
+                <button
+                  onClick={() => setVolOscShortLen(12)}
+                  className={`px-1.5 py-0.5 text-[10px] font-bold cursor-pointer ${volOscShortLen === 12 ? 'bg-[#1a1a1a] text-white' : 'text-gray-600 hover:text-black'}`}
+                >
+                  12d
+                </button>
+              </div>
+
+              {/* Long SMA Selector */}
+              <div className="flex items-center space-x-1 bg-white border border-[#e5e4e1] px-2 py-0.5">
+                <span className="text-[10px] text-gray-500">Long:</span>
+                <button
+                  onClick={() => setVolOscLongLen(20)}
+                  className={`px-1.5 py-0.5 text-[10px] font-bold cursor-pointer ${volOscLongLen === 20 ? 'bg-[#1a1a1a] text-white' : 'text-gray-600 hover:text-black'}`}
+                >
+                  20d
+                </button>
+                <button
+                  onClick={() => setVolOscLongLen(26)}
+                  className={`px-1.5 py-0.5 text-[10px] font-bold cursor-pointer ${volOscLongLen === 26 ? 'bg-[#1a1a1a] text-white' : 'text-gray-600 hover:text-black'}`}
+                >
+                  26d
+                </button>
+              </div>
+
+              {/* Display Mode */}
+              <div className="flex items-center space-x-1 bg-white border border-[#e5e4e1] px-2 py-0.5">
+                <button
+                  onClick={() => setVolOscMode('HISTOGRAM')}
+                  className={`px-1.5 py-0.5 text-[10px] font-bold cursor-pointer ${volOscMode === 'HISTOGRAM' ? 'bg-[#1a1a1a] text-white' : 'text-gray-600 hover:text-black'}`}
+                >
+                  Histo
+                </button>
+                <button
+                  onClick={() => setVolOscMode('LINE')}
+                  className={`px-1.5 py-0.5 text-[10px] font-bold cursor-pointer ${volOscMode === 'LINE' ? 'bg-[#1a1a1a] text-white' : 'text-gray-600 hover:text-black'}`}
+                >
+                  Line
+                </button>
+                <button
+                  onClick={() => setVolOscMode('BOTH')}
+                  className={`px-1.5 py-0.5 text-[10px] font-bold cursor-pointer ${volOscMode === 'BOTH' ? 'bg-[#1a1a1a] text-white' : 'text-gray-600 hover:text-black'}`}
+                >
+                  Both
+                </button>
+              </div>
+
+            </div>
+          </div>
+
+          {/* 20-Session Institutional Accumulation Footprint Breakdown */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
+            <div className="bg-emerald-50/70 border border-emerald-200 p-2.5 space-y-0.5">
+              <span className="text-[10px] uppercase font-bold text-emerald-800 flex items-center space-x-1">
+                <TrendingUp className="w-3 h-3 text-emerald-600" />
+                <span>Accumulation Days</span>
+              </span>
+              <div className="flex items-baseline space-x-1">
+                <strong className="text-xl font-black text-emerald-900">{volOscSummaryStats.accCount}</strong>
+                <span className="text-[10px] text-emerald-700">/ 20 Sessions</span>
+              </div>
+              <p className="text-[10px] font-sans text-gray-600 leading-tight">
+                High volume expanding on price up days. Institutional buying demand!
+              </p>
+            </div>
+
+            <div className="bg-rose-50/70 border border-rose-200 p-2.5 space-y-0.5">
+              <span className="text-[10px] uppercase font-bold text-rose-800 flex items-center space-x-1">
+                <TrendingDown className="w-3 h-3 text-rose-600" />
+                <span>Distribution Days</span>
+              </span>
+              <div className="flex items-baseline space-x-1">
+                <strong className="text-xl font-black text-rose-900">{volOscSummaryStats.distCount}</strong>
+                <span className="text-[10px] text-rose-700">/ 20 Sessions</span>
+              </div>
+              <p className="text-[10px] font-sans text-gray-600 leading-tight">
+                High volume on price down days. Heavy selling pressure or profit taking.
+              </p>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 p-2.5 space-y-0.5">
+              <span className="text-[10px] uppercase font-bold text-gray-700 flex items-center space-x-1">
+                <Droplets className="w-3 h-3 text-gray-600" />
+                <span>Volume Dry-Up Days</span>
+              </span>
+              <div className="flex items-baseline space-x-1">
+                <strong className="text-xl font-black text-[#1a1a1a]">{volOscSummaryStats.dryCount}</strong>
+                <span className="text-[10px] text-gray-600">/ 20 Sessions</span>
+              </div>
+              <p className="text-[10px] font-sans text-gray-600 leading-tight">
+                Below average volume during contractions. Supply exhaustion near pivot!
+              </p>
+            </div>
+
+            <div className="bg-purple-50/70 border border-purple-200 p-2.5 space-y-0.5">
+              <span className="text-[10px] uppercase font-bold text-purple-900 flex items-center space-x-1">
+                <BarChart3 className="w-3 h-3 text-purple-700" />
+                <span>Net Buying Bias</span>
+              </span>
+              <div className="flex items-baseline space-x-1">
+                <strong className={`text-xl font-black ${volOscSummaryStats.netBias >= 0 ? 'text-emerald-800' : 'text-rose-800'}`}>
+                  {volOscSummaryStats.netBias >= 0 ? '+' : ''}{volOscSummaryStats.netBias} Days
+                </strong>
+              </div>
+              <p className="text-[10px] font-sans text-gray-600 leading-tight">
+                {volOscSummaryStats.netBias > 3 ? 'Strong institutional accumulation bias.' : 'Balanced / Consolidation footprint.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Volume Oscillator Recharts ComposedChart */}
+          <div className="w-full h-[140px] bg-[#f9f8f5] p-2 border border-[#e5e4e1] relative">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart
+                data={displayedVolumeOscData}
+                margin={{ top: 10, right: 20, left: 10, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="2 2" stroke="#e5e4e1" vertical={false} />
+                <XAxis dataKey="date" hide />
+                <YAxis
+                  stroke="#888888"
+                  orientation="right"
+                  tick={{ fontSize: 9, fill: '#666666' }}
+                  tickFormatter={(val) => `${val > 0 ? '+' : ''}${val}%`}
+                />
+                <Tooltip content={<VolumeOscillatorTooltip />} />
+
+                {/* Zero Reference Line */}
+                <ReferenceLine
+                  y={0}
+                  stroke="#1a1a1a"
+                  strokeWidth={1.5}
+                  label={{ value: '0% Baseline', fill: '#666666', fontSize: 9, position: 'insideTopLeft' }}
+                />
+
+                {/* Overbought Accumulation Threshold (+15%) */}
+                <ReferenceLine
+                  y={15}
+                  stroke="#16a34a"
+                  strokeDasharray="3 3"
+                  strokeWidth={1}
+                />
+
+                {/* Dry-Up Threshold (-20%) */}
+                <ReferenceLine
+                  y={-20}
+                  stroke="#b5a68d"
+                  strokeDasharray="3 3"
+                  strokeWidth={1}
+                />
+
+                {/* Histogram Bars */}
+                {(volOscMode === 'HISTOGRAM' || volOscMode === 'BOTH') && (
+                  <Bar dataKey="volOsc">
+                    {displayedVolumeOscData.map((entry, index) => {
+                      let color = '#1a1a1a'; // Dry-up default
+                      if (entry.signalType === 'ACCUMULATION') color = '#16a34a';
+                      if (entry.signalType === 'DISTRIBUTION') color = '#dc2626';
+
+                      return <Cell key={`vol-osc-cell-${index}`} fill={color} opacity={0.8} />;
+                    })}
+                  </Bar>
+                )}
+
+                {/* Smooth Curve Line Overlay */}
+                {(volOscMode === 'LINE' || volOscMode === 'BOTH') && (
+                  <Line
+                    type="monotone"
+                    dataKey="volOsc"
+                    stroke="#2563eb"
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 5, fill: '#2563eb' }}
+                  />
+                )}
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+
+        </div>
+      )}
+
       {/* VCP Explanation Banner */}
       <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-4 flex items-start space-x-3 text-xs text-gray-600">
         <Info className="w-4 h-4 text-[#1a1a1a] shrink-0 mt-0.5" />
@@ -935,6 +1298,55 @@ const VolumeTooltip = ({ active, payload }: any) => {
         </div>
         <div className={isDryUp ? 'text-[#b5a68d] font-bold' : 'text-gray-400'}>
           Vs Avg: {diffPct}% {isDryUp && '(Dry-Up)'}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+// Custom Tooltip for Volume Oscillator
+const VolumeOscillatorTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data: VolumeOscillatorPoint = payload[0].payload;
+    const isAccumulation = data.signalType === 'ACCUMULATION';
+    const isDistribution = data.signalType === 'DISTRIBUTION';
+
+    return (
+      <div className="bg-[#1a1a1a] text-white p-3 text-xs font-mono space-y-1.5 border border-black shadow-2xl min-w-[230px]">
+        <div className="flex justify-between items-center border-b border-gray-800 pb-1">
+          <span className="font-bold text-gray-300">{data.date}</span>
+          <span className={`px-1.5 py-0.5 text-[9px] font-extrabold uppercase ${
+            isAccumulation
+              ? 'bg-emerald-600 text-white'
+              : isDistribution
+              ? 'bg-rose-600 text-white'
+              : 'bg-gray-700 text-gray-200'
+          }`}>
+            {data.signalType}
+          </span>
+        </div>
+
+        <div className="flex justify-between items-baseline pt-0.5">
+          <span className="text-gray-400">Volume Oscillator:</span>
+          <strong className={`text-sm font-black ${
+            data.volOsc > 0
+              ? isAccumulation ? 'text-emerald-400' : 'text-rose-400'
+              : 'text-amber-300'
+          }`}>
+            {data.volOsc >= 0 ? '+' : ''}{data.volOsc}%
+          </strong>
+        </div>
+
+        <div className="grid grid-cols-2 gap-x-2 text-[10px] text-gray-300 pt-1 border-t border-gray-800">
+          <div>Short Vol SMA: <strong className="text-white">{formatVolume(data.shortVolSma)}</strong></div>
+          <div>Long Vol SMA: <span className="text-gray-400">{formatVolume(data.longVolSma)}</span></div>
+        </div>
+
+        <div className="text-[10px] text-gray-300 font-sans italic pt-1 border-t border-gray-800 leading-tight">
+          {isAccumulation && '🟢 Institutional Accumulation: Volume expansion on an Up Day.'}
+          {isDistribution && '🔴 Institutional Distribution: High volume selling pressure on a Down Day.'}
+          {!isAccumulation && !isDistribution && '⚫ Volume Dry-Up: Short-term volume below average. Tight supply near pivot!'}
         </div>
       </div>
     );
