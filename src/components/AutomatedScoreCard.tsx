@@ -143,7 +143,9 @@ export const AutomatedScoreCard: React.FC<AutomatedScoreCardProps> = ({ stock })
             </div>
             <div className="bg-[#181e2b] p-2 border border-gray-800">
               <span className="text-gray-400 block text-[10px]">RECOMMENDED STOP</span>
-              <span className="font-bold text-red-400 text-sm">{formatCurrency(stock.suggestedStopPrice, currencySymbol)} (-{(((stock.pivotPrice - stock.suggestedStopPrice)/stock.pivotPrice)*100).toFixed(1)}%)</span>
+              <span className="font-bold text-red-400 text-sm">
+                {formatCurrency(stock.suggestedStopPrice, currencySymbol)} (-{stock?.pivotPrice && stock.pivotPrice > 0 ? (((stock.pivotPrice - (stock.suggestedStopPrice || 0)) / stock.pivotPrice) * 100).toFixed(1) : '5.0'}%)
+              </span>
             </div>
           </div>
         </div>
@@ -170,7 +172,7 @@ export const AutomatedScoreCard: React.FC<AutomatedScoreCardProps> = ({ stock })
               <div className="bg-blue-600 h-2 transition-all" style={{ width: `${(trendTemplateScore/50)*100}%` }}></div>
             </div>
             <p className="text-[10px] text-gray-500 font-sans">
-              SMA 50 ({formatCurrency(stock.sma50, currencySymbol)}) &gt; SMA 150 &gt; SMA 200. Price is +{stock.fiftyTwoWeekLowPercent?.toFixed(0) || 45}% above 52-wk low.
+              SMA 50 ({formatCurrency(stock.sma50, currencySymbol)}) &gt; SMA 150 &gt; SMA 200. Price is +{(stock?.fiftyTwoWeekLowPercent ?? 45).toFixed(0)}% above 52-wk low.
             </p>
           </div>
 

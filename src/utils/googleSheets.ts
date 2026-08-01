@@ -48,7 +48,7 @@ export async function createWatchlistSpreadsheet(
     s.pivotPrice,
     s.stopLossPrice,
     s.target1Price,
-    `${s.riskRewardRatio.toFixed(1)}x`,
+    `${(s.riskRewardRatio ?? 0).toFixed(1)}x`,
     s.rsRating,
   ]);
 
@@ -139,7 +139,7 @@ export async function appendTradePlanToSheet(
     stock.pivotPrice,
     stock.stopLossPrice,
     stock.target1Price,
-    `${stock.riskRewardRatio.toFixed(1)}x`,
+    `${(stock.riskRewardRatio ?? 0).toFixed(1)}x`,
     stock.trendScore,
     stock.vcpStage,
     `${stock.volumeDryUpPercent}%`,

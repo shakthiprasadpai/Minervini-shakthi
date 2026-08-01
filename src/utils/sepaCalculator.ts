@@ -125,11 +125,14 @@ export function calculatePositionSize(
   };
 }
 
-export function getCurrencySymbol(exchange: string): string {
+export function getCurrencySymbol(exchange?: string): string {
   return exchange === 'NSE' || exchange === 'BSE' ? 'Rs. ' : '$';
 }
 
-export function formatCurrency(num: number, symbol = '$', decimals?: number): string {
+export function formatCurrency(num: number | undefined | null, symbol = '$', decimals?: number): string {
+  if (num === undefined || num === null || isNaN(num)) {
+    return `${symbol}0.00`;
+  }
   if (decimals !== undefined) {
     return `${symbol}${num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
   }
@@ -250,7 +253,8 @@ export function calculateBreakoutProbability(stock: MinerviniTradeSetup): Breako
   };
 }
 
-export function formatVolume(vol: number): string {
+export function formatVolume(vol: number | undefined | null): string {
+  if (vol === undefined || vol === null || isNaN(vol)) return '0';
   if (vol >= 1_000_000_000) return `${(vol / 1_000_000_000).toFixed(2)}B`;
   if (vol >= 1_000_000) return `${(vol / 1_000_000).toFixed(2)}M`;
   if (vol >= 1_000) return `${(vol / 1_000).toFixed(1)}K`;

@@ -25,8 +25,8 @@ export const RiskRewardChart: React.FC<RiskRewardChartProps> = ({
   stock,
   accountCapital = 100000,
 }) => {
-  const currencySymbol = getCurrencySymbol(stock.exchange);
-  const entryPrice = stock.pivotPrice || stock.currentPrice;
+  const currencySymbol = getCurrencySymbol(stock?.exchange);
+  const entryPrice = stock?.pivotPrice || stock?.currentPrice || 100;
 
   // Sliders state
   const [stopLossPct, setStopLossPct] = useState<number>(5.0);

@@ -615,11 +615,7 @@ export const VcpChart: React.FC<VcpChartProps> = ({ stock }) => {
       )}
 
       {chartSubTab === 'risk_reward' && (
-        <RiskRewardChart
-          pivotPrice={stock.pivotPrice}
-          stopLossPrice={stock.suggestedStopPrice}
-          currencySymbol={currencySymbol}
-        />
+        <RiskRewardChart stock={stock} />
       )}
 
       {chartSubTab === 'vcp_candlestick' && (
