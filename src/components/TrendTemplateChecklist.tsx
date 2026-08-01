@@ -1,10 +1,59 @@
 import React, { useState } from 'react';
 import { MinerviniTradeSetup } from '../types';
 import { evaluateTrendTemplate } from '../utils/sepaCalculator';
-import { CheckCircle2, XCircle, ShieldCheck, AlertCircle, Info, Code, Copy, Check, ChevronDown, ChevronUp, Award, Zap } from 'lucide-react';
+import { CheckCircle2, XCircle, ShieldCheck, AlertCircle, Info, Code, Copy, Check, ChevronDown, ChevronUp, Award, Zap, X } from 'lucide-react';
 import { PineScriptExporter, PINE_SCRIPT_CODE } from './PineScriptExporter';
 import { HistoricalBacktestPanel } from './HistoricalBacktestPanel';
 import { AutomatedScoreCard } from './AutomatedScoreCard';
+
+interface Stage2Explanation {
+  summary: string;
+  rationale: string;
+  minerviniInsight: string;
+}
+
+const STAGE_2_EXPLANATIONS: Record<string, Stage2Explanation> = {
+  rule_1: {
+    summary: 'Establishes Macro Bullish Trend Baseline',
+    rationale: 'Trading above the 150-day and 200-day SMAs confirms long-term institutional accumulation. Big funds defend these key levels, preventing overhead supply from causing persistent selling pressure.',
+    minerviniInsight: 'Never buy stocks trading below long-term moving averages; Stage 2 requires sustained institutional support above key baseline trendlines.'
+  },
+  rule_2: {
+    summary: 'Validates Intermediate Momentum over Baseline',
+    rationale: 'When the 150-day SMA trades above the 200-day SMA, it confirms a "Golden Cross" alignment. Short-to-intermediate buying pressure is outpacing long-term baseline trends.',
+    minerviniInsight: 'Moving average alignment (150 > 200) ensures you are trading with the path of least resistance, avoiding choppy or declining stocks.'
+  },
+  rule_3: {
+    summary: 'Guarantees Macro Trend Slope is Upward',
+    rationale: 'A flat or declining 200-day SMA indicates Stage 1 consolidation or Stage 4 distribution. An upward-sloping 200-day SMA for at least 1–2 months provides a strong tailwind.',
+    minerviniInsight: 'A rising 200-day SMA is a non-negotiable benchmark of Stage 2. It proves the stock has sustained long-term institutional backing.'
+  },
+  rule_4: {
+    summary: 'Establishes Perfect Bullish Moving Average Hierarchy',
+    rationale: 'Stacking moving averages (50 > 150 > 200) creates optimal trend hierarchy. Short-term buying demand is accelerating faster than medium and long-term averages.',
+    minerviniInsight: 'Multiple moving average stacking confirms multi-timeframe alignment, eliminating laggy stocks and targeting high-momentum market leaders.'
+  },
+  rule_5: {
+    summary: 'Confirms Short-Term Institutional Demand',
+    rationale: 'The 50-day SMA is the primary level where institutions step in to buy pullbacks. Trading above the 50-day SMA indicates healthy short-term buying interest.',
+    minerviniInsight: 'Staying above the 50-day SMA keeps you positioned in stocks with active accumulation and prevents entering during deep pullbacks.'
+  },
+  rule_6: {
+    summary: 'Verifies Stage 1 to Stage 2 Base Breakout',
+    rationale: 'Superperformers make initial powerful moves out of Stage 1 bottoming bases. Requiring at least +30% above the 52-week low filters out dead-money bottom fishing.',
+    minerviniInsight: 'Market leaders bounce strongly off their lows before entering massive Stage 2 advances. Avoid bottom-picking and wait for price power.'
+  },
+  rule_7: {
+    summary: 'Ensures Proximity to Leadership Highs',
+    rationale: 'True market leaders trade near new 52-week highs, not bargain lows. Trading within 25% of highs minimizes overhead resistance from trapped sellers.',
+    minerviniInsight: 'Buy strength, not weakness. Stocks near 52-week highs have clear skies ahead with minimal overhead supply.'
+  },
+  rule_8: {
+    summary: 'Filters for Market-Leading Outperformance',
+    rationale: 'An RS Rating of 70+ confirms the stock is outperforming at least 70% of all stocks in the market, highlighting institutional sponsorship.',
+    minerviniInsight: 'Focus exclusively on top-tier relative strength leaders. High RS ratings are the hallmark of future Stage 2 Superperformers.'
+  }
+};
 
 interface TrendTemplateChecklistProps {
   stock: MinerviniTradeSetup;
@@ -28,6 +77,7 @@ export const TrendTemplateChecklist: React.FC<TrendTemplateChecklistProps> = ({ 
   const [isPineModalOpen, setIsPineScriptModalOpen] = useState(false);
   const [showCodePreview, setShowCodePreview] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null);
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(PINE_SCRIPT_CODE);
@@ -164,9 +214,21 @@ export const TrendTemplateChecklist: React.FC<TrendTemplateChecklistProps> = ({ 
                   <XCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
                 )}
                 <div>
-                  <h4 className="text-xs font-bold text-[#1a1a1a] leading-tight">
-                    {rule.title}
-                  </h4>
+                  <div className="flex items-center space-x-2">
+                    <h4 className="text-xs font-bold text-[#1a1a1a] leading-tight">
+                      {rule.title}
+                    </h4>
+                    <button
+                      type="button"
+                      id={`info-rule-${rule.id}`}
+                      onClick={() => setSelectedRuleId(rule.id)}
+                      title="Why is this rule important for Stage 2 analysis?"
+                      className="p-1 text-amber-600 hover:text-amber-800 hover:bg-amber-100/60 rounded transition-colors cursor-pointer shrink-0"
+                      aria-label={`Explanation for ${rule.title}`}
+                    >
+                      <Info className="w-3.5 h-3.5 text-amber-600" />
+                    </button>
+                  </div>
                   <p className="text-[11px] text-gray-600 mt-1 line-clamp-2 leading-relaxed">
                     {rule.description}
                   </p>
@@ -182,6 +244,74 @@ export const TrendTemplateChecklist: React.FC<TrendTemplateChecklistProps> = ({ 
           </div>
         ))}
       </div>
+
+      {/* Stage 2 Rule Explanation Popup Modal */}
+      {selectedRuleId && STAGE_2_EXPLANATIONS[selectedRuleId] && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+          onClick={() => setSelectedRuleId(null)}
+        >
+          <div 
+            className="bg-white border-2 border-[#1a1a1a] max-w-lg w-full p-6 shadow-2xl space-y-4 relative animate-in fade-in zoom-in duration-150 text-[#1a1a1a]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => setSelectedRuleId(null)}
+              className="absolute top-4 right-4 p-1.5 text-gray-500 hover:text-black hover:bg-gray-100 transition-colors cursor-pointer border border-transparent hover:border-gray-300"
+              aria-label="Close popup"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Header */}
+            <div className="flex items-center space-x-2 border-b border-[#e5e4e1] pb-3 pr-8">
+              <span className="p-1.5 bg-amber-100 text-amber-800 font-mono text-[10px] font-bold uppercase tracking-wider border border-amber-300">
+                Stage 2 Analysis
+              </span>
+              <h3 className="text-sm font-bold font-serif text-[#1a1a1a]">
+                {rules.find(r => r.id === selectedRuleId)?.title}
+              </h3>
+            </div>
+
+            {/* Summary Tag */}
+            <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-2.5 font-mono text-xs font-bold text-amber-900 flex items-center space-x-2">
+              <Zap className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>{STAGE_2_EXPLANATIONS[selectedRuleId].summary}</span>
+            </div>
+
+            {/* Rationale Section */}
+            <div className="space-y-1 text-xs">
+              <span className="font-bold text-gray-500 uppercase tracking-wider text-[10px] font-mono block">
+                Why This Rule is Crucial for Stage 2
+              </span>
+              <p className="text-gray-800 leading-relaxed font-sans">
+                {STAGE_2_EXPLANATIONS[selectedRuleId].rationale}
+              </p>
+            </div>
+
+            {/* Minervini Insight Box */}
+            <div className="bg-[#1a1a1a] text-amber-300 p-3.5 border border-black space-y-1 font-mono text-xs">
+              <span className="text-gray-400 text-[10px] uppercase font-bold tracking-widest block">
+                Minervini Stage 2 Rule
+              </span>
+              <p className="text-amber-200 text-[11px] font-serif italic leading-relaxed">
+                &quot;{STAGE_2_EXPLANATIONS[selectedRuleId].minerviniInsight}&quot;
+              </p>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => setSelectedRuleId(null)}
+                className="px-4 py-1.5 bg-[#1a1a1a] hover:bg-black text-amber-300 text-xs font-mono font-bold uppercase tracking-wider cursor-pointer border border-black"
+              >
+                Close Explanation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Collapsible Pine Script Code Banner */}
       <div className="bg-[#0e1117] text-white border border-gray-800 p-4 space-y-3 font-mono">
