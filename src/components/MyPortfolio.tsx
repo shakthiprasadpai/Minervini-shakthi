@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PortfolioHolding, MinerviniTradeSetup } from '../types';
 import { formatCurrency, getCurrencySymbol } from '../utils/sepaCalculator';
 import { exportPortfolioToCsv } from '../utils/csvExport';
+import { PortfolioRebalancing } from './PortfolioRebalancing';
 import {
   Briefcase,
   TrendingUp,
@@ -37,6 +38,7 @@ export const MyPortfolio: React.FC<MyPortfolioProps> = ({
   onSelectStock,
   onViewChart,
 }) => {
+  const [portfolioSubTab, setPortfolioSubTab] = useState<'holdings' | 'rebalancing'>('holdings');
   // Load portfolio from localStorage or provide initial default holdings
   const [holdings, setHoldings] = useState<PortfolioHolding[]>(() => {
     try {
@@ -324,14 +326,38 @@ export const MyPortfolio: React.FC<MyPortfolioProps> = ({
         </div>
 
         {/* Portfolio Header Actions */}
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center space-x-1 bg-[#f9f8f5] p-1 border border-[#e5e4e1] font-mono text-xs">
+            <button
+              onClick={() => setPortfolioSubTab('holdings')}
+              className={`px-3 py-1.5 font-bold uppercase tracking-wider transition cursor-pointer ${
+                portfolioSubTab === 'holdings'
+                  ? 'bg-[#1a1a1a] text-white shadow-xs'
+                  : 'text-gray-600 hover:text-black'
+              }`}
+            >
+              Active Holdings ({holdings.length})
+            </button>
+            <button
+              onClick={() => setPortfolioSubTab('rebalancing')}
+              className={`px-3 py-1.5 font-bold uppercase tracking-wider transition cursor-pointer flex items-center space-x-1 ${
+                portfolioSubTab === 'rebalancing'
+                  ? 'bg-purple-800 text-white shadow-xs'
+                  : 'text-purple-800 hover:bg-purple-50'
+              }`}
+            >
+              <PieChart className="w-3.5 h-3.5" />
+              <span>Portfolio Rebalancer</span>
+            </button>
+          </div>
+
           <button
             onClick={() => exportPortfolioToCsv(holdings)}
-            className="bg-[#f9f8f5] hover:bg-black hover:text-white text-[#1a1a1a] font-bold px-3.5 py-2.5 text-xs uppercase tracking-wider flex items-center space-x-2 transition-all border border-[#e5e4e1] shadow-xs cursor-pointer group"
+            className="bg-[#f9f8f5] hover:bg-black hover:text-white text-[#1a1a1a] font-bold px-3 py-2 text-xs uppercase tracking-wider flex items-center space-x-1.5 transition-all border border-[#e5e4e1] shadow-xs cursor-pointer group"
             title="Export portfolio holdings to CSV format"
           >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600 group-hover:text-amber-400" />
-            <span>Export Portfolio CSV</span>
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 group-hover:text-amber-400" />
+            <span className="hidden sm:inline">Export CSV</span>
           </button>
 
           <button
@@ -339,13 +365,22 @@ export const MyPortfolio: React.FC<MyPortfolioProps> = ({
               setEditingHoldingId(null);
               setIsAddModalOpen(true);
             }}
-            className="bg-[#1a1a1a] hover:bg-black text-white font-bold px-4 py-2.5 text-xs uppercase tracking-wider flex items-center space-x-2 transition-all border border-black shadow-xs cursor-pointer"
+            className="bg-[#1a1a1a] hover:bg-black text-white font-bold px-3.5 py-2 text-xs uppercase tracking-wider flex items-center space-x-1.5 transition-all border border-black shadow-xs cursor-pointer"
           >
-            <Plus className="w-4 h-4 text-amber-400" />
-            <span>Add Portfolio Holding</span>
+            <Plus className="w-3.5 h-3.5 text-amber-400" />
+            <span>Add Position</span>
           </button>
         </div>
       </div>
+
+      {portfolioSubTab === 'rebalancing' ? (
+        <PortfolioRebalancing
+          holdings={holdings}
+          stocksList={stocks}
+          onApplyRebalance={(updated) => setHoldings(updated)}
+        />
+      ) : (
+        <>
 
       {/* Real-Time Portfolio Performance Summary Widget */}
       <div className="bg-[#1a1a1a] text-white p-5 border border-black shadow-lg space-y-4">
@@ -937,6 +972,9 @@ export const MyPortfolio: React.FC<MyPortfolioProps> = ({
 
           </div>
         </div>
+      )}
+
+        </>
       )}
 
     </div>

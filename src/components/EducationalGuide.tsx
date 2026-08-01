@@ -1,12 +1,15 @@
-import React from 'react';
-import { BookOpen, ShieldCheck, TrendingUp, Droplets, Target, ShieldAlert, Award, Layers } from 'lucide-react';
+import React, { useState } from 'react';
+import { BookOpen, ShieldCheck, TrendingUp, Droplets, Target, ShieldAlert, Award, Layers, Sliders } from 'lucide-react';
+import { TrendTemplateTutor } from './TrendTemplateTutor';
 
 export const EducationalGuide: React.FC = () => {
+  const [guideTab, setGuideTab] = useState<'playbook' | 'tutor'>('playbook');
+
   return (
     <div className="bg-white border border-[#e5e4e1] p-8 shadow-xs space-y-8 text-[#1a1a1a]">
       
-      {/* Header */}
-      <div className="border-b border-[#e5e4e1] pb-6">
+      {/* Header & Sub-Nav */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#e5e4e1] pb-6">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-[#1a1a1a] text-white flex items-center justify-center font-serif italic font-bold text-lg">
             M
@@ -18,7 +21,38 @@ export const EducationalGuide: React.FC = () => {
             </h2>
           </div>
         </div>
+
+        <div className="flex items-center space-x-2 bg-[#f9f8f5] p-1 border border-[#e5e4e1] font-mono text-xs">
+          <button
+            onClick={() => setGuideTab('playbook')}
+            className={`px-4 py-2 font-bold uppercase tracking-wider transition cursor-pointer flex items-center space-x-1.5 ${
+              guideTab === 'playbook'
+                ? 'bg-[#1a1a1a] text-amber-300 shadow-xs'
+                : 'text-gray-700 hover:text-black'
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>Masterclass Playbook</span>
+          </button>
+
+          <button
+            onClick={() => setGuideTab('tutor')}
+            className={`px-4 py-2 font-bold uppercase tracking-wider transition cursor-pointer flex items-center space-x-1.5 ${
+              guideTab === 'tutor'
+                ? 'bg-[#1a1a1a] text-amber-300 shadow-xs'
+                : 'text-gray-700 hover:text-black'
+            }`}
+          >
+            <Sliders className="w-4 h-4 text-emerald-500" />
+            <span>Interactive Trend Tutor & Quiz</span>
+          </button>
+        </div>
       </div>
+
+      {guideTab === 'tutor' ? (
+        <TrendTemplateTutor />
+      ) : (
+        <>
 
       {/* Section 1: The 8-Point Trend Template */}
       <div className="space-y-4">
@@ -134,6 +168,9 @@ export const EducationalGuide: React.FC = () => {
           </div>
         </div>
       </div>
+
+        </>
+      )}
 
     </div>
   );

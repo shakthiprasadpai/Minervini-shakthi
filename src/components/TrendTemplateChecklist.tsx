@@ -4,6 +4,7 @@ import { evaluateTrendTemplate } from '../utils/sepaCalculator';
 import { CheckCircle2, XCircle, ShieldCheck, AlertCircle, Info, Code, Copy, Check, ChevronDown, ChevronUp, Award, Zap } from 'lucide-react';
 import { PineScriptExporter, PINE_SCRIPT_CODE } from './PineScriptExporter';
 import { HistoricalBacktestPanel } from './HistoricalBacktestPanel';
+import { AutomatedScoreCard } from './AutomatedScoreCard';
 
 interface TrendTemplateChecklistProps {
   stock: MinerviniTradeSetup;
@@ -140,6 +141,9 @@ export const TrendTemplateChecklist: React.FC<TrendTemplateChecklistProps> = ({ 
           </div>
         </div>
       </div>
+
+      {/* Automated Setup Scorecard */}
+      <AutomatedScoreCard stock={stock} />
 
       {/* Rules List */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

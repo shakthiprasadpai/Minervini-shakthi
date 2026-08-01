@@ -4,6 +4,8 @@ import { formatCurrency, formatVolume, getCurrencySymbol, evaluateTrendTemplate 
 import { PineScriptExporter } from './PineScriptExporter';
 import { LorentzianClassification } from './LorentzianClassification';
 import { VcpTemplateOverlay } from './VcpTemplateOverlay';
+import { RiskRewardChart } from './RiskRewardChart';
+import { VolatilityTrendChart } from './VolatilityTrendChart';
 import {
   ComposedChart,
   Line,
@@ -166,6 +168,7 @@ export function calculateVolumeOscillatorData(
 }
 
 export const VcpChart: React.FC<VcpChartProps> = ({ stock }) => {
+  const [chartSubTab, setChartSubTab] = useState<'vcp_candlestick' | 'volatility_trend' | 'risk_reward'>('vcp_candlestick');
   const [showSma50, setShowSma50] = useState(true);
   const [showSma150, setShowSma150] = useState(true);
   const [showSma200, setShowSma200] = useState(true);
@@ -559,7 +562,69 @@ export const VcpChart: React.FC<VcpChartProps> = ({ stock }) => {
         </div>
       </div>
 
-      {/* Automatically Detected VCP Base Formation Timeframe Banner */}
+      {/* Chart View Sub-Tab Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-[#f9f8f5] border border-[#e5e4e1] p-1.5 font-mono text-xs">
+        <div className="flex flex-wrap items-center gap-1">
+          <button
+            onClick={() => setChartSubTab('vcp_candlestick')}
+            className={`px-3.5 py-1.5 font-bold uppercase tracking-wider flex items-center space-x-1.5 transition cursor-pointer ${
+              chartSubTab === 'vcp_candlestick'
+                ? 'bg-[#1a1a1a] text-amber-300 shadow-xs'
+                : 'bg-white text-gray-700 hover:bg-gray-100 border border-[#e5e4e1]'
+            }`}
+          >
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span>Interactive VCP Candlestick</span>
+          </button>
+
+          <button
+            onClick={() => setChartSubTab('volatility_trend')}
+            className={`px-3.5 py-1.5 font-bold uppercase tracking-wider flex items-center space-x-1.5 transition cursor-pointer ${
+              chartSubTab === 'volatility_trend'
+                ? 'bg-[#1a1a1a] text-amber-300 shadow-xs'
+                : 'bg-white text-gray-700 hover:bg-gray-100 border border-[#e5e4e1]'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5 text-emerald-500" />
+            <span>Volatility Trend & ATR Squeeze</span>
+          </button>
+
+          <button
+            onClick={() => setChartSubTab('risk_reward')}
+            className={`px-3.5 py-1.5 font-bold uppercase tracking-wider flex items-center space-x-1.5 transition cursor-pointer ${
+              chartSubTab === 'risk_reward'
+                ? 'bg-[#1a1a1a] text-amber-300 shadow-xs'
+                : 'bg-white text-gray-700 hover:bg-gray-100 border border-[#e5e4e1]'
+            }`}
+          >
+            <Target className="w-3.5 h-3.5 text-blue-500" />
+            <span>Risk/Reward Profit Chart</span>
+          </button>
+        </div>
+
+        <div className="text-[11px] text-gray-500 font-sans italic px-2">
+          {chartSubTab === 'vcp_candlestick' && 'Price, SMAs & Volume Oscillator'}
+          {chartSubTab === 'volatility_trend' && 'ATR 14-day Volatility Squeeze Index'}
+          {chartSubTab === 'risk_reward' && 'Scale-Out Targets (T1, T2, T3) Visualizer'}
+        </div>
+      </div>
+
+      {/* Render Selected View */}
+      {chartSubTab === 'volatility_trend' && (
+        <VolatilityTrendChart stock={stock} />
+      )}
+
+      {chartSubTab === 'risk_reward' && (
+        <RiskRewardChart
+          pivotPrice={stock.pivotPrice}
+          stopLossPrice={stock.suggestedStopPrice}
+          currencySymbol={currencySymbol}
+        />
+      )}
+
+      {chartSubTab === 'vcp_candlestick' && (
+        <>
+          {/* Automatically Detected VCP Base Formation Timeframe Banner */}
       {vcpBaseInfo && showBaseFormationArea && (
         <div className="bg-amber-50/90 border-l-4 border-l-amber-500 border border-[#e5e4e1] p-3 flex flex-wrap items-center justify-between gap-3 text-xs font-mono animate-fadeIn">
           <div className="flex flex-wrap items-center gap-2 text-[#1a1a1a]">
@@ -1402,6 +1467,8 @@ export const VcpChart: React.FC<VcpChartProps> = ({ stock }) => {
         isOpen={isPineModalOpen}
         onClose={() => setIsPineModalOpen(false)}
       />
+        </>
+      )}
 
     </div>
   );
