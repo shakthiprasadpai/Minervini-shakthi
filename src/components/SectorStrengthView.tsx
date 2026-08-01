@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { MinerviniTradeSetup } from '../types';
 import { formatCurrency, getCurrencySymbol } from '../utils/sepaCalculator';
 import { SectorPerformanceWidget } from './SectorPerformanceWidget';
+import { SectorCorrelationMatrix } from './SectorCorrelationMatrix';
 import {
   Layers,
   TrendingUp,
@@ -65,7 +66,7 @@ export const SectorStrengthView: React.FC<SectorStrengthViewProps> = ({
   const [heatmapMetric, setHeatmapMetric] = useState<HeatmapMetric>('AVG_CHANGE');
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
   const [sectorSearch, setSectorSearch] = useState<string>('');
-  const [displayMode, setDisplayMode] = useState<'COMBINED' | 'HEATMAP_ONLY' | 'LEADERBOARD_ONLY'>('COMBINED');
+  const [displayMode, setDisplayMode] = useState<'COMBINED' | 'HEATMAP_ONLY' | 'LEADERBOARD_ONLY' | 'CORRELATION_MATRIX'>('COMBINED');
 
   // Compute aggregated sector metrics
   const sectorAggregates = useMemo(() => {
@@ -415,6 +416,15 @@ export const SectorStrengthView: React.FC<SectorStrengthViewProps> = ({
                 title="View Leaderboard Table only"
               >
                 Leaderboard
+              </button>
+              <button
+                onClick={() => setDisplayMode('CORRELATION_MATRIX')}
+                className={`px-2.5 py-1 text-[11px] font-bold uppercase transition-all ${
+                  displayMode === 'CORRELATION_MATRIX' ? 'bg-purple-900 text-white' : 'text-gray-400 hover:text-white'
+                }`}
+                title="View Sector ETF Correlation Matrix & Harmony Score"
+              >
+                ETF Correlation
               </button>
             </div>
           </div>
@@ -805,6 +815,14 @@ export const SectorStrengthView: React.FC<SectorStrengthViewProps> = ({
             </table>
           </div>
         </div>
+      )}
+
+      {/* SECTOR ETF CORRELATION MATRIX SECTION */}
+      {(displayMode === 'COMBINED' || displayMode === 'CORRELATION_MATRIX') && (
+        <SectorCorrelationMatrix
+          stocks={stocks}
+          onSelectStock={onSelectStock}
+        />
       )}
 
     </div>

@@ -450,6 +450,356 @@ export const SmartStopAdjuster: React.FC<SmartStopAdjusterProps> = ({
   );
 };
 
+interface InteractiveRRSliderProps {
+  stock: MinerviniTradeSetup;
+  accountCapital: number;
+  positionShareQuantity: number;
+  currentStopPrice: number;
+  currentTargetPrice: number;
+  onUpdateStopPrice: (newStopPrice: number) => void;
+  onUpdateTargetPrice: (newTargetPrice: number) => void;
+}
+
+export const InteractiveRRSlider: React.FC<InteractiveRRSliderProps> = ({
+  stock,
+  accountCapital,
+  positionShareQuantity,
+  currentStopPrice,
+  currentTargetPrice,
+  onUpdateStopPrice,
+  onUpdateTargetPrice,
+}) => {
+  const currencySymbol = getCurrencySymbol(stock.exchange);
+  const pivotEntry = stock.pivotPrice;
+
+  // Initialize stop loss % state based on currentStopPrice
+  const initialStopPct = pivotEntry > 0
+    ? Number((((pivotEntry - currentStopPrice) / pivotEntry) * 100).toFixed(1))
+    : 5.0;
+
+  const [stopLossPct, setStopLossPct] = useState<number>(Math.max(1.0, Math.min(15.0, initialStopPct || 5.0)));
+
+  // Calculate target R:R ratio based on currentTargetPrice
+  const riskPerShareInitial = Math.max(0.01, pivotEntry - currentStopPrice);
+  const initialRR = pivotEntry > 0 && riskPerShareInitial > 0
+    ? Number(((currentTargetPrice - pivotEntry) / riskPerShareInitial).toFixed(1))
+    : 3.0;
+
+  const [rrRatio, setRrRatio] = useState<number>(Math.max(1.0, Math.min(10.0, initialRR || 3.0)));
+
+  // Sync when prop changes
+  useEffect(() => {
+    if (pivotEntry > 0 && currentStopPrice < pivotEntry) {
+      const computedPct = (((pivotEntry - currentStopPrice) / pivotEntry) * 100);
+      setStopLossPct(Number(computedPct.toFixed(1)));
+    }
+  }, [currentStopPrice, pivotEntry]);
+
+  // Derived Calculations
+  const calcStopPrice = Number((pivotEntry * (1 - stopLossPct / 100)).toFixed(2));
+  const riskPerShare = Math.max(0.01, pivotEntry - calcStopPrice);
+  const rewardPerShare = Number((riskPerShare * rrRatio).toFixed(2));
+  const calcTargetPrice = Number((pivotEntry + rewardPerShare).toFixed(2));
+  const upsidePct = Number(((rewardPerShare / pivotEntry) * 100).toFixed(1));
+
+  const totalDollarRisk = Number((riskPerShare * positionShareQuantity).toFixed(2));
+  const totalProjectedProfit = Number((rewardPerShare * positionShareQuantity).toFixed(2));
+
+  const riskPctPortfolio = accountCapital > 0 ? (totalDollarRisk / accountCapital) * 100 : 0;
+  const profitPctPortfolio = accountCapital > 0 ? (totalProjectedProfit / accountCapital) * 100 : 0;
+
+  // Required win rate to breakeven at this R:R ratio
+  const requiredWinRate = Number(((1 / (1 + rrRatio)) * 100).toFixed(1));
+
+  // Multi-tier Scale-out targets
+  const tier1RR = 1.5;
+  const tier1RewardPerShare = riskPerShare * tier1RR;
+  const tier1Price = Number((pivotEntry + tier1RewardPerShare).toFixed(2));
+  const tier1UpsidePct = Number(((tier1RewardPerShare / pivotEntry) * 100).toFixed(1));
+  const tier1Shares = Math.floor(positionShareQuantity * 0.33);
+  const tier1Profit = Number((tier1RewardPerShare * tier1Shares).toFixed(2));
+
+  const tier2RR = 3.0;
+  const tier2RewardPerShare = riskPerShare * tier2RR;
+  const tier2Price = Number((pivotEntry + tier2RewardPerShare).toFixed(2));
+  const tier2UpsidePct = Number(((tier2RewardPerShare / pivotEntry) * 100).toFixed(1));
+  const tier2Shares = Math.floor(positionShareQuantity * 0.33);
+  const tier2Profit = Number((tier2RewardPerShare * tier2Shares).toFixed(2));
+
+  const tier3Shares = Math.max(0, positionShareQuantity - tier1Shares - tier2Shares);
+  const tier3Profit = Number((rewardPerShare * tier3Shares).toFixed(2));
+
+  const totalScaleOutProfit = Number((tier1Profit + tier2Profit + tier3Profit).toFixed(2));
+
+  return (
+    <div className="bg-white border border-[#e5e4e1] p-5 space-y-5 font-sans">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e5e4e1] pb-3">
+        <div className="flex items-center space-x-2">
+          <Sliders className="w-4 h-4 text-emerald-600" />
+          <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-[#1a1a1a]">
+            🎯 Interactive R:R Ratio & Variable Stop-Loss Profit Calculator
+          </h4>
+        </div>
+        <div className="flex items-center space-x-2 text-[10px] font-mono">
+          <span className="bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold px-2 py-0.5">
+            R:R Target = {rrRatio.toFixed(1)} : 1
+          </span>
+          <span className="bg-red-100 text-red-900 border border-red-300 font-bold px-2 py-0.5">
+            Stop = -{stopLossPct.toFixed(1)}%
+          </span>
+        </div>
+      </div>
+
+      {/* Interactive Sliders Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#f9f8f5] p-4 border border-[#e5e4e1]">
+        
+        {/* Slider 1: Variable Stop-Loss Percentage */}
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <label className="text-xs font-bold uppercase tracking-wider text-[#1a1a1a] flex items-center space-x-1.5">
+              <ShieldAlert className="w-3.5 h-3.5 text-red-600" />
+              <span>Variable Stop-Loss Percentage</span>
+            </label>
+            <span className="font-mono text-sm font-extrabold text-red-600 bg-white border border-red-200 px-2 py-0.5">
+              -{stopLossPct.toFixed(1)}% ({formatCurrency(calcStopPrice, currencySymbol)})
+            </span>
+          </div>
+
+          <input
+            type="range"
+            min="1.0"
+            max="15.0"
+            step="0.1"
+            value={stopLossPct}
+            onChange={(e) => setStopLossPct(Number(e.target.value))}
+            className="w-full accent-red-600 cursor-pointer h-2 bg-gray-200 rounded-none"
+          />
+
+          <div className="flex justify-between text-[10px] font-mono text-gray-500">
+            <span>1.0% (Ultra Tight)</span>
+            <span>5.0% - 8.0% (Minervini Ideal)</span>
+            <span>15.0% (Wide)</span>
+          </div>
+
+          {/* Quick Preset Buttons for Stop-Loss */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <span className="text-[10px] font-bold text-gray-400 font-mono uppercase mr-1">Presets:</span>
+            {[3.0, 5.0, 7.0, 8.0, 10.0].map((preset) => (
+              <button
+                key={preset}
+                onClick={() => setStopLossPct(preset)}
+                className={`px-2 py-0.5 text-[10px] font-mono font-bold border transition cursor-pointer ${
+                  Math.abs(stopLossPct - preset) < 0.1
+                    ? 'bg-red-600 text-white border-red-700'
+                    : 'bg-white text-gray-700 border-[#e5e4e1] hover:bg-red-50'
+                }`}
+              >
+                -{preset.toFixed(1)}%
+              </button>
+            ))}
+          </div>
+
+          <div className="text-[11px] font-mono text-gray-600 bg-white p-2 border border-[#e5e4e1] flex justify-between">
+            <span>Risk / Share: <strong className="text-red-600">{formatCurrency(riskPerShare, currencySymbol)}</strong></span>
+            <span>Total Risk ({positionShareQuantity.toLocaleString()} sh): <strong className="text-red-600">{formatCurrency(totalDollarRisk, currencySymbol)}</strong></span>
+          </div>
+        </div>
+
+        {/* Slider 2: Target Risk-to-Reward Ratio (R:R) */}
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <label className="text-xs font-bold uppercase tracking-wider text-[#1a1a1a] flex items-center space-x-1.5">
+              <Target className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Target Risk-to-Reward Ratio (R:R)</span>
+            </label>
+            <span className="font-mono text-sm font-extrabold text-emerald-700 bg-white border border-emerald-200 px-2 py-0.5">
+              {rrRatio.toFixed(1)} : 1 (+{upsidePct.toFixed(1)}%)
+            </span>
+          </div>
+
+          <input
+            type="range"
+            min="1.0"
+            max="10.0"
+            step="0.1"
+            value={rrRatio}
+            onChange={(e) => setRrRatio(Number(e.target.value))}
+            className="w-full accent-emerald-600 cursor-pointer h-2 bg-gray-200 rounded-none"
+          />
+
+          <div className="flex justify-between text-[10px] font-mono text-gray-500">
+            <span>1.0:1 (Minimum)</span>
+            <span>3.0:1 (SEPA Target)</span>
+            <span>5.0:1 (Champion)</span>
+            <span>10.0:1 (Super)</span>
+          </div>
+
+          {/* Quick Preset Buttons for R:R Ratio */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <span className="text-[10px] font-bold text-gray-400 font-mono uppercase mr-1">R:R Presets:</span>
+            {[1.5, 2.0, 3.0, 4.0, 5.0, 8.0].map((preset) => (
+              <button
+                key={preset}
+                onClick={() => setRrRatio(preset)}
+                className={`px-2 py-0.5 text-[10px] font-mono font-bold border transition cursor-pointer ${
+                  Math.abs(rrRatio - preset) < 0.1
+                    ? 'bg-emerald-700 text-white border-emerald-800'
+                    : 'bg-white text-gray-700 border-[#e5e4e1] hover:bg-emerald-50'
+                }`}
+              >
+                {preset.toFixed(1)}:1
+              </button>
+            ))}
+          </div>
+
+          <div className="text-[11px] font-mono text-gray-600 bg-white p-2 border border-[#e5e4e1] flex justify-between">
+            <span>Target Price: <strong className="text-emerald-700">{formatCurrency(calcTargetPrice, currencySymbol)}</strong></span>
+            <span>Reward / Share: <strong className="text-emerald-700">+{formatCurrency(rewardPerShare, currencySymbol)}</strong></span>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Projected Profit & Portfolio Impact Dashboard */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
+        {/* Box 1: Projected Total Gross Profit */}
+        <div className="bg-emerald-50/70 border border-emerald-300 p-3 space-y-1">
+          <span className="text-[10px] text-emerald-800 uppercase font-bold block">
+            Projected Total Gross Profit
+          </span>
+          <div className="text-2xl font-black text-emerald-800">
+            +{formatCurrency(totalProjectedProfit, currencySymbol)}
+          </div>
+          <p className="text-[10px] text-emerald-700 font-sans">
+            +{upsidePct.toFixed(1)}% stock gain across {positionShareQuantity.toLocaleString()} shares.
+          </p>
+        </div>
+
+        {/* Box 2: Portfolio Return Impact */}
+        <div className="bg-purple-50/70 border border-purple-300 p-3 space-y-1">
+          <span className="text-[10px] text-purple-900 uppercase font-bold block">
+            Portfolio Account Return
+          </span>
+          <div className="text-2xl font-black text-purple-900">
+            +{profitPctPortfolio.toFixed(2)}%
+          </div>
+          <p className="text-[10px] text-purple-800 font-sans">
+            Gain on {formatCurrency(accountCapital, currencySymbol)} account capital.
+          </p>
+        </div>
+
+        {/* Box 3: Max Downside Risk */}
+        <div className="bg-red-50/70 border border-red-300 p-3 space-y-1">
+          <span className="text-[10px] text-red-800 uppercase font-bold block">
+            Defined Max Downside Risk
+          </span>
+          <div className="text-2xl font-black text-red-700">
+            -{formatCurrency(totalDollarRisk, currencySymbol)}
+          </div>
+          <p className="text-[10px] text-red-800 font-sans">
+            -{riskPctPortfolio.toFixed(2)}% portfolio risk cap at -{stopLossPct.toFixed(1)}% stop.
+          </p>
+        </div>
+
+        {/* Box 4: Required Win Rate */}
+        <div className="bg-[#1a1a1a] text-white p-3 space-y-1 border border-black">
+          <span className="text-[10px] text-amber-400 uppercase font-bold block">
+            Required Win Rate to Breakeven
+          </span>
+          <div className="text-2xl font-black font-mono text-amber-400">
+            {requiredWinRate.toFixed(1)}%
+          </div>
+          <p className="text-[10px] text-gray-300 font-sans">
+            At {rrRatio.toFixed(1)}:1 R:R, you only need to be right {requiredWinRate.toFixed(1)}% of the time!
+          </p>
+        </div>
+      </div>
+
+      {/* Multi-Tier Scale-Out Profit Matrix */}
+      <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-4 space-y-3 font-mono text-xs">
+        <div className="flex items-center justify-between border-b border-[#e5e4e1] pb-2">
+          <div className="flex items-center space-x-2">
+            <BarChart3 className="w-4 h-4 text-[#1a1a1a]" />
+            <span className="font-bold text-[#1a1a1a] uppercase tracking-wider text-[11px]">
+              Multi-Tier Scale-Out Projected Profit Matrix (SEPA Staged Partial Lock)
+            </span>
+          </div>
+          <span className="text-[10px] font-bold text-emerald-800">
+            Blended Scale-Out Profit: +{formatCurrency(totalScaleOutProfit, currencySymbol)}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Tier 1: 1.5R Initial Partial Lock */}
+          <div className="bg-white border border-[#e5e4e1] p-3 space-y-1">
+            <div className="flex justify-between text-[10px] font-bold text-blue-800 uppercase">
+              <span>Tier 1: 1.5R Lock (33% Pos)</span>
+              <span>{tier1Shares.toLocaleString()} Sh</span>
+            </div>
+            <div className="text-lg font-bold text-[#1a1a1a]">
+              {formatCurrency(tier1Price, currencySymbol)} <span className="text-xs font-normal text-emerald-700">(+{tier1UpsidePct}%)</span>
+            </div>
+            <div className="text-xs font-bold text-emerald-700">
+              +{formatCurrency(tier1Profit, currencySymbol)} Profit
+            </div>
+          </div>
+
+          {/* Tier 2: 3.0R Core Position Lock */}
+          <div className="bg-white border border-[#e5e4e1] p-3 space-y-1">
+            <div className="flex justify-between text-[10px] font-bold text-purple-800 uppercase">
+              <span>Tier 2: 3.0R Lock (33% Pos)</span>
+              <span>{tier2Shares.toLocaleString()} Sh</span>
+            </div>
+            <div className="text-lg font-bold text-[#1a1a1a]">
+              {formatCurrency(tier2Price, currencySymbol)} <span className="text-xs font-normal text-emerald-700">(+{tier2UpsidePct}%)</span>
+            </div>
+            <div className="text-xs font-bold text-emerald-700">
+              +{formatCurrency(tier2Profit, currencySymbol)} Profit
+            </div>
+          </div>
+
+          {/* Tier 3: Full Custom R:R Runner */}
+          <div className="bg-white border border-[#e5e4e1] p-3 space-y-1">
+            <div className="flex justify-between text-[10px] font-bold text-emerald-800 uppercase">
+              <span>Tier 3: {rrRatio.toFixed(1)}R Runner (34% Pos)</span>
+              <span>{tier3Shares.toLocaleString()} Sh</span>
+            </div>
+            <div className="text-lg font-bold text-[#1a1a1a]">
+              {formatCurrency(calcTargetPrice, currencySymbol)} <span className="text-xs font-normal text-emerald-700">(+{upsidePct}%)</span>
+            </div>
+            <div className="text-xs font-bold text-emerald-700">
+              +{formatCurrency(tier3Profit, currencySymbol)} Profit
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Action Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#e5e4e1]">
+        <div className="text-xs font-mono text-gray-500">
+          Selected Parameters: <strong className="text-[#1a1a1a]">Stop @ {formatCurrency(calcStopPrice, currencySymbol)} (-{stopLossPct}%)</strong> | <strong className="text-[#1a1a1a]">Target @ {formatCurrency(calcTargetPrice, currencySymbol)} (+{upsidePct}%)</strong>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => onUpdateStopPrice(calcStopPrice)}
+            className="px-3 py-1.5 bg-red-700 hover:bg-red-800 text-white font-bold text-xs uppercase tracking-wider border border-red-800 transition cursor-pointer"
+          >
+            Apply Stop Loss ({formatCurrency(calcStopPrice, currencySymbol)})
+          </button>
+          <button
+            onClick={() => onUpdateTargetPrice(calcTargetPrice)}
+            className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs uppercase tracking-wider border border-emerald-900 transition cursor-pointer"
+          >
+            Apply Target Price ({formatCurrency(calcTargetPrice, currencySymbol)})
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 interface TradePlanCardProps {
   stock: MinerviniTradeSetup;
 }
@@ -1018,6 +1368,17 @@ export const TradePlanCard: React.FC<TradePlanCardProps> = ({ stock }) => {
         stock={stock}
         customStopPrice={customStopPrice}
         onUpdateStopPrice={(newStop) => setCustomStopPrice(newStop)}
+      />
+
+      {/* Interactive R:R Ratio & Variable Stop-Loss Profit Calculator Component */}
+      <InteractiveRRSlider
+        stock={stock}
+        accountCapital={accountCapital}
+        positionShareQuantity={posSize.shareQuantity}
+        currentStopPrice={customStopPrice}
+        currentTargetPrice={customTargetPrice}
+        onUpdateStopPrice={(newStop) => setCustomStopPrice(newStop)}
+        onUpdateTargetPrice={(newTarget) => setCustomTargetPrice(newTarget)}
       />
 
       {/* Position Sizing Calculator Module */}
