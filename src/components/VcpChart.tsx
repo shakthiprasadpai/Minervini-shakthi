@@ -71,6 +71,57 @@ export interface VolumeOscillatorPoint extends PricePoint {
   signalType: 'ACCUMULATION' | 'DISTRIBUTION' | 'DRY_UP';
 }
 
+export interface PocketPivotPoint {
+  date: string;
+  price: number;
+  open: number;
+  close: number;
+  volume: number;
+  maxDownVolume10d: number;
+  isPocketPivot: boolean;
+  volVsMaxDownPct: number;
+  description: string;
+}
+
+export function calculatePocketPivots(history: PricePoint[]): PocketPivotPoint[] {
+  if (!history || history.length === 0) return [];
+
+  return history.map((point, idx) => {
+    const prevPoint = idx > 0 ? history[idx - 1] : null;
+    const isUpDay = point.close >= point.open || (prevPoint ? point.close >= prevPoint.close : false);
+
+    const lookbackStart = Math.max(0, idx - 10);
+    const lookbackSlice = history.slice(lookbackStart, idx);
+    const downDays = lookbackSlice.filter((p, pIdx) => {
+      const pPrev = (lookbackStart + pIdx) > 0 ? history[lookbackStart + pIdx - 1] : null;
+      return p.close < p.open || (pPrev ? p.close < pPrev.close : false);
+    });
+
+    const maxDownVolume10d = downDays.length > 0
+      ? Math.max(...downDays.map((p) => p.volume))
+      : 0;
+
+    const isPocketPivot = isUpDay && point.volume > maxDownVolume10d && point.volume > (point.avgVolume20 * 0.55);
+    const volVsMaxDownPct = maxDownVolume10d > 0
+      ? Number((((point.volume - maxDownVolume10d) / maxDownVolume10d) * 100).toFixed(1))
+      : 100;
+
+    return {
+      date: point.date,
+      price: point.close,
+      open: point.open,
+      close: point.close,
+      volume: point.volume,
+      maxDownVolume10d,
+      isPocketPivot,
+      volVsMaxDownPct,
+      description: isPocketPivot
+        ? `Pocket Pivot identified on ${point.date}! Up-day volume (${(point.volume / 1000000).toFixed(2)}M) exceeded highest down-day volume of past 10 sessions (${(maxDownVolume10d / 1000000).toFixed(2)}M) by +${volVsMaxDownPct}%.`
+        : ''
+    };
+  });
+}
+
 export function calculateVolumeOscillatorData(
   history: PricePoint[],
   shortLen: number = 5,
@@ -130,6 +181,12 @@ export const VcpChart: React.FC<VcpChartProps> = ({ stock }) => {
   const [volOscLongLen, setVolOscLongLen] = useState<number>(20);
   const [volOscMode, setVolOscMode] = useState<'HISTOGRAM' | 'LINE' | 'BOTH'>('BOTH');
 
+  // Pocket Pivot Overlay State
+  const [showPocketPivots, setShowPocketPivots] = useState(true);
+
+  // VCP Pattern Base Formation Timeframe Shading State
+  const [showBaseFormationArea, setShowBaseFormationArea] = useState(true);
+
   // Interactive Node Selection state
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
@@ -173,6 +230,68 @@ export const VcpChart: React.FC<VcpChartProps> = ({ stock }) => {
       });
     }
     return signals;
+  }, [stock]);
+
+  // Calculate Pocket Pivot series
+  const pocketPivotFullData = useMemo(() => {
+    return calculatePocketPivots(stock.priceHistory || []);
+  }, [stock.priceHistory]);
+
+  const displayedPocketPivots = useMemo(() => {
+    return calculatePocketPivots(displayedPriceHistory || []);
+  }, [displayedPriceHistory]);
+
+  const pocketPivotDatesSet = useMemo(() => {
+    return new Set(pocketPivotFullData.filter((p) => p.isPocketPivot).map((p) => p.date));
+  }, [pocketPivotFullData]);
+
+  const pocketPivotCount = useMemo(() => {
+    return pocketPivotFullData.filter((p) => p.isPocketPivot).length;
+  }, [pocketPivotFullData]);
+
+  const latestPocketPivot = useMemo(() => {
+    const pivots = pocketPivotFullData.filter((p) => p.isPocketPivot);
+    return pivots.length > 0 ? pivots[pivots.length - 1] : null;
+  }, [pocketPivotFullData]);
+
+  // Automatically detect VCP Pattern Base Formation Timeframe
+  const vcpBaseInfo = useMemo(() => {
+    const contractions = stock.contractions || [];
+    const history = stock.priceHistory || [];
+
+    if (contractions.length === 0 || history.length === 0) {
+      return null;
+    }
+
+    const startDate = contractions[0].startDate;
+    const endDate = contractions[contractions.length - 1].endDate || history[history.length - 1].date;
+
+    const startIdx = history.findIndex((p) => p.date === startDate);
+    const endIdx = history.findIndex((p) => p.date === endDate);
+
+    let daysCount = 0;
+    if (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx) {
+      daysCount = endIdx - startIdx + 1;
+    } else {
+      daysCount = contractions.reduce((acc, c) => acc + (c.durationDays || 0), 0);
+    }
+
+    const weeksCount = Math.max(1, Number((daysCount / 5).toFixed(1))); // ~5 trading days / week
+
+    const baseHigh = Math.max(...contractions.map((c) => c.highPrice));
+    const baseLow = Math.min(...contractions.map((c) => c.lowPrice));
+    const maxBaseDepthPercent = Number((((baseHigh - baseLow) / baseHigh) * 100).toFixed(1));
+
+    return {
+      startDate,
+      endDate,
+      daysCount,
+      weeksCount,
+      baseHigh,
+      baseLow,
+      maxBaseDepthPercent,
+      numContractions: contractions.length,
+    };
   }, [stock]);
 
   // Calculate Volume Oscillator series
@@ -411,8 +530,59 @@ export const VcpChart: React.FC<VcpChartProps> = ({ stock }) => {
             <Activity className="w-3.5 h-3.5 text-cyan-300" />
             <span>Vol Osc {showVolumeOscillator ? 'ON' : 'OFF'}</span>
           </button>
+
+          <button
+            onClick={() => setShowPocketPivots(!showPocketPivots)}
+            className={`px-3 py-1 border text-xs font-semibold uppercase tracking-wider font-mono transition-all flex items-center space-x-1 cursor-pointer ${
+              showPocketPivots
+                ? 'bg-purple-700 text-white border-purple-800 shadow-xs'
+                : 'bg-[#f9f8f5] text-gray-400 border-[#e5e4e1]'
+            }`}
+            title="Toggle Pocket Pivot Volume Spikes (Dr. Kacher & Morales Pattern)"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-purple-200" />
+            <span>Pocket Pivot {showPocketPivots ? 'ON' : 'OFF'}</span>
+          </button>
+
+          <button
+            onClick={() => setShowBaseFormationArea(!showBaseFormationArea)}
+            className={`px-3 py-1 border text-xs font-semibold uppercase tracking-wider font-mono transition-all flex items-center space-x-1 cursor-pointer ${
+              showBaseFormationArea
+                ? 'bg-[#1a1a1a] text-amber-400 border-black shadow-xs'
+                : 'bg-[#f9f8f5] text-gray-400 border-[#e5e4e1]'
+            }`}
+            title="Toggle VCP Base Formation Area Background Shading"
+          >
+            <Layers className="w-3.5 h-3.5 text-amber-400" />
+            <span>Base Area {showBaseFormationArea ? 'ON' : 'OFF'}</span>
+          </button>
         </div>
       </div>
+
+      {/* Automatically Detected VCP Base Formation Timeframe Banner */}
+      {vcpBaseInfo && showBaseFormationArea && (
+        <div className="bg-amber-50/90 border-l-4 border-l-amber-500 border border-[#e5e4e1] p-3 flex flex-wrap items-center justify-between gap-3 text-xs font-mono animate-fadeIn">
+          <div className="flex flex-wrap items-center gap-2 text-[#1a1a1a]">
+            <Layers className="w-4 h-4 text-amber-600 shrink-0" />
+            <span className="font-extrabold uppercase tracking-wider text-[#1a1a1a]">
+              VCP Base Formation Window:
+            </span>
+            <span className="bg-[#1a1a1a] text-white px-2 py-0.5 font-bold font-mono">
+              {vcpBaseInfo.startDate} &rarr; {vcpBaseInfo.endDate}
+            </span>
+            <span className="bg-amber-200 text-amber-950 font-bold px-2 py-0.5 border border-amber-300">
+              {vcpBaseInfo.daysCount} Trading Days ({vcpBaseInfo.weeksCount} Weeks)
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-700 font-sans">
+            <span>Total Base Depth: <strong className="font-mono font-bold text-rose-700">-{vcpBaseInfo.maxBaseDepthPercent}%</strong></span>
+            <span>Contractions: <strong className="font-mono font-bold text-black">{vcpBaseInfo.numContractions} Waves</strong></span>
+            <span>Base Peak: <strong className="font-mono font-bold text-black">{currencySymbol}{vcpBaseInfo.baseHigh.toFixed(2)}</strong></span>
+            <span>Base Floor: <strong className="font-mono font-bold text-black">{currencySymbol}{vcpBaseInfo.baseLow.toFixed(2)}</strong></span>
+          </div>
+        </div>
+      )}
 
       {/* Interactive VCP Formation Nodes Sequence Bar */}
       <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-3 space-y-2 font-mono text-xs">
@@ -605,7 +775,17 @@ export const VcpChart: React.FC<VcpChartProps> = ({ stock }) => {
               tickFormatter={(val) => `${currencySymbol}${val}`}
             />
             <Tooltip
-              content={<CustomChartTooltip currencySymbol={currencySymbol} stock={stock} vcpNodes={vcpNodes} />}
+              content={
+                <CustomChartTooltip
+                  currencySymbol={currencySymbol}
+                  stock={stock}
+                  vcpNodes={vcpNodes}
+                  showPocketPivots={showPocketPivots}
+                  pocketPivotDatesSet={pocketPivotDatesSet}
+                  showBaseFormationArea={showBaseFormationArea}
+                  vcpBaseInfo={vcpBaseInfo}
+                />
+              }
             />
 
             {/* Stage 2 Minervini Uptrend Background Highlight (bgcolor matching Pine Script) */}
@@ -625,6 +805,30 @@ export const VcpChart: React.FC<VcpChartProps> = ({ stock }) => {
                     fontSize: 9,
                     fontWeight: 'bold',
                     position: 'insideTopRight'
+                  }
+                } as any)}
+              />
+            )}
+
+            {/* Automatically Detected VCP Pattern Base Formation Timeframe Shading Area */}
+            {showBaseFormationArea && vcpBaseInfo && (
+              <ReferenceArea
+                {...({
+                  x1: vcpBaseInfo.startDate,
+                  x2: vcpBaseInfo.endDate,
+                  y1: minPrice,
+                  y2: maxPrice,
+                  fill: '#f59e0b',
+                  fillOpacity: 0.08,
+                  stroke: '#d97706',
+                  strokeOpacity: 0.45,
+                  strokeDasharray: '4 4',
+                  label: {
+                    value: `VCP BASE TIMEFRAME: ${vcpBaseInfo.daysCount} DAYS (${vcpBaseInfo.weeksCount} WKS) | DEPTH: -${vcpBaseInfo.maxBaseDepthPercent}%`,
+                    fill: '#b45309',
+                    fontSize: 10,
+                    fontWeight: 'bold',
+                    position: 'insideBottomLeft'
                   }
                 } as any)}
               />
@@ -692,6 +896,20 @@ export const VcpChart: React.FC<VcpChartProps> = ({ stock }) => {
                 fill={sig.type === 'BUY' ? '#8b5cf6' : '#f59e0b'}
                 stroke="#ffffff"
                 strokeWidth={1.5}
+                isFront={true}
+              />
+            ))}
+
+            {/* Pocket Pivot Historical Volume & Price Action Overlay Dots */}
+            {showPocketPivots && displayedPocketPivots.filter((p) => p.isPocketPivot).map((pp) => (
+              <ReferenceDot
+                key={`pp-dot-${pp.date}`}
+                x={pp.date}
+                y={pp.price}
+                r={6}
+                fill="#9333ea"
+                stroke="#ffffff"
+                strokeWidth={2}
                 isFront={true}
               />
             ))}
@@ -870,7 +1088,13 @@ export const VcpChart: React.FC<VcpChartProps> = ({ stock }) => {
             <Droplets className="w-3.5 h-3.5 text-[#1a1a1a]" />
             <span>Volume & Contraction Volume Dry-Up</span>
           </span>
-          <div className="flex items-center space-x-4 text-[10px] font-mono">
+          <div className="flex flex-wrap items-center gap-3 text-[10px] font-mono">
+            {showPocketPivots && (
+              <span className="flex items-center space-x-1 font-bold text-purple-900 bg-purple-50 border border-purple-200 px-1.5 py-0.5">
+                <span className="w-2.5 h-2.5 bg-purple-600"></span>
+                <span>Purple = Pocket Pivot Volume ({pocketPivotCount} Detected)</span>
+              </span>
+            )}
             <span className="flex items-center space-x-1">
               <span className="w-2.5 h-2.5 bg-black"></span>
               <span className="text-[#1a1a1a] font-bold">Black = Dry-Up (&lt;50% Avg)</span>
@@ -899,7 +1123,7 @@ export const VcpChart: React.FC<VcpChartProps> = ({ stock }) => {
                 tick={{ fontSize: 9, fill: '#666666' }}
                 tickFormatter={formatVolume}
               />
-              <Tooltip content={<VolumeTooltip />} />
+              <Tooltip content={<VolumeTooltip showPocketPivots={showPocketPivots} pocketPivotDatesSet={pocketPivotDatesSet} />} />
 
               {/* 20D Avg Volume Line */}
               <Line
@@ -915,13 +1139,17 @@ export const VcpChart: React.FC<VcpChartProps> = ({ stock }) => {
                 {stock.priceHistory.map((entry, index) => {
                   const isUpDay = entry.close >= entry.open;
                   const isTight = entry.isTightVolume || entry.volume < entry.avgVolume20 * 0.5;
+                  const isPp = showPocketPivots && pocketPivotDatesSet.has(entry.date);
 
                   let color = isUpDay ? '#16a34a' : '#dc2626';
                   if (isTight) {
                     color = '#1a1a1a'; // Deep Black for tight volume dry-up!
                   }
+                  if (isPp) {
+                    color = '#9333ea'; // Vibrant Purple for Pocket Pivot Volume Spike!
+                  }
 
-                  return <Cell key={`cell-${index}`} fill={color} opacity={isTight ? 1 : 0.65} />;
+                  return <Cell key={`cell-${index}`} fill={color} opacity={isPp ? 1 : isTight ? 1 : 0.65} />;
                 })}
               </Bar>
             </ComposedChart>
@@ -1180,7 +1408,7 @@ export const VcpChart: React.FC<VcpChartProps> = ({ stock }) => {
 };
 
 // Custom Interactive Tooltip for Price Chart - Enriched with VCP Node & Volume Context
-const CustomChartTooltip = ({ active, payload, currencySymbol, stock, vcpNodes }: any) => {
+const CustomChartTooltip = ({ active, payload, currencySymbol, stock, vcpNodes, showPocketPivots, pocketPivotDatesSet, showBaseFormationArea, vcpBaseInfo }: any) => {
   if (active && payload && payload.length) {
     const data: PricePoint = payload[0].payload;
     const matchingNode: VcpNode | undefined = vcpNodes?.find((n: VcpNode) => n.date === data.date);
@@ -1189,6 +1417,13 @@ const CustomChartTooltip = ({ active, payload, currencySymbol, stock, vcpNodes }
     const distStop = stock?.stopLossPrice ? (((data.close - stock.stopLossPrice) / stock.stopLossPrice) * 100).toFixed(1) : null;
     const volVsAvgPct = data.avgVolume20 ? (((data.volume - data.avgVolume20) / data.avgVolume20) * 100).toFixed(1) : null;
     const isVolumeDryUp = Number(volVsAvgPct) <= -40 || data.isTightVolume;
+    const isPocketPivot = showPocketPivots && pocketPivotDatesSet?.has(data.date);
+
+    const isInsideBaseWindow =
+      showBaseFormationArea &&
+      vcpBaseInfo &&
+      data.date >= vcpBaseInfo.startDate &&
+      data.date <= vcpBaseInfo.endDate;
 
     return (
       <div className="bg-[#1a1a1a] text-white p-3.5 shadow-2xl text-xs space-y-2 font-mono border border-black min-w-[240px]">
@@ -1208,9 +1443,16 @@ const CustomChartTooltip = ({ active, payload, currencySymbol, stock, vcpNodes }
             <span className="font-bold text-gray-300 text-[11px]">{data.date}</span>
           </div>
         ) : (
-          <div className="font-bold text-white text-xs border-b border-gray-800 pb-1 uppercase tracking-wider flex justify-between">
+          <div className="font-bold text-white text-xs border-b border-gray-800 pb-1 uppercase tracking-wider flex justify-between items-center">
             <span>Date: {data.date}</span>
-            {isVolumeDryUp && <span className="text-amber-400 font-extrabold text-[10px]">💧 Dry-Up</span>}
+            {isPocketPivot ? (
+              <span className="text-purple-400 font-extrabold text-[10px] flex items-center space-x-1">
+                <Sparkles className="w-3 h-3 text-purple-400" />
+                <span>Pocket Pivot</span>
+              </span>
+            ) : isVolumeDryUp ? (
+              <span className="text-amber-400 font-extrabold text-[10px]">💧 Dry-Up</span>
+            ) : null}
           </div>
         )}
 
@@ -1253,7 +1495,7 @@ const CustomChartTooltip = ({ active, payload, currencySymbol, stock, vcpNodes }
         <div className="pt-1 border-t border-gray-800 text-[10px] space-y-0.5">
           <div className="flex justify-between">
             <span className="text-gray-400">Daily Volume:</span>
-            <strong className="text-white">{formatVolume(data.volume)}</strong>
+            <strong className={isPocketPivot ? "text-purple-300 font-black" : "text-white"}>{formatVolume(data.volume)}</strong>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-400">20D Avg Vol:</span>
@@ -1262,8 +1504,8 @@ const CustomChartTooltip = ({ active, payload, currencySymbol, stock, vcpNodes }
           {volVsAvgPct !== null && (
             <div className="flex justify-between font-bold">
               <span className="text-gray-400">Vol vs Avg:</span>
-              <span className={isVolumeDryUp ? 'text-amber-400 font-black' : 'text-gray-200'}>
-                {volVsAvgPct}% {isVolumeDryUp ? '(TIGHT DRY-UP)' : ''}
+              <span className={isPocketPivot ? 'text-purple-400 font-extrabold' : isVolumeDryUp ? 'text-amber-400 font-black' : 'text-gray-200'}>
+                {volVsAvgPct}% {isPocketPivot ? '(POCKET PIVOT)' : isVolumeDryUp ? '(TIGHT DRY-UP)' : ''}
               </span>
             </div>
           )}
@@ -1275,6 +1517,19 @@ const CustomChartTooltip = ({ active, payload, currencySymbol, stock, vcpNodes }
             {matchingNode.description}
           </div>
         )}
+
+        {/* Pocket Pivot Signal Detail */}
+        {isPocketPivot && (
+          <div className="pt-1.5 border-t border-purple-800/80 text-[10px] text-purple-200 font-sans space-y-0.5">
+            <div className="flex items-center space-x-1 font-extrabold text-purple-300">
+              <Sparkles className="w-3 h-3 text-purple-400" />
+              <span>POCKET PIVOT SIGNAL</span>
+            </div>
+            <p className="leading-tight text-purple-100/90 text-[10px]">
+              Up-day volume expanded above the highest down-day volume of the past 10 sessions. High probability institutional accumulation before breakout.
+            </p>
+          </div>
+        )}
       </div>
     );
   }
@@ -1282,22 +1537,29 @@ const CustomChartTooltip = ({ active, payload, currencySymbol, stock, vcpNodes }
 };
 
 // Custom Tooltip for Volume - Editorial
-const VolumeTooltip = ({ active, payload }: any) => {
+const VolumeTooltip = ({ active, payload, showPocketPivots, pocketPivotDatesSet }: any) => {
   if (active && payload && payload.length) {
     const data: PricePoint = payload[0].payload;
     const diffPct = (((data.volume - data.avgVolume20) / data.avgVolume20) * 100).toFixed(1);
     const isDryUp = Number(diffPct) < -40;
+    const isPp = showPocketPivots && pocketPivotDatesSet?.has(data.date);
 
     return (
-      <div className="bg-[#1a1a1a] text-white p-2.5 text-[11px] font-mono space-y-1 border border-black shadow-xl">
+      <div className="bg-[#1a1a1a] text-white p-2.5 text-[11px] font-mono space-y-1 border border-black shadow-xl min-w-[190px]">
+        {isPp && (
+          <div className="text-purple-300 font-extrabold flex items-center space-x-1 text-[10px] uppercase border-b border-purple-900 pb-1">
+            <Sparkles className="w-3 h-3 text-purple-400" />
+            <span>Pocket Pivot Volume Spike</span>
+          </div>
+        )}
         <div>
-          Volume: <strong className="text-white">{formatVolume(data.volume)}</strong>
+          Volume: <strong className={isPp ? "text-purple-300 font-bold" : "text-white"}>{formatVolume(data.volume)}</strong>
         </div>
         <div>
           20D Avg: <span className="text-gray-400">{formatVolume(data.avgVolume20)}</span>
         </div>
-        <div className={isDryUp ? 'text-[#b5a68d] font-bold' : 'text-gray-400'}>
-          Vs Avg: {diffPct}% {isDryUp && '(Dry-Up)'}
+        <div className={isPp ? 'text-purple-400 font-bold' : isDryUp ? 'text-[#b5a68d] font-bold' : 'text-gray-400'}>
+          Vs Avg: {diffPct}% {isPp ? '(Pocket Pivot Volume)' : isDryUp ? '(Dry-Up)' : ''}
         </div>
       </div>
     );

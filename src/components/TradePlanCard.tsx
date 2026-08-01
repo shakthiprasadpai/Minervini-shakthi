@@ -6,6 +6,276 @@ import { ExitSignals } from './ExitSignals';
 import { BreakoutProbabilityEngine } from './BreakoutProbabilityEngine';
 import { Target, ShieldAlert, ArrowUpRight, Droplets, DollarSign, Calculator, Layers, Flame, Zap, Sparkles, TrendingUp, BarChart3, ShieldCheck, FileText, Save, Check, Trash2, Clock, StickyNote, FileSpreadsheet, LogOut, AlertTriangle, ArrowRightCircle, Sliders, CheckCircle2, RefreshCw } from 'lucide-react';
 
+function getArcPath(cx: number, cy: number, r: number, startAngleDeg: number, endAngleDeg: number) {
+  const rad1 = (startAngleDeg * Math.PI) / 180;
+  const rad2 = (endAngleDeg * Math.PI) / 180;
+  const x1 = cx - r * Math.cos(rad1);
+  const y1 = cy - r * Math.sin(rad1);
+  const x2 = cx - r * Math.cos(rad2);
+  const y2 = cy - r * Math.sin(rad2);
+  const largeArcFlag = endAngleDeg - startAngleDeg <= 180 ? 0 : 1;
+  return `M ${x1} ${y1} A ${r} ${r} 0 ${largeArcFlag} 1 ${x2} ${y2}`;
+}
+
+interface RiskRewardGaugeProps {
+  ratio: number;
+  pivotEntry: number;
+  stopLoss: number;
+  targetPrice: number;
+  currencySymbol: string;
+}
+
+export const RiskRewardGauge: React.FC<RiskRewardGaugeProps> = ({
+  ratio,
+  pivotEntry,
+  stopLoss,
+  targetPrice,
+  currencySymbol,
+}) => {
+  const riskPerShare = Math.max(0.01, pivotEntry - stopLoss);
+  const rewardPerShare = Math.max(0, targetPrice - pivotEntry);
+  const riskPct = pivotEntry > 0 ? ((pivotEntry - stopLoss) / pivotEntry) * 100 : 0;
+  const rewardPct = pivotEntry > 0 ? ((targetPrice - pivotEntry) / pivotEntry) * 100 : 0;
+
+  const cx = 120;
+  const cy = 110;
+  const r = 80;
+
+  const clampedR = Math.min(6, Math.max(0, ratio));
+  const needleAngleDeg = (clampedR / 6) * 180;
+  const needleRad = (needleAngleDeg * Math.PI) / 180;
+  const needleLen = 68;
+  const nx = cx - needleLen * Math.cos(needleRad);
+  const ny = cy - needleLen * Math.sin(needleRad);
+
+  let statusBadge = {
+    label: 'SUBPAR RISK/REWARD',
+    sub: 'Under 2:1 ratio — High downside risk relative to potential gain.',
+    color: 'bg-red-100 text-red-900 border-red-300',
+    textColor: 'text-red-600',
+    badgeText: '🔴 High Risk',
+  };
+
+  if (ratio >= 5.0) {
+    statusBadge = {
+      label: 'CHAMPION ASYMMETRIC GRADE',
+      sub: '5:1+ ratio — Exceptional reward potential relative to tight risk.',
+      color: 'bg-purple-100 text-purple-900 border-purple-300',
+      textColor: 'text-purple-600',
+      badgeText: '🚀 Champion Grade',
+    };
+  } else if (ratio >= 3.0) {
+    statusBadge = {
+      label: 'MINERVINI SEPA STANDARD',
+      sub: '3:1 to 5:1 ratio — Optimal Mark Minervini asymmetric entry setup.',
+      color: 'bg-emerald-100 text-emerald-900 border-emerald-300',
+      textColor: 'text-emerald-600',
+      badgeText: '🟢 SEPA Standard',
+    };
+  } else if (ratio >= 2.0) {
+    statusBadge = {
+      label: 'ACCEPTABLE MINIMUM THRESHOLD',
+      sub: '2:1 ratio — Passable minimum, but 3:1+ preferred for maximum edge.',
+      color: 'bg-amber-100 text-amber-900 border-amber-300',
+      textColor: 'text-amber-600',
+      badgeText: '🟡 Acceptable Min',
+    };
+  }
+
+  return (
+    <div className="bg-white border border-[#e5e4e1] p-4 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e5e4e1] pb-2">
+        <div className="flex items-center space-x-2">
+          <Target className="w-4 h-4 text-emerald-600" />
+          <h5 className="text-xs font-bold uppercase tracking-[0.2em] text-[#1a1a1a]">
+            Dynamic Risk / Reward Gauge
+          </h5>
+        </div>
+        <span className={`px-2.5 py-0.5 border text-xs font-mono font-black uppercase ${statusBadge.color}`}>
+          {statusBadge.badgeText} ({ratio.toFixed(2)} : 1)
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
+        {/* Left Column: Visual Arc Gauge Meter */}
+        <div className="md:col-span-5 flex flex-col items-center justify-center p-3 bg-[#f9f8f5] border border-[#e5e4e1]">
+          <svg viewBox="0 0 240 145" className="w-full max-w-[220px] overflow-visible">
+            {/* Background Arc Track */}
+            <path
+              d={getArcPath(cx, cy, r, 0, 180)}
+              fill="none"
+              stroke="#e5e4e1"
+              strokeWidth="16"
+              strokeLinecap="round"
+            />
+
+            {/* Colored Zones */}
+            {/* Red: 0:1 to 2:1 */}
+            <path
+              d={getArcPath(cx, cy, r, 2, 58)}
+              fill="none"
+              stroke="#ef4444"
+              strokeWidth="14"
+            />
+            {/* Yellow: 2:1 to 3:1 */}
+            <path
+              d={getArcPath(cx, cy, r, 62, 88)}
+              fill="none"
+              stroke="#f59e0b"
+              strokeWidth="14"
+            />
+            {/* Green: 3:1 to 5:1 */}
+            <path
+              d={getArcPath(cx, cy, r, 92, 148)}
+              fill="none"
+              stroke="#10b981"
+              strokeWidth="14"
+            />
+            {/* Purple: 5:1 to 6:1+ */}
+            <path
+              d={getArcPath(cx, cy, r, 152, 178)}
+              fill="none"
+              stroke="#8b5cf6"
+              strokeWidth="14"
+            />
+
+            {/* Tick Markers */}
+            {[
+              { rVal: 0, deg: 0, label: '0:1' },
+              { rVal: 2, deg: 60, label: '2:1' },
+              { rVal: 3, deg: 90, label: '3:1' },
+              { rVal: 5, deg: 150, label: '5:1' },
+              { rVal: 6, deg: 180, label: '6:1+' },
+            ].map((tick) => {
+              const tickRad = (tick.deg * Math.PI) / 180;
+              const innerX = cx - (r - 12) * Math.cos(tickRad);
+              const innerY = cy - (r - 12) * Math.sin(tickRad);
+              const outerX = cx - (r + 12) * Math.cos(tickRad);
+              const outerY = cy - (r + 12) * Math.sin(tickRad);
+
+              const labelR = r + 22;
+              const lx = cx - labelR * Math.cos(tickRad);
+              const ly = cy - labelR * Math.sin(tickRad);
+
+              return (
+                <g key={tick.label}>
+                  <line
+                    x1={innerX}
+                    y1={innerY}
+                    x2={outerX}
+                    y2={outerY}
+                    stroke="#1a1a1a"
+                    strokeWidth="1.5"
+                  />
+                  <text
+                    x={lx}
+                    y={ly + 3}
+                    textAnchor="middle"
+                    fontSize="9"
+                    fontWeight="bold"
+                    fontFamily="monospace"
+                    fill="#4b5563"
+                  >
+                    {tick.label}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Dynamic Needle */}
+            <line
+              x1={cx}
+              y1={cy}
+              x2={nx}
+              y2={ny}
+              stroke="#1a1a1a"
+              strokeWidth="3.5"
+              strokeLinecap="round"
+              className="transition-all duration-300"
+            />
+            <circle cx={cx} cy={cy} r="6" fill="#1a1a1a" stroke="#ffffff" strokeWidth="2" />
+            <circle cx={nx} cy={ny} r="3" fill="#10b981" />
+          </svg>
+
+          {/* Central Digital Display */}
+          <div className="mt-[-10px] text-center space-y-0.5">
+            <div className={`text-2xl font-black font-mono tracking-tight ${statusBadge.textColor}`}>
+              {ratio.toFixed(2)} : 1
+            </div>
+            <div className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest">
+              Risk-to-Reward Ratio
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Key Metric Breakdown & Minervini Rule Context */}
+        <div className="md:col-span-7 space-y-3 font-mono text-xs">
+          <div className="bg-[#f9f8f5] p-2.5 border border-[#e5e4e1] space-y-1">
+            <div className="text-[10px] uppercase font-bold text-[#b5a68d] flex justify-between">
+              <span>Setup Rating:</span>
+              <span className={`font-bold ${statusBadge.textColor}`}>{statusBadge.label}</span>
+            </div>
+            <p className="text-[11px] text-gray-700 font-sans leading-relaxed">
+              {statusBadge.sub}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            {/* Risk Box */}
+            <div className="bg-red-50/70 border border-red-200 p-2.5 space-y-0.5">
+              <span className="text-[10px] uppercase font-bold text-red-700 block">
+                Defined Risk (1R)
+              </span>
+              <div className="text-base font-black text-red-600 font-mono">
+                {formatCurrency(riskPerShare, currencySymbol)} <span className="text-[10px] font-normal">/ sh</span>
+              </div>
+              <div className="text-[10px] text-red-800 font-bold">
+                -{riskPct.toFixed(1)}% Stop Loss ({formatCurrency(stopLoss, currencySymbol)})
+              </div>
+            </div>
+
+            {/* Reward Box */}
+            <div className="bg-emerald-50/70 border border-emerald-200 p-2.5 space-y-0.5">
+              <span className="text-[10px] uppercase font-bold text-emerald-800 block">
+                Expected Reward
+              </span>
+              <div className="text-base font-black text-emerald-700 font-mono">
+                {formatCurrency(rewardPerShare, currencySymbol)} <span className="text-[10px] font-normal">/ sh</span>
+              </div>
+              <div className="text-[10px] text-emerald-800 font-bold">
+                +{rewardPct.toFixed(1)}% Target ({formatCurrency(targetPrice, currencySymbol)})
+              </div>
+            </div>
+          </div>
+
+          {/* Ratio Comparison Progress Bar */}
+          <div className="space-y-1 pt-0.5">
+            <div className="flex justify-between text-[10px] font-bold">
+              <span className="text-red-700">Risk: 1.0 Unit</span>
+              <span className="text-emerald-700">Reward: {ratio.toFixed(2)} Units</span>
+            </div>
+            <div className="w-full bg-gray-200 h-2.5 flex overflow-hidden rounded border border-gray-300">
+              <div
+                className="bg-red-500 h-full text-[9px] text-white font-bold flex items-center justify-center transition-all"
+                style={{ width: `${Math.min(35, (1 / (1 + ratio)) * 100)}%` }}
+              >
+                1R
+              </div>
+              <div
+                className="bg-emerald-600 h-full text-[9px] text-white font-bold flex items-center justify-center transition-all border-l border-white/40"
+                style={{ width: `${Math.max(25, (ratio / (1 + ratio)) * 100)}%` }}
+              >
+                {ratio.toFixed(2)}R Reward
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+};
+
 interface TradePlanCardProps {
   stock: MinerviniTradeSetup;
 }
@@ -281,6 +551,15 @@ export const TradePlanCard: React.FC<TradePlanCardProps> = ({ stock }) => {
             </span>
           </div>
         </div>
+
+        {/* Dynamic Interactive Risk/Reward Ratio Visual Gauge Dial */}
+        <RiskRewardGauge
+          ratio={dynamicCustomRRRatio}
+          pivotEntry={pivotEntry}
+          stopLoss={currentStopLoss}
+          targetPrice={customTargetPrice}
+          currencySymbol={currencySymbol}
+        />
 
         {/* Quick RRR Preset Buttons & Slider */}
         <div className="space-y-3 bg-white p-4 border border-[#e5e4e1]">

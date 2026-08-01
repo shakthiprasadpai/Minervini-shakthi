@@ -22,9 +22,10 @@ import { TradeJournal } from './components/TradeJournal';
 import { BigMoneyTracker } from './components/BigMoneyTracker';
 import { GlobalNotificationToast } from './components/GlobalNotificationToast';
 import { HistoricalBacktestPanel } from './components/HistoricalBacktestPanel';
+import { BreakoutProbabilityEngine } from './components/BreakoutProbabilityEngine';
 import { MOCK_STOCKS } from './data/mockStocks';
 import { MinerviniTradeSetup } from './types';
-import { formatCurrency, formatVolume, getCurrencySymbol } from './utils/sepaCalculator';
+import { formatCurrency, formatVolume, getCurrencySymbol, calculateBreakoutProbability } from './utils/sepaCalculator';
 import { TrendingUp, ShieldCheck, Target, Droplets, ArrowUpRight, Flame, BarChart3, Calculator, Sparkles, Gem } from 'lucide-react';
 
 export default function App() {
@@ -109,21 +110,27 @@ export default function App() {
             </p>
           </div>
 
-          <div className="flex items-center space-x-4 text-xs">
-            <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-4 text-center min-w-[120px]">
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-3 text-center min-w-[110px]">
               <span className="text-[10px] uppercase tracking-[0.2em] text-[#b5a68d] font-bold block">Selected Stock</span>
               <strong className="text-2xl font-serif italic font-black text-[#1a1a1a]">{selectedStock.ticker}</strong>
             </div>
-            <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-4 text-center min-w-[120px]">
+            <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-3 text-center min-w-[110px]">
               <span className="text-[10px] uppercase tracking-[0.2em] text-[#b5a68d] font-bold block">Pivot Entry</span>
               <strong className="text-xl font-mono font-bold text-[#1a1a1a]">
                 {formatCurrency(selectedStock.pivotPrice, currencySymbol)}
               </strong>
             </div>
-            <div className="bg-red-50/50 border border-red-200 p-4 text-center min-w-[120px]">
+            <div className="bg-red-50/50 border border-red-200 p-3 text-center min-w-[110px]">
               <span className="text-[10px] uppercase tracking-[0.2em] text-red-700 font-bold block">Tight Stop</span>
               <strong className="text-xl font-mono font-bold text-red-600">
                 {formatCurrency(selectedStock.stopLossPrice, currencySymbol)}
+              </strong>
+            </div>
+            <div className="bg-amber-50 border border-amber-300 p-3 text-center min-w-[130px]">
+              <span className="text-[10px] uppercase tracking-[0.2em] text-amber-800 font-bold block">Breakout Prob</span>
+              <strong className="text-xl font-mono font-black text-amber-900">
+                {calculateBreakoutProbability(selectedStock).score}%
               </strong>
             </div>
           </div>
@@ -280,6 +287,9 @@ export default function App() {
               
               {/* Chart Component */}
               <VcpChart stock={selectedStock} />
+
+              {/* Breakout Probability Engine & Interactive Simulator */}
+              <BreakoutProbabilityEngine stock={selectedStock} />
 
               {/* 'Big Money' Institutional Volume Spike Tracker */}
               <BigMoneyTracker stock={selectedStock} />

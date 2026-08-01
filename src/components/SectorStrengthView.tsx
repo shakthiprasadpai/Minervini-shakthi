@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { MinerviniTradeSetup } from '../types';
 import { formatCurrency, getCurrencySymbol } from '../utils/sepaCalculator';
+import { SectorPerformanceWidget } from './SectorPerformanceWidget';
 import {
   Layers,
   TrendingUp,
@@ -258,8 +259,15 @@ export const SectorStrengthView: React.FC<SectorStrengthViewProps> = ({
   return (
     <div className="space-y-6">
       
+      {/* SEPA Sector Performance Summary Widget */}
+      <SectorPerformanceWidget
+        stocks={stocks}
+        onSelectStock={onSelectStock}
+        onFilterSector={onFilterBySector}
+      />
+
       {/* Sector Performance Dashboard Header & Institutional Summary Banner */}
-      <div className="bg-[#161b22] border border-[#30363d] p-6 text-white space-y-5 shadow-xl">
+      <div className="bg-[#161b22] border border-[#30363d] p-6 text-[#1a1a1a] space-y-5 shadow-xl">
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-[#30363d] pb-4">
           <div className="flex items-center space-x-3.5">
             <div className="w-11 h-11 bg-purple-600/20 border border-purple-500/40 flex items-center justify-center text-purple-400 shrink-0">

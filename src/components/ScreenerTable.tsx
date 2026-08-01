@@ -3,6 +3,7 @@ import { MinerviniTradeSetup } from '../types';
 import { formatCurrency, calculateTrendStrengthMeter, getCurrencySymbol } from '../utils/sepaCalculator';
 import { exportTradePlansToCsv } from '../utils/csvExport';
 import { SectorStrengthView } from './SectorStrengthView';
+import { SectorPerformanceWidget } from './SectorPerformanceWidget';
 import {
   Search,
   Droplets,
@@ -217,7 +218,16 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
   });
 
   return (
-    <div className="bg-white border border-[#e5e4e1] p-6 shadow-xs space-y-6">
+    <div className="space-y-6">
+      
+      {/* Sector Performance Summary Widget */}
+      <SectorPerformanceWidget
+        stocks={stocks}
+        onSelectStock={onSelectStock}
+        onFilterSector={(sec) => setSearch(sec)}
+      />
+
+      <div className="bg-white border border-[#e5e4e1] p-6 shadow-xs space-y-6">
       
       {/* Top Banner: VCP Heatmap Control Panel & Legend */}
       <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-4 space-y-4">
@@ -773,6 +783,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
         </div>
       )}
 
+    </div>
     </div>
   );
 };

@@ -18,6 +18,39 @@ export const ObsidianIntegration: React.FC<ObsidianIntegrationProps> = ({
   const [copiedTicker, setCopiedTicker] = useState<string | null>(null);
   const [exportedStatus, setExportedStatus] = useState<string | null>(null);
 
+  // Obsidian Local REST API Connection State
+  const [apiKey, setApiKey] = useState<string>('obsidian_sepa_secret_key');
+  const [apiEndpoint, setApiEndpoint] = useState<string>('https://127.0.0.1:27124');
+  const [connectionStatus, setConnectionStatus] = useState<'DISCONNECTED' | 'TESTING' | 'CONNECTED_URI' | 'CONNECTED_REST'>('CONNECTED_URI');
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(true);
+  const [connectionMessage, setConnectionMessage] = useState<string>('Ready via Obsidian URI Protocol (`obsidian://new`). Local REST API plugin fallback enabled.');
+
+  const handleTestConnection = async () => {
+    setConnectionStatus('TESTING');
+    setConnectionMessage('Testing connection to Obsidian Local REST API at ' + apiEndpoint + '...');
+
+    try {
+      const response = await fetch(`${apiEndpoint}/`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        setConnectionStatus('CONNECTED_REST');
+        setConnectionMessage(`Successfully connected to Obsidian Local REST API! Vault: "${vaultName}".`);
+      } else {
+        setConnectionStatus('CONNECTED_URI');
+        setConnectionMessage(`Rest API ping returned status ${response.status}. Fallback to native Obsidian URI Protocol active.`);
+      }
+    } catch {
+      setConnectionStatus('CONNECTED_URI');
+      setConnectionMessage(`Obsidian URI Protocol handler active. (Tip: Enable Obsidian 'Local REST API' plugin on port 27124 for direct background sync).`);
+    }
+  };
+
   // Generate Obsidian Markdown Note Content for a given stock
   const generateMarkdownNote = (stock: MinerviniTradeSetup): string => {
     const frontmatter = `---
@@ -181,6 +214,110 @@ ${stock.sepaNotes}
             </div>
           </div>
         </a>
+      </div>
+
+      {/* Obsidian Connection Status & REST API Settings Card */}
+      <div className="bg-[#111318] border border-amber-500/30 p-5 space-y-4 font-mono">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+          <div className="flex items-center space-x-3">
+            <div className={`w-3 h-3 rounded-full ${
+              connectionStatus === 'CONNECTED_REST'
+                ? 'bg-emerald-400 animate-pulse'
+                : connectionStatus === 'CONNECTED_URI'
+                ? 'bg-cyan-400'
+                : connectionStatus === 'TESTING'
+                ? 'bg-amber-400 animate-spin'
+                : 'bg-gray-500'
+            }`} />
+            <span className="text-xs font-bold text-white uppercase tracking-wider">
+              Obsidian Vault Connection Status:
+            </span>
+            <span className={`px-2.5 py-0.5 text-[10px] font-extrabold uppercase border ${
+              connectionStatus === 'CONNECTED_REST'
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                : connectionStatus === 'CONNECTED_URI'
+                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+            }`}>
+              {connectionStatus === 'CONNECTED_REST' && '🟢 REST API CONNECTED'}
+              {connectionStatus === 'CONNECTED_URI' && '🔵 URI PROTOCOL ACTIVE'}
+              {connectionStatus === 'TESTING' && '🟡 TESTING CONNECTION...'}
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-2 text-xs">
+            <button
+              onClick={handleTestConnection}
+              className="bg-amber-400 hover:bg-amber-300 text-black font-bold px-3 py-1.5 text-[11px] uppercase tracking-wider flex items-center space-x-1.5 transition-all cursor-pointer shadow-xs"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${connectionStatus === 'TESTING' ? 'animate-spin' : ''}`} />
+              <span>Test Obsidian Connection</span>
+            </button>
+          </div>
+        </div>
+
+        <p className="text-xs text-gray-300 font-sans leading-relaxed">
+          {connectionMessage}
+        </p>
+
+        {/* Configuration Inputs */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 text-xs">
+          <div>
+            <label className="block text-[10px] uppercase font-mono tracking-wider text-gray-400 mb-1">
+              Obsidian Vault Name
+            </label>
+            <input
+              type="text"
+              value={vaultName}
+              onChange={(e) => setVaultName(e.target.value)}
+              placeholder="GrowthStockAlpha"
+              className="w-full bg-black/60 border border-white/20 text-white px-3 py-1.5 text-xs font-mono rounded focus:outline-none focus:border-amber-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10px] uppercase font-mono tracking-wider text-gray-400 mb-1">
+              Local REST API Endpoint
+            </label>
+            <input
+              type="text"
+              value={apiEndpoint}
+              onChange={(e) => setApiEndpoint(e.target.value)}
+              placeholder="https://127.0.0.1:27124"
+              className="w-full bg-black/60 border border-white/20 text-white px-3 py-1.5 text-xs font-mono rounded focus:outline-none focus:border-amber-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10px] uppercase font-mono tracking-wider text-gray-400 mb-1">
+              API Authorization Key
+            </label>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="Secret API Token"
+              className="w-full bg-black/60 border border-white/20 text-white px-3 py-1.5 text-xs font-mono rounded focus:outline-none focus:border-amber-400"
+            />
+          </div>
+        </div>
+
+        {/* Auto Sync Checkbox */}
+        <div className="flex items-center justify-between text-xs pt-1 border-t border-white/10">
+          <label className="flex items-center space-x-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={autoSyncEnabled}
+              onChange={(e) => setAutoSyncEnabled(e.target.checked)}
+              className="accent-amber-400 w-4 h-4"
+            />
+            <span className="text-gray-300 font-sans">Auto-sync stock SEPA Markdown note when selected from screener</span>
+          </label>
+
+          <span className="text-[10px] text-amber-400 font-mono">
+            Vault Target: <strong className="text-white">/{vaultName}/Minervini-SEPA/</strong>
+          </span>
+        </div>
       </div>
 
       {/* Vault Settings & Quick Batch Export */}
