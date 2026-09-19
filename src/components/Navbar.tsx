@@ -28,6 +28,7 @@ interface NavbarProps {
   tightVolumeCount: number;
   isObsidian?: boolean;
   onToggleObsidian?: () => void;
+  realtimeStatus?: any;
 }
 
 
@@ -38,7 +39,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   totalSetupsCount,
   tightVolumeCount,
   isObsidian = false,
-  onToggleObsidian
+  onToggleObsidian,
+  realtimeStatus
 }) => {
   return (
     <header className="bg-white/80 backdrop-blur-md border-b border-[#e5e4e1] text-[#1a1a1a] sticky top-0 z-40 shadow-xs transition-colors duration-300">
@@ -82,6 +84,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="text-emerald-700 font-bold">💧 Dry-Up Volume:</span>
               <span className="font-bold text-[#1a1a1a]">{tightVolumeCount} Setups</span>
             </div>
+
+            <a href="/api/5paisa/auth/login" className={`px-3.5 py-1.5 rounded text-[11px] font-bold uppercase tracking-wider font-mono border shadow-sm ${realtimeStatus?.connected ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-amber-500 text-slate-950 border-amber-400 hover:bg-amber-400'}`}>{realtimeStatus?.connected ? '5Paisa LIVE' : 'Connect 5Paisa'}</a>
 
             {/* OBSIDIAN Theme Toggle Button */}
             {onToggleObsidian && (
