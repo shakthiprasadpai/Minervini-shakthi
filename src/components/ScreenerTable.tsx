@@ -171,6 +171,27 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
       ? ((stock.currentPrice - stock.stopLossPrice) / stock.currentPrice) * 100
       : 0;
 
+  const getHoldingDays = (stock: MinerviniTradeSetup): { min: number; max: number } => {
+    switch (stock.vcpStage) {
+      case 'Active Breakout':
+        return { min: 10, max: 30 };
+      case 'Breakout Pending':
+        return { min: 5, max: 15 };
+      case 'T4':
+        return { min: 10, max: 25 };
+      case 'T3':
+        return { min: 15, max: 30 };
+      case 'T2':
+      default:
+        return { min: 20, max: 40 };
+    }
+  };
+
+  const getExitPlan = (stock: MinerviniTradeSetup) => ({
+    target: stock.target1Price,
+    stop: stock.stopLossPrice,
+  });
+
   const handleSort = (field: SortField) => {
     if (sortBy === field) {
       setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
@@ -461,7 +482,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
         />
       ) : viewMode === 'table' ? (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1500px] text-left border-collapse">
+          <table className="w-full min-w-[1800px] text-left border-collapse">
             <thead>
               <tr className="border-b border-[#e5e4e1] text-[10px] uppercase tracking-[0.2em] text-[#b5a68d] font-bold bg-[#f9f8f5]">
                 {renderSortHeader('Stock & Sector', 'TICKER')}
@@ -487,7 +508,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
             <tbody className="divide-y divide-white/5 text-xs">
               {filteredStocks.length === 0 ? (
                 <tr>
-                  <td colSpan={17} className="py-8 text-center text-gray-500 font-serif italic text-sm">
+                  <td colSpan={21} className="py-8 text-center text-gray-500 font-serif italic text-sm">
                     No growth setups match the selected search or SEPA filter criteria.
                   </td>
                 </tr>
@@ -497,6 +518,8 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                   const isSelected = stock.ticker === selectedTicker;
                   const heatmap = calculateVcpHeatmap(stock);
                   const trendMeter = calculateTrendStrengthMeter(stock);
+                  const holdingDays = getHoldingDays(stock);
+                  const exitPlan = getExitPlan(stock);
 
                   return (
                     <tr
@@ -705,6 +728,24 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                         })()}
                       </td>
 
+                      {/* Entry Price */}
+                      <td className="py-3.5 px-2.5 text-center font-mono">
+                        <div className="font-bold text-amber-300">{formatCurrency(stock.pivotPrice, currency)}</div>
+                        <div className="text-[10px] text-gray-500">Pivot entry</div>
+                      </td>
+
+                      {/* Exit Plan */}
+                      <td className="py-3.5 px-2.5 text-center font-mono">
+                        <div className="font-bold text-emerald-400">{formatCurrency(exitPlan.target, currency)}</div>
+                        <div className="text-[10px] text-rose-400">Stop {formatCurrency(exitPlan.stop, currency)}</div>
+                      </td>
+
+                      {/* Expected Holding Days */}
+                      <td className="py-3.5 px-2.5 text-center font-mono">
+                        <div className="font-bold text-white">{holdingDays.min}–{holdingDays.max}</div>
+                        <div className="text-[10px] text-gray-500">trading days</div>
+                      </td>
+
                       {/* Stop Loss Exit Price */}
                       <td className="py-3.5 px-2.5 font-mono">
                         <div className="font-bold text-rose-400">
@@ -878,104 +919,3 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                         {stock.changePercent >= 0 ? '+' : ''}
                         {stock.changePercent.toFixed(2)}%
                       </span>
-                    </div>
-                  </div>
-
-                  {/* VCP Contraction Meter Bar */}
-                  <div className="space-y-1.5 bg-white p-2.5 border border-[#e5e4e1]">
-                    <div className="flex justify-between text-[10px] font-mono">
-                      <span className="text-gray-500 uppercase tracking-wider font-bold">Vol Dry-Up:</span>
-                      <span className="font-bold text-[#1a1a1a]">{stock.volumeDryUpPercent}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 h-2 overflow-hidden border border-gray-300">
-                      <div
-                        className={`h-full ${heatmap.barColor} transition-all duration-500`}
-                        style={{ width: `${heatmap.score}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-[9px] text-gray-400 font-mono">
-                      <span>Contraction Stage: {stock.vcpStage}</span>
-                      <span>Score: {heatmap.score}/100</span>
-                    </div>
-                  </div>
-
-                  {/* 200MA Trend Strength Meter Bar */}
-                  {(() => {
-                    const trendMeter = calculateTrendStrengthMeter(stock);
-                    const isPos = trendMeter.slopePercent > 0;
-                    return (
-                      <div className="space-y-1.5 bg-white p-2.5 border border-[#e5e4e1]">
-                        <div className="flex items-center justify-between text-[10px] font-mono">
-                          <span className="text-gray-500 uppercase tracking-wider font-bold flex items-center space-x-1">
-                            <Gauge className="w-3 h-3 text-emerald-600" />
-                            <span>200MA Trend Slope:</span>
-                          </span>
-                          <span className="font-extrabold text-[#1a1a1a]">
-                            {isPos ? '+' : ''}{trendMeter.slopePercent.toFixed(2)}%/mo
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 h-2 overflow-hidden border border-gray-300">
-                          <div
-                            className={`h-full ${trendMeter.meterColor} transition-all duration-500`}
-                            style={{ width: `${trendMeter.meterFillPercent}%` }}
-                          />
-                        </div>
-                        <div className="flex justify-between items-center text-[9px] text-gray-500 font-mono">
-                          <span className={`px-1.5 py-0.5 font-bold ${trendMeter.badgeBg} ${trendMeter.badgeText}`}>
-                            {trendMeter.tierLabel}
-                          </span>
-                          <span>MA Align: 50&gt;150&gt;200</span>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Key Execution Levels Grid */}
-                  <div className="grid grid-cols-2 gap-2 text-[11px] font-mono pt-1">
-                    <div className="bg-white p-2 border border-[#e5e4e1]">
-                      <span className="text-[9px] text-gray-500 block uppercase">Pivot Buy:</span>
-                      <strong className="text-[#1a1a1a] font-bold">
-                        {formatCurrency(stock.pivotPrice, currency)}
-                      </strong>
-                    </div>
-                    <div className="bg-white p-2 border border-red-200">
-                      <span className="text-[9px] text-red-700 block uppercase">Stop Loss:</span>
-                      <strong className="text-red-600 font-bold">
-                        {formatCurrency(stock.stopLossPrice, currency)}
-                      </strong>
-                    </div>
-                  </div>
-
-                  {/* Action Button */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onViewChart(stock);
-                    }}
-                    className="w-full bg-[#1a1a1a] hover:bg-black text-white font-bold py-2 text-xs uppercase tracking-widest flex items-center justify-center space-x-1 border border-black transition-all"
-                  >
-                    <span>Scan VCP Chart</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-
-                </div>
-              );
-            })
-          )}
-        </div>
-      )}
-
-    </div>
-    </div>
-
-      {/* Refined 18-Point SEPA Strategy Screener Analysis Modal */}
-      <RefinedSepaScreenerModal
-        isOpen={isRefinedModalOpen}
-        onClose={() => setIsRefinedModalOpen(false)}
-        stocks={stocks}
-        onSelectStock={onSelectStock}
-      />
-    </>
-  );
-};
-
