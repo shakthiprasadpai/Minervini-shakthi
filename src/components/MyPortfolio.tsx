@@ -40,50 +40,8 @@ export const MyPortfolio: React.FC<MyPortfolioProps> = ({
 }) => {
   const [portfolioSubTab, setPortfolioSubTab] = useState<'holdings' | 'rebalancing'>('holdings');
   // Load portfolio from localStorage or provide initial default holdings
-  const [holdings, setHoldings] = useState<PortfolioHolding[]>(() => {
-    try {
-      const saved = localStorage.getItem('minervini_sepa_portfolio');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return [
-      {
-        id: 'hold-1',
-        ticker: 'NVDA',
-        stockName: 'NVIDIA Corporation',
-        exchange: 'NASDAQ',
-        shares: 100,
-        entryPrice: 128.5,
-        currentPrice: 135.2,
-        buyDate: '2026-07-10',
-        stopLossPrice: 122.0,
-        pivotTargetPrice: 154.2,
-        notes: '3T VCP Breakout Entry on 2.5x volume surge',
-        trendScore: 8,
-        sma50: 121.5,
-        sma200: 105.0,
-        vcpStage: 'Active Breakout',
-      },
-      {
-        id: 'hold-2',
-        ticker: 'DIXON',
-        stockName: 'Dixon Technologies Ltd.',
-        exchange: 'NSE',
-        shares: 25,
-        entryPrice: 13200.0,
-        currentPrice: 13850.0,
-        buyDate: '2026-07-14',
-        stopLossPrice: 12500.0,
-        pivotTargetPrice: 15800.0,
-        notes: 'NSE Growth Leader - Cup with Handle pivot',
-        trendScore: 8,
-        sma50: 12400.0,
-        sma200: 10800.0,
-        vcpStage: 'Active Breakout',
-      },
-    ];
-  });
+  const [holdings, setHoldings] = useState<PortfolioHolding[]>([]);
+
 
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
   const [editingHoldingId, setEditingHoldingId] = useState<string | null>(null);
@@ -151,14 +109,12 @@ export const MyPortfolio: React.FC<MyPortfolioProps> = ({
     );
   }, [stocks]);
 
-  // Persist portfolio
+  // Production persistence: PostgreSQL through backend API
   useEffect(() => {
-    try {
-      localStorage.setItem('minervini_sepa_portfolio', JSON.stringify(holdings));
-      window.dispatchEvent(new CustomEvent('minervini_portfolio_updated'));
-    } catch (e) {
-      console.error(e);
-    }
+    fetch('/api/portfolio').then(r => r.ok ? r.json() : []).then(data => setHoldings(data)).catch(() => setHoldings([]));
+  }, []);
+  useEffect(() => {
+    if (holdings.length || stocks.length) fetch('/api/portfolio/sync', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(holdings)}).catch(()=>{});
   }, [holdings]);
 
   // Select stock handler in add modal
