@@ -3,6 +3,8 @@ import { FivePaisaMarketFeed, type FivePaisaInstrument } from '../engine/marketD
 import type { MarketTick } from '../engine/marketData/realtimeTypes';
 import { fivePaisaScripMaster } from './scripMasterScheduler';
 import { fivePaisaAuth } from './fivePaisaAuthService';
+import { createBigulProvider, createXtsProvider, runMinerviniEngine, buildTradeSetup } from '../engine';
+import type { PricePoint } from '../types';
 
 function configuredSymbols(): Array<{ exchange: 'NSE' | 'BSE'; symbol: string }> {
   return (process.env.SCREENER_SYMBOLS || '').split(',').map(x => x.trim()).filter(Boolean).map(spec => {
@@ -18,6 +20,8 @@ export class RealtimeMarketFeedService {
   private latest = new Map<string, MarketTick>();
   private connected = false;
   private instrumentCount = 0;
+  private histories = new Map<string, PricePoint[]>();
+  private benchmark: PricePoint[] | undefined;
 
   async start() {
     const accessToken = fivePaisaAuth.getAccessToken() || process.env.FIVEPAISA_ACCESS_TOKEN;
@@ -33,10 +37,37 @@ export class RealtimeMarketFeedService {
     }
     if (!instruments.length) return false;
     this.instrumentCount = instruments.length;
+    // Warm the same Minervini engine with the latest daily history so every tick can
+    // re-evaluate the affected instrument without inventing a separate signal path.
+    try {
+      const provider = process.env.MARKET_DATA_PROVIDER === 'xts' ? createXtsProvider() : createBigulProvider();
+      for (const instrument of instruments) {
+        const history = await provider.getDailyCandles(instrument.symbol, instrument.exchange);
+        if (history.length >= 200) this.histories.set(instrument.exchange + ':' + instrument.symbol, history);
+      }
+      const benchmarkSpec = (process.env.RS_BENCHMARK_SYMBOL || '').trim();
+      if (benchmarkSpec) {
+        const parts = benchmarkSpec.split(':');
+        const exchange = (/^(NSE|BSE)$/i.test(parts[0]) ? parts[0] : 'NSE').toUpperCase() as 'NSE' | 'BSE';
+        const symbol = (/^(NSE|BSE)$/i.test(parts[0]) ? parts.slice(1).join(':') : benchmarkSpec).trim();
+        this.benchmark = await provider.getDailyCandles(symbol, exchange);
+      }
+    } catch (error) { console.error('Minervini realtime history warm-up failed:', error); }
     this.feed = new FivePaisaMarketFeed({ accessToken, clientCode, websocketUrl: process.env.FIVEPAISA_WEBSOCKET_URL, instruments, reconnectMs: Number(process.env.FIVEPAISA_RECONNECT_MS || 3000) }, tick => {
       this.connected = true;
       this.latest.set(tick.exchange + ':' + tick.symbol, tick);
-      const payload = 'data: ' + JSON.stringify(tick) + '\\n\\n';
+      const key = tick.exchange + ':' + tick.symbol;
+      const history = this.histories.get(key);
+      let screenerResult: any = undefined;
+      if (history?.length) {
+        const next = history.map(x => ({ ...x }));
+        const last = next[next.length - 1];
+        last.close = tick.price; last.high = Math.max(last.high, tick.price); last.low = Math.min(last.low, tick.price); last.volume = Math.max(last.volume, tick.volume);
+        const analysis = runMinerviniEngine({ ticker: tick.symbol, currentPrice: tick.price, priceHistory: next }, this.benchmark);
+        screenerResult = buildTradeSetup(tick.symbol, tick.symbol, tick.exchange, next, analysis);
+        this.histories.set(key, next);
+      }
+      const payload = 'data: ' + JSON.stringify({ ...tick, screenerResult }) + '\\n\\n';
       for (const response of this.clients) response.write(payload);
     });
     this.feed.connect();
