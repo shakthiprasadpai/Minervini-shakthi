@@ -26,17 +26,30 @@ import { BreakoutProbabilityEngine } from './components/BreakoutProbabilityEngin
 import { SectorStrengthView } from './components/SectorStrengthView';
 import { PatternVisualsLibrary } from './components/PatternVisualsLibrary';
 import { ExportTradeData } from './components/ExportTradeData';
-import { MOCK_STOCKS } from './data/mockStocks';
 import { runtimeConfig } from './config/runtime';
 import { MinerviniTradeSetup } from './types';
 import { formatCurrency, formatVolume, getCurrencySymbol, calculateBreakoutProbability } from './utils/sepaCalculator';
 import { TrendingUp, ShieldCheck, Target, Droplets, ArrowUpRight, Flame, BarChart3, Calculator, Sparkles, Gem } from 'lucide-react';
+
+const EMPTY_STOCK: MinerviniTradeSetup = {
+  ticker: '—', name: 'No market data loaded', exchange: 'NSE', sector: '—', industry: '—',
+  currentPrice: 0, changePercent: 0, sma50: 0, sma150: 0, sma200: 0, sma200_1mo_ago: 0,
+  high52w: 0, low52w: 0, rsRating: 0, patternType: 'Pivot Pullback', vcpStage: 'Breakout Pending',
+  trendScore: 0, avgVolume20d: 0, pivotVolume: 0, volumeDryUpPercent: 0, isTightVolume: false,
+  pivotPrice: 0, buyZoneMax: 0, stopLossPrice: 0, stopLossPercent: 0, target1Price: 0,
+  target1Percent: 0, target2Price: 0, target2Percent: 0, riskRewardRatio: 0, contractions: [],
+  priceHistory: [], sepaNotes: 'Connect Bigul/XTS market data to load the live screener.'
+};
 
 export default function App() {
   const [stocksList, setStocksList] = useState<MinerviniTradeSetup[]>(runtimeConfig.demoMode ? MOCK_STOCKS : []);
   const [selectedStock, setSelectedStock] = useState<MinerviniTradeSetup | null>(runtimeConfig.demoMode ? MOCK_STOCKS[0] : null);
   const [activeTab, setActiveTab] = useState<AppNavTab>('screener');
   const [isObsidian, setIsObsidian] = useState<boolean>(true); // Default to Obsidian Dark theme for luxury feel
+
+  useEffect(() => {
+    fetch('/api/screener').then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); }).then(data => { const live=data.results||[]; setStocksList(live); if(live.length) setSelectedStock(live[0]); setMarketDataStatus('LIVE'); }).catch(() => setMarketDataStatus('UNAVAILABLE'));
+  }, []);
 
   useEffect(() => {
     if (isObsidian) {
