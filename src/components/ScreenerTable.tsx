@@ -516,7 +516,6 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                       </td>
 
                       {/* Live signal */}
-                      {/* Live signal */}
                       <td className="py-3.5 px-2.5 text-center">
                         {(() => {
                           const signal = getSignal(stock);
