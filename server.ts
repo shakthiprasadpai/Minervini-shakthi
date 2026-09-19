@@ -2,12 +2,48 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
+import { createBigulProvider, createXtsProvider, runMinerviniEngine, buildTradeSetup, backtestMinervini } from './src/engine';
+import { initDatabase, pool } from './src/db/database';
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(express.json());
+
+  const getMarketDataProvider = () => process.env.MARKET_DATA_PROVIDER === 'xts' ? createXtsProvider() : createBigulProvider();
+
+  app.get('/api/health', async (_req, res) => {
+    let database = 'disabled';
+    if (pool) { try { await pool.query('SELECT 1'); database = 'ok'; } catch { database = 'error'; } }
+    res.json({ ok: true, marketDataProvider: process.env.MARKET_DATA_PROVIDER || 'bigul', database });
+  });
+
+  app.get('/api/screener', async (_req, res) => {
+    try {
+      const provider = getMarketDataProvider();
+      const symbols = (process.env.SCREENER_SYMBOLS || '').split(',').map(x=>x.trim()).filter(Boolean);
+      if (!symbols.length) return res.status(503).json({ error:'SCREENER_SYMBOLS_NOT_CONFIGURED' });
+      const benchmark = process.env.RS_BENCHMARK_SYMBOL ? await provider.getDailyCandles(process.env.RS_BENCHMARK_SYMBOL,'NSE') : undefined;
+      const results=[];
+      for(const ticker of symbols){
+        try { const candles=await provider.getDailyCandles(ticker,'NSE'); if(candles.length<200) continue; const current=candles[candles.length-1].close; const analysis=runMinerviniEngine({ticker,currentPrice:current,priceHistory:candles},benchmark); results.push(buildTradeSetup(ticker,ticker,'NSE',candles,analysis)); } catch(e) { console.error('Screener symbol failed',ticker,e); }
+      }
+      if(pool) await pool.query('INSERT INTO screener_runs(universe_count,result_count) VALUES($1,$2)',[symbols.length,results.length]);
+      res.json({ provider:process.env.MARKET_DATA_PROVIDER||'bigul', results });
+    } catch(e:any) { res.status(503).json({ error:'MARKET_DATA_UNAVAILABLE', message:e?.message||String(e) }); }
+  });
+
+  app.get('/api/quote/:exchange/:ticker', async (req,res) => {
+    try { const provider=getMarketDataProvider(); const q=await provider.getQuote(req.params.ticker,req.params.exchange.toUpperCase() as 'NSE'|'BSE'); res.json(q); }
+    catch(e:any){res.status(503).json({error:'MARKET_DATA_UNAVAILABLE',message:e?.message||String(e)});}
+  });
+
+  app.post('/api/backtest', async (req,res) => {
+    try { const provider=getMarketDataProvider(); const ticker=String(req.body.ticker); const candles=await provider.getDailyCandles(ticker,(req.body.exchange||'NSE').toUpperCase()); const result=backtestMinervini(ticker,candles,{initialCapital:Number(req.body.initialCapital||100000),riskPerTradePercent:Number(req.body.riskPerTradePercent||1),commissionPercent:Number(req.body.commissionPercent||0),slippagePercent:Number(req.body.slippagePercent||0)}); res.json(result); }
+    catch(e:any){res.status(400).json({error:'BACKTEST_FAILED',message:e?.message||String(e)});}
+  });
+
 
   // Helper for Gemini AI instance
   const getGeminiClient = () => {
@@ -176,6 +212,8 @@ Provide 4 to 6 accurate, realistic, high-signal financial headlines. Return ONLY
         message: 'Live news search failed. No generated or fabricated headlines are returned.'
       });
     }  });
+
+  await initDatabase();
 
   // Vite middleware setup
   if (process.env.NODE_ENV !== 'production') {
