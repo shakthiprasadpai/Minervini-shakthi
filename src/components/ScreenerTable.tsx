@@ -134,11 +134,18 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
 }) => {
   const [search, setSearch] = useState<string>('');
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
+  const [exchangeFilter, setExchangeFilter] = useState<'ALL' | 'NSE' | 'BSE' | 'MCX'>('ALL');
   const [viewMode, setViewMode] = useState<'table' | 'heatmap' | 'sector_strength'>('table');
   const [highlightRows, setHighlightRows] = useState<boolean>(true);
   const [sortBy, setSortBy] = useState<SortField>('VCP_INTENSITY');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [isRefinedModalOpen, setIsRefinedModalOpen] = useState<boolean>(false);
+
+  const getSignal = (stock: MinerviniTradeSetup): 'BUY' | 'SELL' | 'WAIT' => {
+    if (stock.currentPrice > 0 && stock.stopLossPrice > 0 && stock.currentPrice <= stock.stopLossPrice) return 'SELL';
+    if (stock.currentPrice >= stock.pivotPrice && stock.rsRating >= 80 && stock.trendScore >= 6) return 'BUY';
+    return 'WAIT';
+  };
 
   const handleSort = (field: SortField) => {
     if (sortBy === field) {
@@ -184,6 +191,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
       stock.industry.toLowerCase().includes(search.toLowerCase());
 
     if (!matchesSearch) return false;
+    if (exchangeFilter !== 'ALL' && stock.exchange !== exchangeFilter) return false;
 
     if (filterCategory === 'TIER_1_POWER') return calculateTrendStrengthMeter(stock).tier === 'TIER_1_POWER';
     if (filterCategory === 'PERFECT') return stock.trendScore === 8;
@@ -231,10 +239,10 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
         onFilterSector={(sec) => setSearch(sec)}
       />
 
-      <div className="bg-white border border-[#e5e4e1] p-6 shadow-xs space-y-6">
+      <div className="rounded-2xl border border-white/10 bg-[#0d1219] shadow-2xl overflow-hidden space-y-0">
       
       {/* Top Banner: VCP Heatmap Control Panel & Legend */}
-      <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-4 space-y-4">
+      <div className="bg-[#10161f] border-b border-white/10 p-4 space-y-4">
         
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#e5e4e1] pb-3">
           <div className="flex items-center space-x-2.5">
@@ -245,7 +253,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
               <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#b5a68d]">
                 Visual Quantitative Heatmap
               </span>
-              <h3 className="text-base font-serif font-black text-[#1a1a1a] leading-tight">
+              <h3 className="text-base font-black text-white leading-tight">
                 VCP Volatility Contraction & Volume Dry-Up Heatmap
               </h3>
             </div>
@@ -365,7 +373,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
       </div>
 
       {/* Search & Quick Category Filters Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#e5e4e1] pb-5">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-white/10 bg-[#0b1016] p-4">
         
         {/* Search Input */}
         <div className="relative flex-1 max-w-md">
@@ -376,9 +384,17 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
             placeholder="Search symbol, stock name, sector (e.g., NVDA, SUVEN)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#f9f8f5] border border-[#e5e4e1] rounded-none pl-9 pr-4 py-2 text-xs text-[#1a1a1a] placeholder-gray-400 focus:outline-none focus:border-black font-sans transition-all"
+            className="w-full bg-[#070b10] border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-400/60 font-sans transition-all"
           />
         </div>
+
+          <div className="flex items-center gap-1.5 rounded-xl bg-[#070b10] border border-white/10 p-1">
+            {(['ALL','NSE','BSE','MCX'] as const).map((ex) => (
+              <button key={ex} onClick={() => setExchangeFilter(ex)} className={"px-3 py-2 rounded-lg text-[10px] font-black tracking-wider transition " + (exchangeFilter === ex ? "bg-amber-400 text-slate-950" : "text-slate-400 hover:text-white hover:bg-white/5")}>
+                {ex}
+              </button>
+            ))}
+          </div>
 
         {/* Quick Filter Badges */}
         <div className="flex flex-wrap items-center gap-2 text-xs font-sans">
@@ -421,7 +437,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
         />
       ) : viewMode === 'table' ? (
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full min-w-[1250px] text-left border-collapse">
             <thead>
               <tr className="border-b border-[#e5e4e1] text-[10px] uppercase tracking-[0.2em] text-[#b5a68d] font-bold bg-[#f9f8f5]">
                 {renderSortHeader('Stock & Sector', 'TICKER')}
@@ -439,7 +455,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                 <th className="py-3 px-2.5 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#e5e4e1] text-xs">
+            <tbody className="divide-y divide-white/5 text-xs">
               {filteredStocks.length === 0 ? (
                 <tr>
                   <td colSpan={13} className="py-8 text-center text-gray-500 font-serif italic text-sm">
@@ -468,21 +484,21 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                       {/* Ticker & Exchange */}
                       <td className="py-3.5 px-2.5">
                         <div className="flex items-center space-x-2">
-                          <span className="font-extrabold text-sm text-[#1a1a1a] font-mono">
+                          <span className="font-extrabold text-sm text-white font-mono">
                             {stock.ticker}
                           </span>
                           <span className="text-[9px] px-1.5 py-0.5 uppercase tracking-wider bg-[#1a1a1a] text-white font-mono font-semibold">
                             {stock.exchange}
                           </span>
                         </div>
-                        <div className="text-[11px] text-gray-600 truncate max-w-[150px] mt-0.5 font-sans">
+                        <div className="text-[11px] text-slate-500 truncate max-w-[150px] mt-0.5 font-sans">
                           {stock.name}
                         </div>
                       </td>
 
                       {/* Price */}
                       <td className="py-3.5 px-2.5 font-mono">
-                        <div className="font-bold text-[#1a1a1a] text-sm">
+                        <div className="font-bold text-white text-sm">
                           {formatCurrency(stock.currentPrice, currency)}
                         </div>
                       </td>
@@ -574,12 +590,20 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                         </div>
                       </td>
 
+                      <td className="py-3.5 px-2.5 text-center">
+                        {(() => {
+                          const signal = getSignal(stock);
+                          const cls = signal === 'BUY' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : signal === 'SELL' ? 'bg-rose-500/15 text-rose-300 border-rose-500/30' : 'bg-amber-500/10 text-amber-300 border-amber-500/20';
+                          return <span className={"inline-flex min-w-[58px] justify-center rounded-lg border px-2.5 py-1 text-[9px] font-black tracking-wider " + cls}>{signal}</span>;
+                        })()}
+                      </td>
+
                       {/* Pattern Type */}
                       <td className="py-3.5 px-2.5">
-                        <div className="font-bold text-[#1a1a1a]">
+                        <div className="font-bold text-slate-200">
                           {stock.patternType}
                         </div>
-                        <div className="text-[10px] text-[#b5a68d] font-bold uppercase tracking-wider">
+                        <div className="text-[10px] text-amber-400/70 font-bold uppercase tracking-wider">
                           {stock.vcpStage}
                         </div>
                       </td>
@@ -639,7 +663,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
 
                       {/* Stop Loss Exit Price */}
                       <td className="py-3.5 px-2.5 font-mono">
-                        <div className="font-bold text-red-600">
+                        <div className="font-bold text-rose-400">
                           {formatCurrency(stock.stopLossPrice, currency)}
                         </div>
                         <div className="text-[10px] text-red-700/80">
@@ -649,7 +673,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
 
                       {/* Profit Target 1 */}
                       <td className="py-3.5 px-2.5 font-mono">
-                        <div className="font-bold text-emerald-700">
+                        <div className="font-bold text-emerald-400">
                           {formatCurrency(stock.target1Price, currency)}
                         </div>
                         <div className="text-[10px] text-emerald-800/80">
@@ -659,7 +683,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
 
                       {/* R/R Ratio */}
                       <td className="py-3.5 px-2.5 text-center font-mono font-bold text-[#1a1a1a]">
-                        <span className="bg-white px-2 py-1 border border-[#e5e4e1]">
+                        <span className="bg-white/5 px-2 py-1 rounded-lg border border-white/10 text-white">
                           {stock.riskRewardRatio.toFixed(1)}x
                         </span>
                       </td>
