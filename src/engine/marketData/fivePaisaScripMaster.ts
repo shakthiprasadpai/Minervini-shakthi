@@ -92,7 +92,7 @@ export function parseFivePaisaScripMaster(text: string): FivePaisaScrip[] {
     if (!exchange || !((exchange === 'MCX' && exchangeType === 'D') || ((exchange === 'NSE' || exchange === 'BSE') && exchangeType === 'C')) || !Number.isFinite(code) || !symbol) continue;
     result.push({
       exchange,
-      exchangeType: 'C',
+      exchangeType: exchange === 'MCX' ? 'D' : 'C',
       scripCode: code,
       symbol,
       name: String(value(row, 'FullName', 'Name') ?? '').trim() || undefined,

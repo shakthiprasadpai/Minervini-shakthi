@@ -13,20 +13,38 @@ export interface FivePaisaRealtimeConfig {
   websocketUrl?: string;
   instruments: FivePaisaInstrument[];
   reconnectMs?: number;
+  reconnectJitterMs?: number;
 }
 
 type TickHandler = (tick: MarketTick) => void;
 type ConnectionHandler = (connected: boolean) => void;
-const exchangeCode = (exchange: FivePaisaInstrument['exchange']) => exchange === 'NSE' ? 'N' : exchange === 'BSE' ? 'B' : 'M';
 
-function parseTick(raw: any, instruments: FivePaisaInstrument[]): MarketTick | null {
+const exchangeCode = (exchange: FivePaisaInstrument['exchange']) =>
+  exchange === 'NSE' ? 'N' : exchange === 'BSE' ? 'B' : 'M';
+
+function instrumentKey(exchange: FivePaisaInstrument['exchange'], exchangeType: FivePaisaInstrument['exchangeType'], scripCode: number) {
+  return `${exchange}:${exchangeType}:${scripCode}`;
+}
+
+function parseTick(raw: any, instrumentsByToken: Map<string, FivePaisaInstrument>): MarketTick | null {
   const row = Array.isArray(raw) ? raw[0] : raw;
   if (!row) return null;
+
   const token = Number(row.Token ?? row.ScripCode ?? row.scripCode);
-  const instrument = instruments.find(x => x.scripCode === token);
+  const exchRaw = String(row.Exch ?? row.exch ?? '').toUpperCase();
+  const exchTypeRaw = String(row.ExchType ?? row.exchType ?? '').toUpperCase();
+  const exchange = exchRaw === 'N' ? 'NSE' : exchRaw === 'B' ? 'BSE' : exchRaw === 'M' ? 'MCX' : null;
+  const exchangeType = exchTypeRaw === 'C' || exchTypeRaw === 'D' || exchTypeRaw === 'U' ? exchTypeRaw : null;
+  const instrument =
+    exchange && exchangeType
+      ? instrumentsByToken.get(instrumentKey(exchange, exchangeType, token))
+      : Array.from(instrumentsByToken.values()).find(x => x.scripCode === token);
+
   if (!instrument) return null;
+
   const price = Number(row.LastRate ?? row.lastRate ?? row.LTP ?? row.ltp);
   if (!Number.isFinite(price) || price <= 0) return null;
+
   return {
     exchange: instrument.exchange,
     symbol: instrument.symbol,
@@ -46,10 +64,22 @@ export class FivePaisaMarketFeed {
   private ws: WebSocket | null = null;
   private stopped = true;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly instrumentsByToken: Map<string, FivePaisaInstrument>;
 
-  constructor(private readonly config: FivePaisaRealtimeConfig, private readonly onTick: TickHandler, private readonly onConnection?: ConnectionHandler) {}
+  constructor(
+    private readonly config: FivePaisaRealtimeConfig,
+    private readonly onTick: TickHandler,
+    private readonly onConnection?: ConnectionHandler
+  ) {
+    this.instrumentsByToken = new Map(
+      config.instruments.map(i => [instrumentKey(i.exchange, i.exchangeType, i.scripCode), i])
+    );
+  }
 
-  connect() { this.stopped = false; this.open(); }
+  connect() {
+    this.stopped = false;
+    this.open();
+  }
 
   disconnect() {
     this.stopped = true;
@@ -82,14 +112,17 @@ export class FivePaisaMarketFeed {
     this.ws.onmessage = event => {
       try {
         const payload = JSON.parse(String(event.data));
-        const rows = Array.isArray(payload) ? payload : (payload.Data || payload.data || payload.Body || payload.body || payload);
+        const rows = Array.isArray(payload)
+          ? payload
+          : (payload.Data || payload.data || payload.Body || payload.body || payload);
+
         if (Array.isArray(rows)) {
           for (const row of rows) {
-            const tick = parseTick(row, this.config.instruments);
+            const tick = parseTick(row, this.instrumentsByToken);
             if (tick) this.onTick(tick);
           }
         } else {
-          const tick = parseTick(rows, this.config.instruments);
+          const tick = parseTick(rows, this.instrumentsByToken);
           if (tick) this.onTick(tick);
         }
       } catch {
@@ -101,7 +134,12 @@ export class FivePaisaMarketFeed {
     this.ws.onclose = () => {
       this.ws = null;
       this.onConnection?.(false);
-      if (!this.stopped) this.reconnectTimer = setTimeout(() => this.open(), this.config.reconnectMs ?? 3000);
+      if (!this.stopped) {
+        const baseDelay = this.config.reconnectMs ?? 3000;
+        const jitter = this.config.reconnectJitterMs ?? 0;
+        const delay = baseDelay + jitter;
+        this.reconnectTimer = setTimeout(() => this.open(), delay);
+      }
     };
   }
 }

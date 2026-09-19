@@ -1,10 +1,50 @@
 import type { Response } from 'express';
-import { FivePaisaMarketFeed, type FivePaisaInstrument } from '../engine/marketData/providers/fivePaisaWebSocket';
+import type { FivePaisaInstrument } from '../engine/marketData/providers/fivePaisaWebSocket';
+import { FivePaisaWebSocketPool } from '../engine/marketData/providers/fivePaisaWebSocketPool';
 import type { MarketTick } from '../engine/marketData/realtimeTypes';
 import { fivePaisaScripMaster } from './scripMasterScheduler';
 import { fivePaisaAuth } from './fivePaisaAuthService';
 import { createBigulProvider, createXtsProvider, runMinerviniEngine, buildTradeSetup } from '../engine';
 import type { PricePoint } from '../types';
+
+
+function adaptivePriorityScore(tick: MarketTick, history: PricePoint[], analysis: any): number {
+  const current = tick.price;
+  const pivot = Number(analysis?.pivotPrice || 0);
+  const entryZone = Number(analysis?.buyZoneMax || 0);
+  const pivotDistance = pivot > 0 ? Math.abs(current - pivot) / pivot * 100 : 999;
+  // 0-35: price approaching/inside the Minervini pivot buy zone.
+  const pivotScore = pivot > 0
+    ? current >= pivot && current <= (entryZone || pivot * 1.05)
+      ? 35
+      : pivotDistance <= 2 ? 32
+      : pivotDistance <= 4 ? 24
+      : pivotDistance <= 7 ? 12
+      : 0
+    : 0;
+
+  // 0-25: VCP contraction quality.
+  const vcpScore = Math.min(25, Math.max(0, Number(analysis?.vcpScore || 0) * 0.25));
+
+  // 0-20: unusual volume / accumulation.
+  const recent = history.slice(-5);
+  const baseline = history.slice(-25, -5);
+  const avgRecent = recent.length ? recent.reduce((s, x) => s + x.volume, 0) / recent.length : 0;
+  const avgBaseline = baseline.length ? baseline.reduce((s, x) => s + x.volume, 0) / baseline.length : avgRecent;
+  const volumeRatio = avgBaseline > 0 ? avgRecent / avgBaseline : 1;
+  const volumeScore = Math.min(20, Math.max(0, (volumeRatio - 1) * 50));
+
+  // 0-20: breakout proximity / actual breakout confirmation.
+  const breakoutScore = analysis?.breakoutStatus === 'ABOVE_PIVOT'
+    ? 20
+    : analysis?.breakoutStatus === 'IN_BUY_ZONE'
+      ? 17
+      : pivotDistance <= 3 ? 14
+      : pivotDistance <= 5 ? 8
+      : 0;
+
+  return Math.round(Math.min(100, pivotScore + vcpScore + volumeScore + breakoutScore));
+}
 
 function configuredSymbols(): Array<{ exchange: 'NSE' | 'BSE' | 'MCX'; symbol: string }> {
   return (process.env.SCREENER_SYMBOLS || '').split(',').map(x => x.trim()).filter(Boolean).map(spec => {
@@ -15,7 +55,7 @@ function configuredSymbols(): Array<{ exchange: 'NSE' | 'BSE' | 'MCX'; symbol: s
 }
 
 export class RealtimeMarketFeedService {
-  private feed: FivePaisaMarketFeed | null = null;
+  private feed: FivePaisaWebSocketPool | null = null;
   private clients = new Set<Response>();
   private latest = new Map<string, MarketTick>();
   private connected = false;
@@ -64,7 +104,22 @@ export class RealtimeMarketFeedService {
         this.benchmark = await provider.getDailyCandles(symbol, exchange);
       }
     } catch (error) { console.error('Minervini realtime history warm-up failed:', error); }
-    this.feed = new FivePaisaMarketFeed({ accessToken, clientCode, websocketUrl: process.env.FIVEPAISA_WEBSOCKET_URL, instruments, reconnectMs: Number(process.env.FIVEPAISA_RECONNECT_MS || 3000) }, tick => {
+    const prioritySymbols = [
+      ...configuredSymbols().map(x => `${x.exchange}:${x.symbol}`),
+      ...(process.env.FIVEPAISA_PRIORITY_SYMBOLS || '').split(',').map(x => x.trim()).filter(Boolean)
+    ];
+
+    this.feed = new FivePaisaWebSocketPool({
+      accessToken,
+      clientCode,
+      websocketUrl: process.env.FIVEPAISA_WEBSOCKET_URL,
+      shardSize: Number(process.env.FIVEPAISA_WS_SHARD_SIZE || 180),
+      maxConnections: Number(process.env.FIVEPAISA_WS_MAX_CONNECTIONS || 4),
+      prioritySymbols,
+      rotationIntervalMs: Number(process.env.FIVEPAISA_WS_ROTATION_MS || 60000),
+      connectionStaggerMs: Number(process.env.FIVEPAISA_WS_CONNECTION_STAGGER_MS || 350),
+      reconnectMs: Number(process.env.FIVEPAISA_RECONNECT_MS || 3000)
+    }, tick => {
       this.connected = true;
       this.latest.set(tick.exchange + ':' + tick.symbol, tick);
       const key = tick.exchange + ':' + tick.symbol;
@@ -91,23 +146,25 @@ export class RealtimeMarketFeedService {
         last.close = tick.price; last.high = Math.max(last.high, tick.price); last.low = Math.min(last.low, tick.price); last.volume = Math.max(last.volume, tick.volume);
         const analysis = runMinerviniEngine({ ticker: tick.symbol, currentPrice: tick.price, priceHistory: next }, this.benchmark);
         screenerResult = buildTradeSetup(tick.symbol, tick.symbol, tick.exchange, next, analysis);
+        const adaptiveScore = adaptivePriorityScore(tick, next, analysis);
+        this.feed?.updatePriorityScore(key, adaptiveScore);
         this.histories.set(key, next);
         if (screenerResult) this.qualifying.set(key, screenerResult);
       }
       const payload = 'data: ' + JSON.stringify({ ...tick, screenerResult, universeFilterPassed: passesUniverseFilter }) + '\\n\\n';
       for (const response of this.clients) response.write(payload);
     }, connected => { this.connected = connected; });
-    this.feed.connect();
+    await this.feed.start(instruments);
     return true;
   }
 
   stop() {
-    this.feed?.disconnect(); this.feed = null; this.connected = false;
+    this.feed?.stop(); this.feed = null; this.connected = false;
     for (const response of this.clients) response.end(); this.clients.clear();
   }
 
   status() {
-    return { configured: Boolean(fivePaisaAuth.getAccessToken() || (process.env.FIVEPAISA_ACCESS_TOKEN && process.env.FIVEPAISA_CLIENT_CODE)), auth: fivePaisaAuth.status(), connected: this.connected, instruments: this.instrumentCount, liveTicks: this.latest.size, qualifyingCount: this.qualifying.size, universeMode: 'FULL_NSE_BSE_MCX -> LIQUIDITY_FILTER -> MINERVINI', filter: { minPrice: RealtimeMarketFeedService.MIN_PRICE, minLiquidity: RealtimeMarketFeedService.MIN_LIQUIDITY }, scripMaster: fivePaisaScripMaster.status() };
+    return { configured: Boolean(fivePaisaAuth.getAccessToken() || (process.env.FIVEPAISA_ACCESS_TOKEN && process.env.FIVEPAISA_CLIENT_CODE)), auth: fivePaisaAuth.status(), connected: this.connected, instruments: this.instrumentCount, liveTicks: this.latest.size, qualifyingCount: this.qualifying.size, universeMode: 'FULL_NSE_BSE_MCX -> LIQUIDITY_FILTER -> MINERVINI', filter: { minPrice: RealtimeMarketFeedService.MIN_PRICE, minLiquidity: RealtimeMarketFeedService.MIN_LIQUIDITY }, websocket: this.feed?.status() ?? { enabled: false }, scripMaster: fivePaisaScripMaster.status() };
   }
 
   addClient(response: Response) {
