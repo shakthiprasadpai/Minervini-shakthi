@@ -22,18 +22,94 @@ async function startServer() {
   app.get('/api/screener', async (_req, res) => {
     try {
       const provider = getMarketDataProvider();
-      const symbols = (process.env.SCREENER_SYMBOLS || '').split(',').map(x=>x.trim()).filter(Boolean);
-      if (!symbols.length) return res.status(503).json({ error:'SCREENER_SYMBOLS_NOT_CONFIGURED' });
-      const benchmark = process.env.RS_BENCHMARK_SYMBOL ? await provider.getDailyCandles(process.env.RS_BENCHMARK_SYMBOL,'NSE') : undefined;
-      const raw=[];
-      for(const ticker of symbols){
-        try { const candles=await provider.getDailyCandles(ticker,'NSE'); if(candles.length<200) continue; const current=candles[candles.length-1].close; const analysis=runMinerviniEngine({ticker,currentPrice:current,priceHistory:candles},benchmark); raw.push({ticker,candles,analysis}); } catch(e) { console.error('Screener symbol failed',ticker,e); }
+      const configuredSymbols = (process.env.SCREENER_SYMBOLS || '')
+        .split(',')
+        .map(x => x.trim())
+        .filter(Boolean)
+        .map(spec => {
+          const parts = spec.split(':');
+          const hasExchange = parts.length > 1 && /^(NSE|BSE)$/i.test(parts[0]);
+          const exchange = (hasExchange ? parts[0] : 'NSE').toUpperCase() as 'NSE' | 'BSE';
+          const ticker = (hasExchange ? parts.slice(1).join(':') : spec).trim();
+          return { ticker, exchange };
+        })
+        .filter(x => x.ticker.length > 0);
+
+      if (!configuredSymbols.length) {
+        return res.status(503).json({ error: 'SCREENER_SYMBOLS_NOT_CONFIGURED' });
       }
-      const ratings=rankRsRatings(raw.map(x=>x.analysis.rsRating ?? 0));
-      const results=raw.map((x,i)=>{x.analysis.rsRating=ratings[i]; return buildTradeSetup(x.ticker,x.ticker,'NSE',x.candles,x.analysis);});
-      if(pool) await pool.query('INSERT INTO screener_runs(universe_count,result_count) VALUES($1,$2)',[symbols.length,results.length]);
-      res.json({ provider:process.env.MARKET_DATA_PROVIDER||'bigul', results });
-    } catch(e:any) { res.status(503).json({ error:'MARKET_DATA_UNAVAILABLE', message:e?.message||String(e) }); }
+
+      let benchmark: Awaited<ReturnType<typeof provider.getDailyCandles>> | undefined;
+      const benchmarkSpec = (process.env.RS_BENCHMARK_SYMBOL || '').trim();
+      if (benchmarkSpec) {
+        const parts = benchmarkSpec.split(':');
+        const hasExchange = parts.length > 1 && /^(NSE|BSE)$/i.test(parts[0]);
+        const exchange = (hasExchange ? parts[0] : 'NSE').toUpperCase() as 'NSE' | 'BSE';
+        const ticker = (hasExchange ? parts.slice(1).join(':') : benchmarkSpec).trim();
+        benchmark = await provider.getDailyCandles(ticker, exchange);
+      }
+
+      const raw: Array<{
+        ticker: string;
+        exchange: 'NSE' | 'BSE';
+        candles: Awaited<ReturnType<typeof provider.getDailyCandles>>;
+        analysis: any;
+      }> = [];
+
+      for (const instrument of configuredSymbols) {
+        try {
+          const candles = await provider.getDailyCandles(instrument.ticker, instrument.exchange);
+          if (candles.length < 200) continue;
+          const current = candles[candles.length - 1].close;
+          const analysis = runMinerviniEngine(
+            { ticker: instrument.ticker, currentPrice: current, priceHistory: candles },
+            benchmark
+          );
+          raw.push({ ticker: instrument.ticker, exchange: instrument.exchange, candles, analysis });
+        } catch (e) {
+          console.error('Screener instrument failed', instrument, e);
+        }
+      }
+
+      const ratings = rankRsRatings(raw.map(x => x.analysis.rsRating ?? 0));
+      const results = raw.map((x, i) => {
+        x.analysis.rsRating = ratings[i];
+        return buildTradeSetup(x.ticker, x.ticker, x.exchange, x.candles, x.analysis);
+      });
+
+      if (pool) {
+        await pool.query(
+          'INSERT INTO screener_runs(universe_count,result_count) VALUES($1,$2)',
+          [configuredSymbols.length, results.length]
+        );
+      }
+
+      res.json({
+        provider: process.env.MARKET_DATA_PROVIDER || 'bigul',
+        exchanges: ['NSE', 'BSE'],
+        configuredCount: configuredSymbols.length,
+        resultCount: results.length,
+        results
+      });
+    } catch (e: any) {
+      res.status(503).json({
+        error: 'MARKET_DATA_UNAVAILABLE',
+        message: e?.message || String(e)
+      });
+    }
+  });
+
+  app.get('/api/market/status', (_req, res) => {
+    res.json({
+      provider: process.env.MARKET_DATA_PROVIDER || 'bigul',
+      exchanges: ['NSE', 'BSE'],
+      configured: Boolean(
+        process.env.BIGUL_API_BASE_URL ||
+        process.env.XTS_MARKET_DATA_BASE_URL ||
+        process.env.MARKET_DATA_BASE_URL
+      ),
+      screenerSymbolsConfigured: Boolean(process.env.SCREENER_SYMBOLS)
+    });
   });
 
   app.get('/api/alerts', async (_req,res) => {
