@@ -22,6 +22,7 @@ export class RealtimeMarketFeedService {
   private instrumentCount = 0;
   private histories = new Map<string, PricePoint[]>();
   private benchmark: PricePoint[] | undefined;
+  private loadingHistories = new Set<string>();
 
   async start() {
     const accessToken = fivePaisaAuth.getAccessToken() || process.env.FIVEPAISA_ACCESS_TOKEN;
@@ -31,6 +32,9 @@ export class RealtimeMarketFeedService {
     const raw = process.env.FIVEPAISA_INSTRUMENTS_JSON;
     if (raw && raw !== '[]') {
       try { instruments = JSON.parse(raw); } catch { throw new Error('FIVEPAISA_INSTRUMENTS_JSON must be valid JSON'); }
+    } else if ((process.env.AUTO_UNIVERSE || 'true').toLowerCase() === 'true') {
+      const mapped = fivePaisaScripMaster.allCashInstruments();
+      instruments = mapped.map(x => ({ exchange: x.exchange, exchangeType: x.exchangeType, scripCode: x.scripCode, symbol: x.symbol }));
     } else {
       const mapped = fivePaisaScripMaster.findMany(configuredSymbols());
       instruments = mapped.map(x => ({ exchange: x.exchange, exchangeType: x.exchangeType, scripCode: x.scripCode, symbol: x.symbol }));
@@ -41,9 +45,11 @@ export class RealtimeMarketFeedService {
     // re-evaluate the affected instrument without inventing a separate signal path.
     try {
       const provider = process.env.MARKET_DATA_PROVIDER === 'xts' ? createXtsProvider() : createBigulProvider();
-      for (const instrument of instruments) {
-        const history = await provider.getDailyCandles(instrument.symbol, instrument.exchange);
-        if (history.length >= 200) this.histories.set(instrument.exchange + ':' + instrument.symbol, history);
+      if ((process.env.MINERVINI_PRELOAD_HISTORY || 'false').toLowerCase() === 'true') {
+        for (const instrument of instruments) {
+          const history = await provider.getDailyCandles(instrument.symbol, instrument.exchange);
+          if (history.length >= 200) this.histories.set(instrument.exchange + ':' + instrument.symbol, history);
+        }
       }
       const benchmarkSpec = (process.env.RS_BENCHMARK_SYMBOL || '').trim();
       if (benchmarkSpec) {
@@ -57,8 +63,19 @@ export class RealtimeMarketFeedService {
       this.connected = true;
       this.latest.set(tick.exchange + ':' + tick.symbol, tick);
       const key = tick.exchange + ':' + tick.symbol;
-      const history = this.histories.get(key);
+      let history = this.histories.get(key);
       let screenerResult: any = undefined;
+      if (!history && !this.loadingHistories.has(key)) {
+        this.loadingHistories.add(key);
+        void (async () => {
+          try {
+            const provider = process.env.MARKET_DATA_PROVIDER === 'xts' ? createXtsProvider() : createBigulProvider();
+            const loaded = await provider.getDailyCandles(tick.symbol, tick.exchange);
+            if (loaded.length >= 200) this.histories.set(key, loaded);
+          } catch (error) { console.error('Live Minervini history load failed:', key, error); }
+          finally { this.loadingHistories.delete(key); }
+        })();
+      }
       if (history?.length) {
         const next = history.map(x => ({ ...x }));
         const last = next[next.length - 1];
