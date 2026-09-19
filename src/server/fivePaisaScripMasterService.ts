@@ -39,7 +39,7 @@ export class FivePaisaScripMasterService {
     } catch { return 0; }
   }
 
-  get(exchange: 'NSE' | 'BSE', symbol: string): FivePaisaScrip | undefined {
+  get(exchange: 'NSE' | 'BSE' | 'MCX', symbol: string): FivePaisaScrip | undefined {
     return this.cache.get(this.key(exchange, symbol));
   }
 
@@ -47,7 +47,7 @@ export class FivePaisaScripMasterService {
     return Array.from(this.cache.values()).sort((a, b) => a.exchange.localeCompare(b.exchange) || a.symbol.localeCompare(b.symbol));
   }
 
-  findMany(instruments: Array<{ exchange: 'NSE' | 'BSE'; symbol: string }>): FivePaisaScrip[] {
+  findMany(instruments: Array<{ exchange: 'NSE' | 'BSE' | 'MCX'; symbol: string }>): FivePaisaScrip[] {
     return instruments.map(x => this.get(x.exchange, x.symbol)).filter((x): x is FivePaisaScrip => Boolean(x));
   }
 
