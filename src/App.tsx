@@ -84,6 +84,34 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!selectedStock || runtimeConfig.demoMode) return;
+    const stream = new EventSource(`${runtimeConfig.apiBaseUrl}/api/market/stream`);
+    stream.onmessage = event => {
+      try {
+        const tick = JSON.parse(event.data);
+        if (tick.exchange !== selectedStock.exchange || tick.symbol !== selectedStock.ticker) return;
+        setStocksList(current => current.map(stock =>
+          stock.exchange === tick.exchange && stock.ticker === tick.symbol
+            ? { ...stock, currentPrice: tick.price, changePercent: tick.changePercent, pivotVolume: tick.volume }
+            : stock
+        ));
+        setSelectedStock(current =>
+          current && current.exchange === tick.exchange && current.ticker === tick.symbol
+            ? { ...current, currentPrice: tick.price, changePercent: tick.changePercent, pivotVolume: tick.volume }
+            : current
+        );
+        setMarketDataStatus('LIVE');
+      } catch (error) {
+        console.error('Invalid realtime market tick:', error);
+      }
+    };
+    stream.onerror = () => {
+      // Keep the screener's last known values; the backend reconnects to 5paisa.
+    };
+    return () => stream.close();
+  }, [selectedStock?.ticker, selectedStock?.exchange, runtimeConfig.apiBaseUrl, runtimeConfig.demoMode]);
+
+  useEffect(() => {
     if (isObsidian) {
       document.body.classList.add('obsidian-theme');
     } else {
