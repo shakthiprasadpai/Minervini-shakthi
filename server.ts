@@ -5,6 +5,8 @@ import { GoogleGenAI } from '@google/genai';
 import { createBigulProvider, createXtsProvider, runMinerviniEngine, buildTradeSetup, backtestMinervini, rankRsRatings } from './src/engine';
 import { initDatabase, pool } from './src/db/database';
 import { RealtimeMarketFeedService } from './src/server/realtimeMarketFeed';
+import { fivePaisaAuth } from './src/server/fivePaisaAuthService';
+import { registerFivePaisaOAuth } from './src/server/fivePaisaOAuth';
 import { startFivePaisaScripMaster, fivePaisaScripMaster } from './src/server/scripMasterScheduler';
 
 async function startServer() {
@@ -15,6 +17,8 @@ async function startServer() {
 
   const getMarketDataProvider = () => process.env.MARKET_DATA_PROVIDER === 'xts' ? createXtsProvider() : createBigulProvider();
   const realtimeFeed = new RealtimeMarketFeedService();
+  if ((process.env.REALTIME_MARKET_PROVIDER || '').toLowerCase() === '5paisa') await fivePaisaAuth.start();
+  registerFivePaisaOAuth(app, async () => { await realtimeFeed.stop(); await realtimeFeed.start(); });
   if ((process.env.REALTIME_MARKET_PROVIDER || '').toLowerCase() === '5paisa') {
     await startFivePaisaScripMaster();
     await realtimeFeed.start();
