@@ -27,7 +27,8 @@ import {
   ArrowUpRight,
   TrendingDown,
   Layers,
-  Award
+  Award,
+  ExternalLink
 } from 'lucide-react';
 
 interface ScreenerTableProps {
@@ -124,6 +125,12 @@ export function calculateVcpHeatmap(stock: MinerviniTradeSetup): VcpHeatmapInfo 
       label: 'NORMAL VOL',
     };
   }
+}
+
+
+function getChartUrl(stock: MinerviniTradeSetup): string {
+  const symbol = `${stock.exchange}:${stock.ticker}`;
+  return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(symbol)}`;
 }
 
 export const ScreenerTable: React.FC<ScreenerTableProps> = ({
@@ -445,10 +452,13 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
         />
       ) : viewMode === 'table' ? (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1250px] text-left border-collapse">
+          <table className="w-full min-w-[1400px] text-left border-collapse">
             <thead>
               <tr className="border-b border-[#e5e4e1] text-[10px] uppercase tracking-[0.2em] text-[#b5a68d] font-bold bg-[#f9f8f5]">
                 {renderSortHeader('Stock & Sector', 'TICKER')}
+                <th className="py-3 px-2.5 text-center">Signal</th>
+                <th className="py-3 px-2.5 text-center">Entry Δ</th>
+                <th className="py-3 px-2.5 text-center">Stop Δ</th>
                 {renderSortHeader('Price', 'PRICE')}
                 {renderSortHeader('Chg %', 'CHANGE_PERCENT')}
                 {renderSortHeader('RS Rating', 'RS_RATING', 'center')}
@@ -456,20 +466,18 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                 {renderSortHeader('200MA Trend', 'TREND_SLOPE', 'center')}
                 <th className="py-3 px-2.5">Pattern / Stage</th>
                 {renderSortHeader('VCP Heatmap', 'VCP_INTENSITY', 'center')}
-                <th className="py-3 px-2.5">Signal</th>
-                <th className="py-3 px-2.5">Entry Δ</th>
-                <th className="py-3 px-2.5">Stop Δ</th>
                 <th className="py-3 px-2.5">Pivot Entry</th>
                 <th className="py-3 px-2.5">Stop Loss</th>
                 <th className="py-3 px-2.5">Target (+20%)</th>
                 <th className="py-3 px-2.5 text-center">R/R</th>
+                <th className="py-3 px-2.5 text-center">Chart</th>
                 <th className="py-3 px-2.5 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-xs">
               {filteredStocks.length === 0 ? (
                 <tr>
-                  <td colSpan={16} className="py-8 text-center text-gray-500 font-serif italic text-sm">
+                  <td colSpan={17} className="py-8 text-center text-gray-500 font-serif italic text-sm">
                     No growth setups match the selected search or SEPA filter criteria.
                   </td>
                 </tr>
@@ -624,14 +632,6 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                         </div>
                       </td>
 
-                      <td className="py-3.5 px-2.5 text-center">
-                        {(() => {
-                          const signal = getSignal(stock);
-                          const cls = signal === 'BUY' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : signal === 'SELL' ? 'bg-rose-500/15 text-rose-300 border-rose-500/30' : 'bg-amber-500/10 text-amber-300 border-amber-500/20';
-                          return <span className={"inline-flex min-w-[58px] justify-center rounded-lg border px-2.5 py-1 text-[9px] font-black tracking-wider " + cls}>{signal}</span>;
-                        })()}
-                      </td>
-
                       {/* Pattern Type */}
                       <td className="py-3.5 px-2.5">
                         <div className="font-bold text-slate-200">
@@ -722,18 +722,34 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                         </span>
                       </td>
 
+                      {/* Chart */}
+                      <td className="py-3.5 px-2.5 text-center">
+                        <a
+                          href={getChartUrl(stock)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-3 py-1.5 text-[10px] uppercase tracking-wider border border-amber-500 transition-colors"
+                          title={`Open ${stock.exchange}:${stock.ticker} chart in TradingView`}
+                          aria-label={`Open ${stock.exchange} ${stock.ticker} chart in TradingView`}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          Chart
+                        </a>
+                      </td>
+
                       {/* Action */}
                       <td className="py-3.5 px-2.5 text-right">
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onViewChart(stock);
-                          }}
-                          className="bg-[#1a1a1a] hover:bg-black text-white font-bold px-3 py-1.5 text-xs uppercase tracking-wider transition-all flex items-center space-x-1 ml-auto border border-black"
-                        >
-                          <span>Scan VCP</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onViewChart(stock);
+                            }}
+                            className="bg-[#1a1a1a] hover:bg-black text-white font-bold px-3 py-1.5 text-xs uppercase tracking-wider transition-all flex items-center space-x-1 border border-black"
+                          >
+                            <span>Scan VCP</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
                       </td>
 
                     </tr>
@@ -902,5 +918,4 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
     </>
   );
 };
-
 
