@@ -133,13 +133,14 @@ function getChartUrl(stock: MinerviniTradeSetup): string {
   return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(symbol)}`;
 }
 
-function getScreenerUrl(stock: MinerviniTradeSetup): string {
-  return `https://www.screener.in/company/${encodeURIComponent(stock.ticker)}/`;
-}
-
-function getChartinkUrl(stock: MinerviniTradeSetup): string {
-  return `https://chartink.com/stocks/${encodeURIComponent(stock.ticker)}.html`;
-}
+const MINERVINI_SCREENER_URL =
+  'https://www.screener.in/screens/1613519/sid-mark-minervini-trend-template/';
+const MINERVINI_SCAN_URL =
+  'https://www.screener.in/screens/592687/minervini-scan/';
+const MINERVINI_CHARTINK_URL =
+  'https://chartink.com/screener/minervini-sma';
+const MINERVINI_VCP_CHARTINK_URL =
+  'https://chartink.com/screener/minervini-vcp-2';
 
 export const ScreenerTable: React.FC<ScreenerTableProps> = ({
   stocks,
@@ -747,30 +748,52 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                         </a>
                       </td>
 
-                      {/* External screeners */}
+                      {/* Minervini external screeners */}
                       <td className="py-3.5 px-2.5 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
+                        <div className="flex flex-wrap items-center justify-center gap-1">
                           <a
-                            href={getScreenerUrl(stock)}
+                            href={MINERVINI_SCREENER_URL}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
                             className="inline-flex items-center justify-center rounded-md bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-2 py-1 text-[9px] uppercase tracking-wider border border-emerald-600 transition-colors"
-                            title={`Open ${stock.ticker} on Screener.in`}
-                            aria-label={`Open ${stock.ticker} on Screener.in`}
+                            title="Open Mark Minervini Trend Template on Screener.in"
+                            aria-label="Open Mark Minervini Trend Template on Screener.in"
                           >
-                            Screener.in
+                            S.in TT
                           </a>
                           <a
-                            href={getChartinkUrl(stock)}
+                            href={MINERVINI_SCAN_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center justify-center rounded-md bg-emerald-700 hover:bg-emerald-600 text-white font-black px-2 py-1 text-[9px] uppercase tracking-wider border border-emerald-800 transition-colors"
+                            title="Open Minervini Scan on Screener.in"
+                            aria-label="Open Minervini Scan on Screener.in"
+                          >
+                            S.in Scan
+                          </a>
+                          <a
+                            href={MINERVINI_CHARTINK_URL}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
                             className="inline-flex items-center justify-center rounded-md bg-sky-500 hover:bg-sky-400 text-slate-950 font-black px-2 py-1 text-[9px] uppercase tracking-wider border border-sky-600 transition-colors"
-                            title={`Open ${stock.ticker} on Chartink`}
-                            aria-label={`Open ${stock.ticker} on Chartink`}
+                            title="Open Minervini Trend Template scan on Chartink"
+                            aria-label="Open Minervini Trend Template scan on Chartink"
                           >
-                            Chartink
+                            Ck TT
+                          </a>
+                          <a
+                            href={MINERVINI_VCP_CHARTINK_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center justify-center rounded-md bg-indigo-500 hover:bg-indigo-400 text-white font-black px-2 py-1 text-[9px] uppercase tracking-wider border border-indigo-600 transition-colors"
+                            title="Open Minervini VCP scan on Chartink"
+                            aria-label="Open Minervini VCP scan on Chartink"
+                          >
+                            Ck VCP
                           </a>
                         </div>
                       </td>
