@@ -1,0 +1,4 @@
+import Database from 'better-sqlite3';
+export const db=new Database(process.env.DB_PATH||'./data/minervini.db');
+db.pragma('journal_mode = WAL');
+db.exec("CREATE TABLE IF NOT EXISTS holdings(id INTEGER PRIMARY KEY AUTOINCREMENT,ticker TEXT NOT NULL,exchange TEXT NOT NULL,shares REAL NOT NULL,entry_price REAL NOT NULL,current_price REAL NOT NULL,stop_loss REAL,created_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS trades(id INTEGER PRIMARY KEY AUTOINCREMENT,ticker TEXT NOT NULL,exchange TEXT NOT NULL,entry_price REAL,exit_price REAL,quantity REAL,pnl REAL,entry_date TEXT,exit_date TEXT,status TEXT); CREATE TABLE IF NOT EXISTS alerts(id INTEGER PRIMARY KEY AUTOINCREMENT,ticker TEXT NOT NULL,exchange TEXT NOT NULL,target_price REAL,status TEXT NOT NULL,created_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS journal(id INTEGER PRIMARY KEY AUTOINCREMENT,ticker TEXT NOT NULL,note TEXT NOT NULL,created_at TEXT NOT NULL);");
