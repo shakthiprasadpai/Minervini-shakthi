@@ -41,6 +41,7 @@ export const MyPortfolio: React.FC<MyPortfolioProps> = ({
   const [portfolioSubTab, setPortfolioSubTab] = useState<'holdings' | 'rebalancing'>('holdings');
   // Load portfolio from localStorage or provide initial default holdings
   const [holdings, setHoldings] = useState<PortfolioHolding[]>([]);
+  const [portfolioLoaded, setPortfolioLoaded] = useState(false);
 
 
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
@@ -111,10 +112,10 @@ export const MyPortfolio: React.FC<MyPortfolioProps> = ({
 
   // Production persistence: PostgreSQL through backend API
   useEffect(() => {
-    fetch('/api/portfolio').then(r => r.ok ? r.json() : []).then(data => setHoldings(data)).catch(() => setHoldings([]));
+    fetch('/api/portfolio').then(r => r.ok ? r.json() : []).then(data => { setHoldings(data); setPortfolioLoaded(true); }).catch(() => setPortfolioLoaded(true));
   }, []);
   useEffect(() => {
-    if (holdings.length || stocks.length) fetch('/api/portfolio/sync', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(holdings)}).catch(()=>{});
+    if (portfolioLoaded) fetch('/api/portfolio/sync', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(holdings)}).catch(()=>{});
   }, [holdings]);
 
   // Select stock handler in add modal
