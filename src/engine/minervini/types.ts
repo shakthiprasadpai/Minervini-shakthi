@@ -30,4 +30,5 @@ export interface MinerviniInput {
   rsRating?: number;
   pivotPrice?: number;
   stopLossPercent?: number;
+  atrMultiple?: number;
 }
