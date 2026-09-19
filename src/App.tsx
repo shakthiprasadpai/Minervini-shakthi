@@ -152,15 +152,15 @@ export default function App() {
 
   if (!selectedStock) {
     return (
-      <div className="min-h-screen bg-[#0b0d11] text-white flex items-center justify-center p-8">
-        <div className="max-w-xl text-center space-y-4">
-          <h1 className="text-3xl font-bold">Minervini Screener — Live Data Required</h1>
-          <p className="text-gray-300">
-            Demo data is disabled. Connect the market-data service and load an NSE/BSE stock before using the screener.
-          </p>
-          <p className="text-sm text-gray-400">
-            For local UI testing only, set VITE_DEMO_MODE=true.
-          </p>
+      <div className="min-h-screen bg-[#0b0d11] text-white">
+        <LiveMarketStatus apiBaseUrl={runtimeConfig.apiBaseUrl} demoMode={runtimeConfig.demoMode} status={realtimeStatus} />
+        <div className="flex items-center justify-center p-8 min-h-[80vh]">
+          <div className="max-w-xl text-center space-y-4">
+            <h1 className="text-3xl font-bold">Minervini Screener — Live Data Required</h1>
+            <p className="text-gray-300">Demo data is disabled. Connect 5Paisa and load an NSE/BSE stock before using the screener.</p>
+            <a href="/api/5paisa/auth/login" className="inline-flex px-6 py-3 bg-amber-500 text-black font-bold uppercase tracking-wider rounded">Connect 5Paisa</a>
+            <p className="text-sm text-gray-400">For local UI testing only, set VITE_DEMO_MODE=true.</p>
+          </div>
         </div>
       </div>
     );
