@@ -31,6 +31,7 @@ import { MOCK_STOCKS } from './data/mockStocks';
 import { MinerviniTradeSetup } from './types';
 import { formatCurrency, formatVolume, getCurrencySymbol, calculateBreakoutProbability } from './utils/sepaCalculator';
 import { TrendingUp, ShieldCheck, Target, Droplets, ArrowUpRight, Flame, BarChart3, Calculator, Sparkles, Gem } from 'lucide-react';
+import { LiveMarketStatus } from './components/LiveMarketStatus';
 
 const EMPTY_STOCK: MinerviniTradeSetup = {
   ticker: '—', name: 'No market data loaded', exchange: 'NSE', sector: '—', industry: '—',
@@ -46,6 +47,7 @@ export default function App() {
   const [stocksList, setStocksList] = useState<MinerviniTradeSetup[]>(runtimeConfig.demoMode ? MOCK_STOCKS : []);
   const [selectedStock, setSelectedStock] = useState<MinerviniTradeSetup | null>(runtimeConfig.demoMode ? MOCK_STOCKS[0] : null);
   const [marketDataStatus, setMarketDataStatus] = useState<'LOADING' | 'LIVE' | 'UNAVAILABLE'>('LOADING');
+  const [realtimeStatus, setRealtimeStatus] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<AppNavTab>('screener');
   const [isObsidian, setIsObsidian] = useState<boolean>(true); // Default to Obsidian Dark theme for luxury feel
 
@@ -84,6 +86,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (runtimeConfig.demoMode) return;
+    const poll = async () => { try { const response = await fetch(`${runtimeConfig.apiBaseUrl}/api/market/realtime-status`); if (response.ok) { const status = await response.json(); setRealtimeStatus(status); setMarketDataStatus(status.connected ? 'LIVE' : 'LOADING'); } } catch { setMarketDataStatus('UNAVAILABLE'); } };
+    poll(); const timer = window.setInterval(poll, 5000); return () => window.clearInterval(timer);
+  }, [runtimeConfig.apiBaseUrl, runtimeConfig.demoMode]);
+
+  useEffect(() => {
     if (!selectedStock || runtimeConfig.demoMode) return;
     const stream = new EventSource(`${runtimeConfig.apiBaseUrl}/api/market/stream`);
     stream.onmessage = event => {
@@ -92,12 +100,12 @@ export default function App() {
         if (tick.exchange !== selectedStock.exchange || tick.symbol !== selectedStock.ticker) return;
         setStocksList(current => current.map(stock =>
           stock.exchange === tick.exchange && stock.ticker === tick.symbol
-            ? { ...stock, currentPrice: tick.price, changePercent: tick.changePercent, pivotVolume: tick.volume }
+            ? (tick.screenerResult ? { ...tick.screenerResult } : { ...stock, currentPrice: tick.price, changePercent: tick.changePercent, pivotVolume: tick.volume })
             : stock
         ));
         setSelectedStock(current =>
           current && current.exchange === tick.exchange && current.ticker === tick.symbol
-            ? { ...current, currentPrice: tick.price, changePercent: tick.changePercent, pivotVolume: tick.volume }
+            ? (tick.screenerResult ? { ...tick.screenerResult } : { ...current, currentPrice: tick.price, changePercent: tick.changePercent, pivotVolume: tick.volume })
             : current
         );
         setMarketDataStatus('LIVE');
@@ -173,6 +181,7 @@ export default function App() {
       {/* Top Navbar */}
       <Navbar
         activeTab={activeTab}
+        realtimeStatus={realtimeStatus}
         setActiveTab={setActiveTab}
         selectedStockTicker={selectedStock?.ticker ?? '—'}
         totalSetupsCount={totalSetupsCount}
@@ -180,6 +189,8 @@ export default function App() {
         isObsidian={isObsidian}
         onToggleObsidian={() => setIsObsidian(!isObsidian)}
       />
+
+      <LiveMarketStatus apiBaseUrl={runtimeConfig.apiBaseUrl} demoMode={runtimeConfig.demoMode} status={realtimeStatus} />
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
