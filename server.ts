@@ -104,39 +104,9 @@ Provide a structured, expert, authoritative analysis in Mark Minervini's signatu
 
       const ai = getGeminiClient();
       if (!ai) {
-        return res.json({
-          summary: `Financial headline summary for ${ticker} (${stockName}). Grounded search provides fundamental context for price movements and volatility contraction setups.`,
-          headlines: [
-            {
-              title: `${ticker} Reports Acceleration in Core Quarter Revenues and Margin Expansion`,
-              source: 'Wall Street Journal',
-              date: 'Recent',
-              snippet: `${ticker} delivered Q1 performance topping analyst consensus, driven by strong enterprise backlog in ${sectorVal}. Management expanded full-year guidance.`,
-              sentiment: 'BULLISH',
-              catalystType: 'Earnings & Guidance'
-            },
-            {
-              title: `Institutional Funds Increase Allocation in ${ticker} Amid Base Formation`,
-              source: 'Investor\'s Business Daily',
-              date: 'Recent',
-              snippet: `Significant accumulation detected as large institutions accumulate shares ahead of key product announcements, providing floor support near key moving averages.`,
-              sentiment: 'BULLISH',
-              catalystType: 'Institutional Buying'
-            },
-            {
-              title: `Analyst Consortium Raises Price Targets on ${ticker} Citing Competitive Advantages`,
-              source: 'Bloomberg Markets',
-              date: 'Recent',
-              snippet: `Major equity research firms adjusted 12-month target prices upward, highlighting strong market position and improving supply chain dynamics.`,
-              sentiment: 'BULLISH',
-              catalystType: 'Analyst Rating'
-            }
-          ],
-          groundingSources: [
-            { title: `${ticker} Financial News & Investor Updates`, uri: `https://www.google.com/search?q=${ticker}+stock+financial+news` },
-            { title: `MarketWatch — ${ticker} Stock Overview`, uri: `https://www.marketwatch.com/investing/stock/${ticker.toLowerCase()}` }
-          ],
-          groundingQueries: [`${ticker} latest stock news financial headlines`, `${stockName} catalysts earnings`]
+        return res.status(503).json({
+          error: 'LIVE_NEWS_UNAVAILABLE',
+          message: 'Live news search is unavailable because GEMINI_API_KEY is not configured.'
         });
       }
 
