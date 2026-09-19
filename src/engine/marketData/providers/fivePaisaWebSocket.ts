@@ -1,7 +1,7 @@
 import type { MarketTick } from '../realtimeTypes';
 
 export interface FivePaisaInstrument {
-  exchange: 'NSE' | 'BSE';
+  exchange: 'NSE' | 'BSE' | 'MCX';
   exchangeType: 'C' | 'D' | 'U';
   scripCode: number;
   symbol: string;
@@ -17,7 +17,7 @@ export interface FivePaisaRealtimeConfig {
 
 type TickHandler = (tick: MarketTick) => void;
 type ConnectionHandler = (connected: boolean) => void;
-const exchangeCode = (exchange: FivePaisaInstrument['exchange']) => exchange === 'NSE' ? 'N' : 'B';
+const exchangeCode = (exchange: FivePaisaInstrument['exchange']) => exchange === 'NSE' ? 'N' : exchange === 'BSE' ? 'B' : 'M';
 
 function parseTick(raw: any, instruments: FivePaisaInstrument[]): MarketTick | null {
   const row = Array.isArray(raw) ? raw[0] : raw;
