@@ -1,0 +1,7 @@
+import { MinerviniTradeSetup, PricePoint } from '../../types';
+import { MinerviniEngineResult } from './types';
+
+export function buildTradeSetup(ticker:string,name:string,exchange:'NSE'|'BSE',history:PricePoint[],a:MinerviniEngineResult):MinerviniTradeSetup{
+ const c=history[history.length-1], pivot=a.pivotPrice??c.close, stop=a.stopLoss??pivot*.95;
+ return {ticker,name,exchange,sector:'Unknown',industry:'Unknown',currentPrice:c.close,changePercent:0,sma50:c.sma50,sma150:c.sma150,sma200:c.sma200,sma200_1mo_ago:history[Math.max(0,history.length-22)]?.sma200??c.sma200,high52w:Math.max(...history.slice(-252).map(x=>x.high)),low52w:Math.min(...history.slice(-252).map(x=>x.low)),rsRating:a.rsRating??0,patternType:a.vcpDetected?'VCP (3 Contractions)':'Pivot Pullback',vcpStage:a.breakoutStatus==='ABOVE_PIVOT'?'Active Breakout':'Breakout Pending',trendScore:a.trendTemplateScore,avgVolume20d:history.slice(-20).reduce((s,x)=>s+x.volume,0)/Math.min(20,history.length),pivotVolume:c.volume,pivotPrice:pivot,buyZoneMax:a.buyZoneMax??pivot*1.02,stopLossPrice:stop,stopLossPercent:(stop/pivot-1)*100,target1Price:a.target1??pivot+(pivot-stop)*3,target1Percent:20,target2Price:a.target2??pivot+(pivot-stop)*5,target2Percent:35,riskRewardRatio:a.riskReward??5,volumeDryUpPercent:0,isTightVolume:false,contractions:a.contractions??[],priceHistory:history,sepaNotes:a.reasons.join(' | '),atr14:undefined,atr14Percent:undefined};
+}

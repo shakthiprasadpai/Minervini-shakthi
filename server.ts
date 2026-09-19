@@ -2,12 +2,153 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
+import { createBigulProvider, createXtsProvider, runMinerviniEngine, buildTradeSetup, backtestMinervini, rankRsRatings } from './src/engine';
+import { initDatabase, pool } from './src/db/database';
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(express.json());
+
+  const getMarketDataProvider = () => process.env.MARKET_DATA_PROVIDER === 'xts' ? createXtsProvider() : createBigulProvider();
+
+  app.get('/api/health', async (_req, res) => {
+    let database = 'disabled';
+    if (pool) { try { await pool.query('SELECT 1'); database = 'ok'; } catch { database = 'error'; } }
+    res.json({ ok: true, marketDataProvider: process.env.MARKET_DATA_PROVIDER || 'bigul', database });
+  });
+
+  app.get('/api/screener', async (_req, res) => {
+    try {
+      const provider = getMarketDataProvider();
+      const configuredSymbols = (process.env.SCREENER_SYMBOLS || '')
+        .split(',')
+        .map(x => x.trim())
+        .filter(Boolean)
+        .map(spec => {
+          const parts = spec.split(':');
+          const hasExchange = parts.length > 1 && /^(NSE|BSE)$/i.test(parts[0]);
+          const exchange = (hasExchange ? parts[0] : 'NSE').toUpperCase() as 'NSE' | 'BSE';
+          const ticker = (hasExchange ? parts.slice(1).join(':') : spec).trim();
+          return { ticker, exchange };
+        })
+        .filter(x => x.ticker.length > 0);
+
+      if (!configuredSymbols.length) {
+        return res.status(503).json({ error: 'SCREENER_SYMBOLS_NOT_CONFIGURED' });
+      }
+
+      let benchmark: Awaited<ReturnType<typeof provider.getDailyCandles>> | undefined;
+      const benchmarkSpec = (process.env.RS_BENCHMARK_SYMBOL || '').trim();
+      if (benchmarkSpec) {
+        const parts = benchmarkSpec.split(':');
+        const hasExchange = parts.length > 1 && /^(NSE|BSE)$/i.test(parts[0]);
+        const exchange = (hasExchange ? parts[0] : 'NSE').toUpperCase() as 'NSE' | 'BSE';
+        const ticker = (hasExchange ? parts.slice(1).join(':') : benchmarkSpec).trim();
+        benchmark = await provider.getDailyCandles(ticker, exchange);
+      }
+
+      const raw: Array<{
+        ticker: string;
+        exchange: 'NSE' | 'BSE';
+        candles: Awaited<ReturnType<typeof provider.getDailyCandles>>;
+        analysis: any;
+      }> = [];
+
+      for (const instrument of configuredSymbols) {
+        try {
+          const candles = await provider.getDailyCandles(instrument.ticker, instrument.exchange);
+          if (candles.length < 200) continue;
+          const current = candles[candles.length - 1].close;
+          const analysis = runMinerviniEngine(
+            { ticker: instrument.ticker, currentPrice: current, priceHistory: candles },
+            benchmark
+          );
+          raw.push({ ticker: instrument.ticker, exchange: instrument.exchange, candles, analysis });
+        } catch (e) {
+          console.error('Screener instrument failed', instrument, e);
+        }
+      }
+
+      const ratings = rankRsRatings(raw.map(x => x.analysis.rsRating ?? 0));
+      const results = raw.map((x, i) => {
+        x.analysis.rsRating = ratings[i];
+        return buildTradeSetup(x.ticker, x.ticker, x.exchange, x.candles, x.analysis);
+      });
+
+      if (pool) {
+        await pool.query(
+          'INSERT INTO screener_runs(universe_count,result_count) VALUES($1,$2)',
+          [configuredSymbols.length, results.length]
+        );
+      }
+
+      res.json({
+        provider: process.env.MARKET_DATA_PROVIDER || 'bigul',
+        exchanges: ['NSE', 'BSE'],
+        configuredCount: configuredSymbols.length,
+        resultCount: results.length,
+        results
+      });
+    } catch (e: any) {
+      res.status(503).json({
+        error: 'MARKET_DATA_UNAVAILABLE',
+        message: e?.message || String(e)
+      });
+    }
+  });
+
+  app.get('/api/market/status', (_req, res) => {
+    res.json({
+      provider: process.env.MARKET_DATA_PROVIDER || 'bigul',
+      exchanges: ['NSE', 'BSE'],
+      configured: Boolean(
+        process.env.BIGUL_API_BASE_URL ||
+        process.env.XTS_MARKET_DATA_BASE_URL ||
+        process.env.MARKET_DATA_BASE_URL
+      ),
+      screenerSymbolsConfigured: Boolean(process.env.SCREENER_SYMBOLS)
+    });
+  });
+
+  app.get('/api/alerts', async (_req,res) => {
+    if(!pool) return res.status(503).json({error:'DATABASE_NOT_CONFIGURED'});
+    const r=await pool.query('SELECT id,ticker,exchange,target_type AS "targetType",target_price AS "targetPrice",status,created_at AS "createdAt",triggered_at AS "triggeredAt" FROM price_alerts ORDER BY id DESC'); res.json(r.rows);
+  });
+  app.post('/api/alerts/sync', async (req,res) => {
+    if(!pool) return res.status(503).json({error:'DATABASE_NOT_CONFIGURED'});
+    const client=await pool.connect(); try{await client.query('BEGIN'); await client.query('DELETE FROM price_alerts'); for(const a of (req.body||[])){await client.query('INSERT INTO price_alerts(ticker,exchange,target_type,target_price,status,created_at,triggered_at) VALUES($1,$2,$3,$4,$5,$6,$7)',[a.ticker,a.exchange,a.targetType,a.targetPrice,a.status,a.createdAt||new Date().toISOString(),a.triggeredAt||null]);} await client.query('COMMIT'); res.json({ok:true});}catch(e){await client.query('ROLLBACK');res.status(500).json({error:'ALERT_SYNC_FAILED'});}finally{client.release();}
+  });
+
+  app.get('/api/portfolio', async (_req,res) => {
+    if(!pool) return res.status(503).json({error:'DATABASE_NOT_CONFIGURED'});
+    const r=await pool.query('SELECT id,ticker,stock_name AS "stockName",exchange,shares,entry_price AS "entryPrice",current_price AS "currentPrice",buy_date AS "buyDate",stop_loss_price AS "stopLossPrice",pivot_target_price AS "pivotTargetPrice",notes FROM portfolio_holdings ORDER BY id DESC');
+    res.json(r.rows);
+  });
+  app.post('/api/portfolio/sync', async (req,res) => {
+    if(!pool) return res.status(503).json({error:'DATABASE_NOT_CONFIGURED'});
+    const client=await pool.connect(); try { await client.query('BEGIN'); await client.query('DELETE FROM portfolio_holdings'); for(const h of (req.body||[])){await client.query('INSERT INTO portfolio_holdings(ticker,stock_name,exchange,shares,entry_price,current_price,buy_date,stop_loss_price,pivot_target_price,notes) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[h.ticker,h.stockName||h.ticker,h.exchange,h.shares,h.entryPrice,h.currentPrice,h.buyDate,h.stopLossPrice,h.pivotTargetPrice,h.notes||null]);} await client.query('COMMIT'); res.json({ok:true}); } catch(e){await client.query('ROLLBACK'); res.status(500).json({error:'PORTFOLIO_SYNC_FAILED'});} finally{client.release();}
+  });
+  app.get('/api/journal', async (_req,res) => {
+    if(!pool) return res.status(503).json({error:'DATABASE_NOT_CONFIGURED'});
+    const r=await pool.query('SELECT id,ticker,exchange,opened_at AS date,entry_price AS "entryPrice",exit_price AS "exitPrice",notes,status AS "tradeStatus" FROM trades ORDER BY id DESC'); res.json(r.rows);
+  });
+  app.post('/api/journal/sync', async (req,res) => {
+    if(!pool) return res.status(503).json({error:'DATABASE_NOT_CONFIGURED'});
+    const client=await pool.connect(); try{await client.query('BEGIN'); await client.query('DELETE FROM trades'); for(const n of (req.body||[])){await client.query('INSERT INTO trades(ticker,exchange,side,quantity,entry_price,exit_price,pnl,status,opened_at,notes) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',[n.ticker,n.exchange,'BUY',1,n.entryPrice||null,n.exitPrice||null,null,n.tradeStatus||'PLANNING',n.date||new Date().toISOString(),n.notes||null]);} await client.query('COMMIT'); res.json({ok:true});}catch(e){await client.query('ROLLBACK');res.status(500).json({error:'JOURNAL_SYNC_FAILED'});}finally{client.release();}
+  });
+
+  app.get('/api/quote/:exchange/:ticker', async (req,res) => {
+    try { const provider=getMarketDataProvider(); const q=await provider.getQuote(req.params.ticker,req.params.exchange.toUpperCase() as 'NSE'|'BSE'); res.json(q); }
+    catch(e:any){res.status(503).json({error:'MARKET_DATA_UNAVAILABLE',message:e?.message||String(e)});}
+  });
+
+  app.post('/api/backtest', async (req,res) => {
+    try { const provider=getMarketDataProvider(); const ticker=String(req.body.ticker); const candles=await provider.getDailyCandles(ticker,(req.body.exchange||'NSE').toUpperCase()); const result=backtestMinervini(ticker,candles,{initialCapital:Number(req.body.initialCapital||100000),riskPerTradePercent:Number(req.body.riskPerTradePercent||1),commissionPercent:Number(req.body.commissionPercent||0),slippagePercent:Number(req.body.slippagePercent||0)}); res.json(result); }
+    catch(e:any){res.status(400).json({error:'BACKTEST_FAILED',message:e?.message||String(e)});}
+  });
+
 
   // Helper for Gemini AI instance
   const getGeminiClient = () => {
@@ -104,39 +245,9 @@ Provide a structured, expert, authoritative analysis in Mark Minervini's signatu
 
       const ai = getGeminiClient();
       if (!ai) {
-        return res.json({
-          summary: `Financial headline summary for ${ticker} (${stockName}). Grounded search provides fundamental context for price movements and volatility contraction setups.`,
-          headlines: [
-            {
-              title: `${ticker} Reports Acceleration in Core Quarter Revenues and Margin Expansion`,
-              source: 'Wall Street Journal',
-              date: 'Recent',
-              snippet: `${ticker} delivered Q1 performance topping analyst consensus, driven by strong enterprise backlog in ${sectorVal}. Management expanded full-year guidance.`,
-              sentiment: 'BULLISH',
-              catalystType: 'Earnings & Guidance'
-            },
-            {
-              title: `Institutional Funds Increase Allocation in ${ticker} Amid Base Formation`,
-              source: 'Investor\'s Business Daily',
-              date: 'Recent',
-              snippet: `Significant accumulation detected as large institutions accumulate shares ahead of key product announcements, providing floor support near key moving averages.`,
-              sentiment: 'BULLISH',
-              catalystType: 'Institutional Buying'
-            },
-            {
-              title: `Analyst Consortium Raises Price Targets on ${ticker} Citing Competitive Advantages`,
-              source: 'Bloomberg Markets',
-              date: 'Recent',
-              snippet: `Major equity research firms adjusted 12-month target prices upward, highlighting strong market position and improving supply chain dynamics.`,
-              sentiment: 'BULLISH',
-              catalystType: 'Analyst Rating'
-            }
-          ],
-          groundingSources: [
-            { title: `${ticker} Financial News & Investor Updates`, uri: `https://www.google.com/search?q=${ticker}+stock+financial+news` },
-            { title: `MarketWatch — ${ticker} Stock Overview`, uri: `https://www.marketwatch.com/investing/stock/${ticker.toLowerCase()}` }
-          ],
-          groundingQueries: [`${ticker} latest stock news financial headlines`, `${stockName} catalysts earnings`]
+        return res.status(503).json({
+          error: 'LIVE_NEWS_UNAVAILABLE',
+          message: 'Live news search is unavailable because GEMINI_API_KEY is not configured.'
         });
       }
 
@@ -200,48 +311,14 @@ Provide 4 to 6 accurate, realistic, high-signal financial headlines. Return ONLY
       });
 
     } catch (err: any) {
-      if (err?.status === 429 || err?.message?.includes('429') || err?.message?.includes('prepayment credits')) {
-        console.log(`Notice: Gemini API quota temporarily limited for ${ticker} news grounding (using curated offline fallback).`);
-      } else {
-        console.error('Ticker News Grounding API Error (fallback triggered):', err?.message || err);
-      }
-      // Return robust fallback news response instead of 500 error
-      res.json({
-        summary: `Financial headline summary for ${ticker}. (Note: Live AI search quota temporarily limited; displaying robust curated catalyst headlines).`,
-        headlines: [
-          {
-            title: `${ticker} Expands Market Share with Strong Quarterly Execution`,
-            source: 'Wall Street Journal',
-            date: 'Recent',
-            snippet: `${ticker} continues to demonstrate robust operational metrics with rising institutional sponsorship and solid earnings resilience.`,
-            sentiment: 'BULLISH',
-            catalystType: 'Earnings & Guidance'
-          },
-          {
-            title: `Institutional Accumulation Patterns Visible in ${ticker} Price Action`,
-            source: 'Investor\'s Business Daily',
-            date: 'Recent',
-            snippet: `Volume patterns confirm strong institutional sponsorship supporting key moving average support levels during base consolidation.`,
-            sentiment: 'BULLISH',
-            catalystType: 'Institutional Buying'
-          },
-          {
-            title: `Wall Street Analysts Maintain Positive Outlook on ${ticker}`,
-            source: 'Bloomberg Markets',
-            date: 'Recent',
-            snippet: `Equity research updates highlight favorable sector tailwinds and strong competitive moat supporting forward earnings growth.`,
-            sentiment: 'CATALYST',
-            catalystType: 'Analyst Rating'
-          }
-        ],
-        groundingSources: [
-          { title: `${ticker} Financial News & Updates`, uri: `https://www.google.com/search?q=${ticker}+stock+financial+news` },
-          { title: `MarketWatch — ${ticker}`, uri: `https://www.marketwatch.com/investing/stock/${ticker.toLowerCase()}` }
-        ],
-        groundingQueries: [`${ticker} latest stock news financial headlines`]
+      console.error('Ticker News Grounding API Error:', err?.message || err);
+      return res.status(503).json({
+        error: 'LIVE_NEWS_UNAVAILABLE',
+        message: 'Live news search failed. No generated or fabricated headlines are returned.'
       });
-    }
-  });
+    }  });
+
+  await initDatabase();
 
   // Vite middleware setup
   if (process.env.NODE_ENV !== 'production') {

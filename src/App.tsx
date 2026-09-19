@@ -26,16 +26,62 @@ import { BreakoutProbabilityEngine } from './components/BreakoutProbabilityEngin
 import { SectorStrengthView } from './components/SectorStrengthView';
 import { PatternVisualsLibrary } from './components/PatternVisualsLibrary';
 import { ExportTradeData } from './components/ExportTradeData';
+import { runtimeConfig } from './config/runtime';
 import { MOCK_STOCKS } from './data/mockStocks';
 import { MinerviniTradeSetup } from './types';
 import { formatCurrency, formatVolume, getCurrencySymbol, calculateBreakoutProbability } from './utils/sepaCalculator';
 import { TrendingUp, ShieldCheck, Target, Droplets, ArrowUpRight, Flame, BarChart3, Calculator, Sparkles, Gem } from 'lucide-react';
 
+const EMPTY_STOCK: MinerviniTradeSetup = {
+  ticker: '—', name: 'No market data loaded', exchange: 'NSE', sector: '—', industry: '—',
+  currentPrice: 0, changePercent: 0, sma50: 0, sma150: 0, sma200: 0, sma200_1mo_ago: 0,
+  high52w: 0, low52w: 0, rsRating: 0, patternType: 'Pivot Pullback', vcpStage: 'Breakout Pending',
+  trendScore: 0, avgVolume20d: 0, pivotVolume: 0, volumeDryUpPercent: 0, isTightVolume: false,
+  pivotPrice: 0, buyZoneMax: 0, stopLossPrice: 0, stopLossPercent: 0, target1Price: 0,
+  target1Percent: 0, target2Price: 0, target2Percent: 0, riskRewardRatio: 0, contractions: [],
+  priceHistory: [], sepaNotes: 'Connect Bigul/XTS market data to load the live screener.'
+};
+
 export default function App() {
-  const [stocksList, setStocksList] = useState<MinerviniTradeSetup[]>(MOCK_STOCKS);
-  const [selectedStock, setSelectedStock] = useState<MinerviniTradeSetup>(MOCK_STOCKS[0]);
+  const [stocksList, setStocksList] = useState<MinerviniTradeSetup[]>(runtimeConfig.demoMode ? MOCK_STOCKS : []);
+  const [selectedStock, setSelectedStock] = useState<MinerviniTradeSetup | null>(runtimeConfig.demoMode ? MOCK_STOCKS[0] : null);
+  const [marketDataStatus, setMarketDataStatus] = useState<'LOADING' | 'LIVE' | 'UNAVAILABLE'>('LOADING');
   const [activeTab, setActiveTab] = useState<AppNavTab>('screener');
   const [isObsidian, setIsObsidian] = useState<boolean>(true); // Default to Obsidian Dark theme for luxury feel
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadLiveScreener = async () => {
+      try {
+        const response = await fetch(`${runtimeConfig.apiBaseUrl}/api/screener`, { signal: controller.signal });
+        if (!response.ok) throw new Error(await response.text());
+        const data = await response.json();
+        const live = Array.isArray(data.results) ? data.results : [];
+        if (live.length > 0) {
+          setStocksList(live);
+          setSelectedStock(current =>
+            current
+              ? live.find((x: MinerviniTradeSetup) => x.ticker === current.ticker && x.exchange === current.exchange) ?? live[0]
+              : live[0]
+          );
+          setMarketDataStatus('LIVE');
+        } else {
+          setMarketDataStatus('UNAVAILABLE');
+        }
+      } catch (error) {
+        if ((error as Error).name !== 'AbortError') {
+          console.error('Live screener unavailable:', error);
+          if (!runtimeConfig.demoMode) {
+            setStocksList([]);
+            setSelectedStock(null);
+          }
+          setMarketDataStatus('UNAVAILABLE');
+        }
+      }
+    };
+    loadLiveScreener();
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     if (isObsidian) {
@@ -51,7 +97,7 @@ export default function App() {
   const handleAddStock = (newStock: MinerviniTradeSetup) => {
     // Generate dummy price history if empty
     if (!newStock.priceHistory || newStock.priceHistory.length === 0) {
-      newStock.priceHistory = MOCK_STOCKS[0].priceHistory;
+      newStock.priceHistory = [];
     }
     setStocksList([newStock, ...stocksList]);
     setSelectedStock(newStock);
@@ -66,7 +112,23 @@ export default function App() {
     }
   };
 
-  const currencySymbol = getCurrencySymbol(selectedStock.exchange);
+  const currencySymbol = selectedStock ? getCurrencySymbol(selectedStock?.exchange ?? 'NSE') : '₹';
+
+  if (!selectedStock) {
+    return (
+      <div className="min-h-screen bg-[#0b0d11] text-white flex items-center justify-center p-8">
+        <div className="max-w-xl text-center space-y-4">
+          <h1 className="text-3xl font-bold">Minervini Screener — Live Data Required</h1>
+          <p className="text-gray-300">
+            Demo data is disabled. Connect the market-data service and load an NSE/BSE stock before using the screener.
+          </p>
+          <p className="text-sm text-gray-400">
+            For local UI testing only, set VITE_DEMO_MODE=true.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen font-sans antialiased selection:bg-[#1a1a1a] selection:text-white pb-16 transition-colors duration-300 ${
@@ -84,7 +146,7 @@ export default function App() {
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        selectedStockTicker={selectedStock.ticker}
+        selectedStockTicker={selectedStock?.ticker ?? '—'}
         totalSetupsCount={totalSetupsCount}
         tightVolumeCount={tightVolumeCount}
         isObsidian={isObsidian}
@@ -121,19 +183,19 @@ export default function App() {
             <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-3 text-center min-w-[110px]">
               <span className="text-[10px] uppercase tracking-[0.2em] text-[#b5a68d] font-bold block">Pivot Entry</span>
               <strong className="text-xl font-mono font-bold text-[#1a1a1a]">
-                {formatCurrency(selectedStock.pivotPrice, currencySymbol)}
+                {formatCurrency(selectedStock?.pivotPrice ?? 0, currencySymbol)}
               </strong>
             </div>
             <div className="bg-red-50/50 border border-red-200 p-3 text-center min-w-[110px]">
               <span className="text-[10px] uppercase tracking-[0.2em] text-red-700 font-bold block">Tight Stop</span>
               <strong className="text-xl font-mono font-bold text-red-600">
-                {formatCurrency(selectedStock.stopLossPrice, currencySymbol)}
+                {formatCurrency(selectedStock?.stopLossPrice ?? 0, currencySymbol)}
               </strong>
             </div>
             <div className="bg-amber-50 border border-amber-300 p-3 text-center min-w-[130px]">
               <span className="text-[10px] uppercase tracking-[0.2em] text-amber-800 font-bold block">Breakout Prob</span>
               <strong className="text-xl font-mono font-black text-amber-900">
-                {calculateBreakoutProbability(selectedStock).score}%
+                {selectedStock ? calculateBreakoutProbability(selectedStock) : { score: 0 }.score}%
               </strong>
             </div>
           </div>
@@ -213,25 +275,25 @@ export default function App() {
                     </div>
                     <div>
                       <h2 className="text-xl font-serif font-black text-[#1a1a1a] flex items-center space-x-2">
-                        <span>{selectedStock.name}</span>
+                        <span>{selectedStock?.name ?? 'No live stock selected'}</span>
                         <span className="text-xs font-sans font-normal text-gray-500">
-                          — {selectedStock.sector} / {selectedStock.industry}
+                          — {selectedStock?.sector ?? '—'} / {selectedStock?.industry ?? '—'}
                         </span>
                       </h2>
                       <div className="flex items-center space-x-4 text-xs font-mono mt-1">
                         <span className="text-[#1a1a1a] font-bold">
-                          Price: {formatCurrency(selectedStock.currentPrice, currencySymbol)}
+                          Price: {formatCurrency(selectedStock?.currentPrice ?? 0, currencySymbol)}
                         </span>
                         <span
                           className={`font-bold ${
-                            selectedStock.changePercent >= 0 ? 'text-green-700' : 'text-red-600'
+                            selectedStock?.changePercent ?? 0 >= 0 ? 'text-green-700' : 'text-red-600'
                           }`}
                         >
                           {selectedStock.changePercent >= 0 ? '+' : ''}
                           {selectedStock.changePercent}%
                         </span>
                         <span className="bg-[#1a1a1a] text-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                          RS Rating: {selectedStock.rsRating}
+                          RS Rating: {selectedStock?.rsRating ?? 0}
                         </span>
                       </div>
                     </div>
