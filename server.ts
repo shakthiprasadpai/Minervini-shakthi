@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
-import { createBigulProvider, createXtsProvider, runMinerviniEngine, buildTradeSetup, backtestMinervini } from './src/engine';
+import { createBigulProvider, createXtsProvider, runMinerviniEngine, buildTradeSetup, backtestMinervini, rankRsRatings } from './src/engine';
 import { initDatabase, pool } from './src/db/database';
 
 async function startServer() {
@@ -25,10 +25,12 @@ async function startServer() {
       const symbols = (process.env.SCREENER_SYMBOLS || '').split(',').map(x=>x.trim()).filter(Boolean);
       if (!symbols.length) return res.status(503).json({ error:'SCREENER_SYMBOLS_NOT_CONFIGURED' });
       const benchmark = process.env.RS_BENCHMARK_SYMBOL ? await provider.getDailyCandles(process.env.RS_BENCHMARK_SYMBOL,'NSE') : undefined;
-      const results=[];
+      const raw=[];
       for(const ticker of symbols){
-        try { const candles=await provider.getDailyCandles(ticker,'NSE'); if(candles.length<200) continue; const current=candles[candles.length-1].close; const analysis=runMinerviniEngine({ticker,currentPrice:current,priceHistory:candles},benchmark); results.push(buildTradeSetup(ticker,ticker,'NSE',candles,analysis)); } catch(e) { console.error('Screener symbol failed',ticker,e); }
+        try { const candles=await provider.getDailyCandles(ticker,'NSE'); if(candles.length<200) continue; const current=candles[candles.length-1].close; const analysis=runMinerviniEngine({ticker,currentPrice:current,priceHistory:candles},benchmark); raw.push({ticker,candles,analysis}); } catch(e) { console.error('Screener symbol failed',ticker,e); }
       }
+      const ratings=rankRsRatings(raw.map(x=>x.analysis.rsRating ?? 0));
+      const results=raw.map((x,i)=>{x.analysis.rsRating=ratings[i]; return buildTradeSetup(x.ticker,x.ticker,'NSE',x.candles,x.analysis);});
       if(pool) await pool.query('INSERT INTO screener_runs(universe_count,result_count) VALUES($1,$2)',[symbols.length,results.length]);
       res.json({ provider:process.env.MARKET_DATA_PROVIDER||'bigul', results });
     } catch(e:any) { res.status(503).json({ error:'MARKET_DATA_UNAVAILABLE', message:e?.message||String(e) }); }
