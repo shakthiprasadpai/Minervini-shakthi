@@ -46,9 +46,10 @@ async function startServer() {
         })
         .filter(x => x.ticker.length > 0);
 
-      if (!configuredSymbols.length) {
-        return res.status(503).json({ error: 'SCREENER_SYMBOLS_NOT_CONFIGURED' });
-      }
+      const universe = (process.env.REALTIME_MARKET_PROVIDER || '').toLowerCase() === '5paisa' && (process.env.AUTO_UNIVERSE || 'true').toLowerCase() === 'true'
+        ? fivePaisaScripMaster.allCashInstruments().map(x => ({ ticker: x.symbol, exchange: x.exchange }))
+        : configuredSymbols;
+      if (!universe.length) return res.status(503).json({ error: 'MARKET_UNIVERSE_NOT_AVAILABLE' });
 
       let benchmark: Awaited<ReturnType<typeof provider.getDailyCandles>> | undefined;
       const benchmarkSpec = (process.env.RS_BENCHMARK_SYMBOL || '').trim();
@@ -67,7 +68,7 @@ async function startServer() {
         analysis: any;
       }> = [];
 
-      for (const instrument of configuredSymbols) {
+      for (const instrument of universe) {
         try {
           const candles = await provider.getDailyCandles(instrument.ticker, instrument.exchange);
           if (candles.length < 200) continue;
@@ -91,14 +92,14 @@ async function startServer() {
       if (pool) {
         await pool.query(
           'INSERT INTO screener_runs(universe_count,result_count) VALUES($1,$2)',
-          [configuredSymbols.length, results.length]
+          [universe.length, results.length]
         );
       }
 
       res.json({
         provider: process.env.MARKET_DATA_PROVIDER || 'bigul',
         exchanges: ['NSE', 'BSE'],
-        configuredCount: configuredSymbols.length,
+        configuredCount: universe.length,
         resultCount: results.length,
         results
       });
@@ -124,7 +125,9 @@ async function startServer() {
         process.env.XTS_MARKET_DATA_BASE_URL ||
         process.env.MARKET_DATA_BASE_URL
       ),
-      screenerSymbolsConfigured: Boolean(process.env.SCREENER_SYMBOLS)
+      screenerSymbolsConfigured: Boolean(process.env.SCREENER_SYMBOLS),
+      automaticUniverse: (process.env.AUTO_UNIVERSE || 'true').toLowerCase() === 'true',
+      universeCount: fivePaisaScripMaster.status().count
     });
   });
 
