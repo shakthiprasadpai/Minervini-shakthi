@@ -151,7 +151,7 @@ export default function App() {
 
   if (!selectedStock) {
     return (
-      <div className="min-h-screen bg-[#0b0d11] text-white">
+      <div className="min-h-screen bg-[#080b10] text-white">
         <LiveMarketStatus apiBaseUrl={runtimeConfig.apiBaseUrl} demoMode={runtimeConfig.demoMode} status={realtimeStatus} />
         <div className="flex items-center justify-center p-8 min-h-[80vh]">
           <div className="max-w-xl text-center space-y-4">
@@ -192,23 +192,24 @@ export default function App() {
       <LiveMarketStatus apiBaseUrl={runtimeConfig.apiBaseUrl} demoMode={runtimeConfig.demoMode} status={realtimeStatus} />
 
       {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
         
         {/* Banner Quick Info - Editorial Style */}
-        <div className="bg-white border border-[#e5e4e1] p-6 sm:p-8 shadow-xs flex flex-wrap items-center justify-between gap-6">
+        <div className={`relative overflow-hidden rounded-2xl border border-white/10 p-6 sm:p-8 shadow-2xl flex flex-wrap items-center justify-between gap-6 ${isObsidian ? 'bg-gradient-to-br from-[#121722] via-[#0f141d] to-[#0a0e14]' : 'bg-white border-[#e5e4e1]'}`}>
+          <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-amber-400/10 blur-3xl pointer-events-none" />
           <div className="space-y-3 max-w-2xl">
             <div className="flex items-center space-x-3">
               <span className="inline-block bg-[#1a1a1a] text-white text-[10px] px-3 py-1 uppercase tracking-[0.2em] font-medium">
                 Priority Setup
               </span>
-              <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#b5a68d]">
+              <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-amber-300/80">
                 Mark Minervini SEPA Engine
               </span>
             </div>
-            <h1 className="text-2xl sm:text-4xl font-serif font-black text-[#1a1a1a] tracking-tight leading-tight">
+            <h1 className="text-2xl sm:text-4xl font-serif font-black text-white tracking-tight leading-tight">
               Stage 2 Trend Continuation & VCP Screener
             </h1>
-            <p className="text-sm font-serif italic text-gray-600 leading-relaxed">
+            <p className="text-sm font-serif italic text-slate-400 leading-relaxed">
               Identifies high-momentum growth stocks in Stage 2 uptrends forming Volatility Contraction Patterns (VCP) with extreme volume dry-ups prior to pivot breakouts.
             </p>
           </div>
@@ -216,7 +217,7 @@ export default function App() {
           <div className="flex flex-wrap items-center gap-3 text-xs">
             <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-3 text-center min-w-[110px]">
               <span className="text-[10px] uppercase tracking-[0.2em] text-[#b5a68d] font-bold block">Selected Stock</span>
-              <strong className="text-2xl font-serif italic font-black text-[#1a1a1a]">{selectedStock.ticker}</strong>
+              <strong className="text-2xl font-serif italic font-black text-white">{selectedStock.ticker}</strong>
             </div>
             <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-3 text-center min-w-[110px]">
               <span className="text-[10px] uppercase tracking-[0.2em] text-[#b5a68d] font-bold block">Pivot Entry</span>
@@ -671,7 +672,7 @@ export default function App() {
       </main>
 
       {/* Footer - Editorial Style */}
-      <footer className="mt-16 bg-white border-t border-[#e5e4e1] py-8 text-xs text-gray-500 font-sans">
+      <footer className="mt-16 bg-[#0a0e14] border-t border-white/10 py-8 text-xs text-slate-500 font-sans">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 uppercase tracking-[0.15em] font-semibold text-[10px]">
           <div>
             Market Outlook: <span className="text-green-700 font-bold">Confirmed Uptrend</span>
