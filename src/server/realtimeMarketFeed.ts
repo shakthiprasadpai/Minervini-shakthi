@@ -1,5 +1,6 @@
 import type { Response } from 'express';
-import { FivePaisaMarketFeed, type FivePaisaInstrument } from '../engine/marketData/providers/fivePaisaWebSocket';
+import type { FivePaisaInstrument } from '../engine/marketData/providers/fivePaisaWebSocket';
+import { FivePaisaWebSocketPool } from '../engine/marketData/providers/fivePaisaWebSocketPool';
 import type { MarketTick } from '../engine/marketData/realtimeTypes';
 import { fivePaisaScripMaster } from './scripMasterScheduler';
 import { fivePaisaAuth } from './fivePaisaAuthService';
@@ -15,7 +16,7 @@ function configuredSymbols(): Array<{ exchange: 'NSE' | 'BSE' | 'MCX'; symbol: s
 }
 
 export class RealtimeMarketFeedService {
-  private feed: FivePaisaMarketFeed | null = null;
+  private feed: FivePaisaWebSocketPool | null = null;
   private clients = new Set<Response>();
   private latest = new Map<string, MarketTick>();
   private connected = false;
@@ -64,7 +65,22 @@ export class RealtimeMarketFeedService {
         this.benchmark = await provider.getDailyCandles(symbol, exchange);
       }
     } catch (error) { console.error('Minervini realtime history warm-up failed:', error); }
-    this.feed = new FivePaisaMarketFeed({ accessToken, clientCode, websocketUrl: process.env.FIVEPAISA_WEBSOCKET_URL, instruments, reconnectMs: Number(process.env.FIVEPAISA_RECONNECT_MS || 3000) }, tick => {
+    const prioritySymbols = [
+      ...configuredSymbols().map(x => `${x.exchange}:${x.symbol}`),
+      ...(process.env.FIVEPAISA_PRIORITY_SYMBOLS || '').split(',').map(x => x.trim()).filter(Boolean)
+    ];
+
+    this.feed = new FivePaisaWebSocketPool({
+      accessToken,
+      clientCode,
+      websocketUrl: process.env.FIVEPAISA_WEBSOCKET_URL,
+      shardSize: Number(process.env.FIVEPAISA_WS_SHARD_SIZE || 180),
+      maxConnections: Number(process.env.FIVEPAISA_WS_MAX_CONNECTIONS || 4),
+      prioritySymbols,
+      rotationIntervalMs: Number(process.env.FIVEPAISA_WS_ROTATION_MS || 60000),
+      connectionStaggerMs: Number(process.env.FIVEPAISA_WS_CONNECTION_STAGGER_MS || 350),
+      reconnectMs: Number(process.env.FIVEPAISA_RECONNECT_MS || 3000)
+    }, tick => {
       this.connected = true;
       this.latest.set(tick.exchange + ':' + tick.symbol, tick);
       const key = tick.exchange + ':' + tick.symbol;
@@ -97,17 +113,17 @@ export class RealtimeMarketFeedService {
       const payload = 'data: ' + JSON.stringify({ ...tick, screenerResult, universeFilterPassed: passesUniverseFilter }) + '\\n\\n';
       for (const response of this.clients) response.write(payload);
     }, connected => { this.connected = connected; });
-    this.feed.connect();
+    await this.feed.start(instruments);
     return true;
   }
 
   stop() {
-    this.feed?.disconnect(); this.feed = null; this.connected = false;
+    this.feed?.stop(); this.feed = null; this.connected = false;
     for (const response of this.clients) response.end(); this.clients.clear();
   }
 
   status() {
-    return { configured: Boolean(fivePaisaAuth.getAccessToken() || (process.env.FIVEPAISA_ACCESS_TOKEN && process.env.FIVEPAISA_CLIENT_CODE)), auth: fivePaisaAuth.status(), connected: this.connected, instruments: this.instrumentCount, liveTicks: this.latest.size, qualifyingCount: this.qualifying.size, universeMode: 'FULL_NSE_BSE_MCX -> LIQUIDITY_FILTER -> MINERVINI', filter: { minPrice: RealtimeMarketFeedService.MIN_PRICE, minLiquidity: RealtimeMarketFeedService.MIN_LIQUIDITY }, scripMaster: fivePaisaScripMaster.status() };
+    return { configured: Boolean(fivePaisaAuth.getAccessToken() || (process.env.FIVEPAISA_ACCESS_TOKEN && process.env.FIVEPAISA_CLIENT_CODE)), auth: fivePaisaAuth.status(), connected: this.connected, instruments: this.instrumentCount, liveTicks: this.latest.size, qualifyingCount: this.qualifying.size, universeMode: 'FULL_NSE_BSE_MCX -> LIQUIDITY_FILTER -> MINERVINI', filter: { minPrice: RealtimeMarketFeedService.MIN_PRICE, minLiquidity: RealtimeMarketFeedService.MIN_LIQUIDITY }, websocket: this.feed?.status() ?? { enabled: false }, scripMaster: fivePaisaScripMaster.status() };
   }
 
   addClient(response: Response) {
