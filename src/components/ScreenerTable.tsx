@@ -452,7 +452,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
         />
       ) : viewMode === 'table' ? (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1250px] text-left border-collapse">
+          <table className="w-full min-w-[1400px] text-left border-collapse">
             <thead>
               <tr className="border-b border-[#e5e4e1] text-[10px] uppercase tracking-[0.2em] text-[#b5a68d] font-bold bg-[#f9f8f5]">
                 {renderSortHeader('Stock & Sector', 'TICKER')}
@@ -729,21 +729,25 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                         </span>
                       </td>
 
+                      {/* Chart */}
+                      <td className="py-3.5 px-2.5 text-center">
+                        <a
+                          href={getChartUrl(stock)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-3 py-1.5 text-[10px] uppercase tracking-wider border border-amber-500 transition-colors"
+                          title={`Open ${stock.exchange}:${stock.ticker} chart in TradingView`}
+                          aria-label={`Open ${stock.exchange} ${stock.ticker} chart in TradingView`}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          Chart
+                        </a>
+                      </td>
+
                       {/* Action */}
                       <td className="py-3.5 px-2.5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <a
-                            href={getChartUrl(stock)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-2.5 py-1.5 text-[10px] uppercase tracking-wider border border-amber-500"
-                            title={`Open ${stock.exchange}:${stock.ticker} chart in TradingView`}
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            Chart
-                          </a>
-                          <button
+                        <button
                             onClick={(e) => {
                               e.stopPropagation();
                               onViewChart(stock);
