@@ -170,48 +170,12 @@ Provide 4 to 6 accurate, realistic, high-signal financial headlines. Return ONLY
       });
 
     } catch (err: any) {
-      if (err?.status === 429 || err?.message?.includes('429') || err?.message?.includes('prepayment credits')) {
-        console.log(`Notice: Gemini API quota temporarily limited for ${ticker} news grounding (using curated offline fallback).`);
-      } else {
-        console.error('Ticker News Grounding API Error (fallback triggered):', err?.message || err);
-      }
-      // Return robust fallback news response instead of 500 error
-      res.json({
-        summary: `Financial headline summary for ${ticker}. (Note: Live AI search quota temporarily limited; displaying robust curated catalyst headlines).`,
-        headlines: [
-          {
-            title: `${ticker} Expands Market Share with Strong Quarterly Execution`,
-            source: 'Wall Street Journal',
-            date: 'Recent',
-            snippet: `${ticker} continues to demonstrate robust operational metrics with rising institutional sponsorship and solid earnings resilience.`,
-            sentiment: 'BULLISH',
-            catalystType: 'Earnings & Guidance'
-          },
-          {
-            title: `Institutional Accumulation Patterns Visible in ${ticker} Price Action`,
-            source: 'Investor\'s Business Daily',
-            date: 'Recent',
-            snippet: `Volume patterns confirm strong institutional sponsorship supporting key moving average support levels during base consolidation.`,
-            sentiment: 'BULLISH',
-            catalystType: 'Institutional Buying'
-          },
-          {
-            title: `Wall Street Analysts Maintain Positive Outlook on ${ticker}`,
-            source: 'Bloomberg Markets',
-            date: 'Recent',
-            snippet: `Equity research updates highlight favorable sector tailwinds and strong competitive moat supporting forward earnings growth.`,
-            sentiment: 'CATALYST',
-            catalystType: 'Analyst Rating'
-          }
-        ],
-        groundingSources: [
-          { title: `${ticker} Financial News & Updates`, uri: `https://www.google.com/search?q=${ticker}+stock+financial+news` },
-          { title: `MarketWatch — ${ticker}`, uri: `https://www.marketwatch.com/investing/stock/${ticker.toLowerCase()}` }
-        ],
-        groundingQueries: [`${ticker} latest stock news financial headlines`]
+      console.error('Ticker News Grounding API Error:', err?.message || err);
+      return res.status(503).json({
+        error: 'LIVE_NEWS_UNAVAILABLE',
+        message: 'Live news search failed. No generated or fabricated headlines are returned.'
       });
-    }
-  });
+    }  });
 
   // Vite middleware setup
   if (process.env.NODE_ENV !== 'production') {
