@@ -516,6 +516,123 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                       </td>
 
                       {/* Live signal */}
+                      {/* Live signal */}
+                      <td className="py-3.5 px-2.5 text-center">
+                        {(() => {
+                          const signal = getSignal(stock);
+                          const cls = signal === 'BUY' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : signal === 'SELL' ? 'bg-rose-500/15 text-rose-300 border-rose-500/30' : 'bg-amber-500/10 text-amber-300 border-amber-500/20';
+                          return <span className={"inline-flex min-w-[54px] justify-center rounded-lg border px-2 py-1 text-[9px] font-black " + cls}>{signal}</span>;
+                        })()}
+                      </td>
+
+                      {/* Entry distance */}
+                      <td className="py-3.5 px-2.5 font-mono text-xs">
+                        <span className={getEntryDistance(stock) >= 0 ? 'text-emerald-300' : 'text-amber-300'}>
+                          {getEntryDistance(stock) >= 0 ? '+' : ''}{getEntryDistance(stock).toFixed(2)}%
+                        </span>
+                      </td>
+
+                      {/* Stop distance */}
+                      <td className="py-3.5 px-2.5 font-mono text-xs">
+                        <span className={getStopDistance(stock) <= 0 ? 'text-rose-300' : 'text-amber-300'}>
+                          {getStopDistance(stock).toFixed(2)}%
+                        </span>
+                      </td>
+
+                      {/* Price */}
+                      <td className="py-3.5 px-2.5 font-mono">
+                        <div className="font-bold text-white text-sm">
+                          {formatCurrency(stock.currentPrice, currency)}
+                        </div>
+                      </td>
+
+                      {/* Daily Change % */}
+                      <td className="py-3.5 px-2.5 font-mono">
+                        <div
+                          className={`text-xs font-bold ${
+                            stock.changePercent >= 0 ? 'text-emerald-700' : 'text-rose-600'
+                          }`}
+                        >
+                          {stock.changePercent >= 0 ? '+' : ''}
+                          {stock.changePercent.toFixed(2)}%
+                        </div>
+                      </td>
+
+                      {/* RS Rating Column */}
+                      <td className="py-3.5 px-2.5 text-center font-mono">
+                        <span
+                          className={`inline-flex items-center space-x-1 px-2 py-0.5 text-xs font-bold border ${
+                            stock.rsRating >= 90
+                              ? 'bg-purple-950 text-amber-300 border-purple-600 font-black'
+                              : stock.rsRating >= 80
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                              : 'bg-gray-50 text-gray-700 border-gray-200'
+                          }`}
+                        >
+                          <Award className="w-3 h-3 text-amber-400" />
+                          <span>{stock.rsRating} RS</span>
+                        </span>
+                      </td>
+
+                      {/* Trend Readiness Score Column */}
+                      <td className="py-3.5 px-2.5 text-center">
+                        {(() => {
+                          const readiness = calculateTrendReadinessScore(stock);
+                          return (
+                            <div className="flex flex-col items-center space-y-1">
+                              <span
+                                className={`inline-flex items-center space-x-1 px-2.5 py-0.5 text-xs font-bold border ${readiness.badgeBg} ${readiness.badgeBorder}`}
+                                title={`Trend Readiness: ${readiness.readinessLabel} (${readiness.passedCount} of 8 Trend Template Rules Passed)`}
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>{readiness.passedCount}/8 ({readiness.scorePercent}%)</span>
+                              </span>
+
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIsRefinedModalOpen(true);
+                                }}
+                                className="text-[9px] font-mono px-1.5 py-0.5 bg-[#10141d] text-amber-300 border border-amber-500/40 hover:border-amber-400 font-bold uppercase tracking-wider cursor-pointer"
+                                title="Click to view 18-Point Refined SEPA Screener Evaluation"
+                              >
+                                18-Pt: {evaluateRefinedSepaScreener(stock).passedCount}/18
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </td>
+
+                      {/* 200MA Trend Strength Meter Column */}
+                      <td className="py-3.5 px-2.5 text-center font-mono">
+                        <div className="flex flex-col items-center space-y-1">
+                          <span
+                            className={`px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider border ${trendMeter.badgeBg} ${trendMeter.badgeText} ${trendMeter.badgeBorder} inline-flex items-center space-x-1`}
+                            title={trendMeter.description}
+                          >
+                            {trendMeter.slopePercent > 0 ? (
+                              <ArrowUpRight className="w-3 h-3 text-amber-300" />
+                            ) : (
+                              <TrendingDown className="w-3 h-3 text-rose-300" />
+                            )}
+                            <span>{trendMeter.tierLabel}</span>
+                          </span>
+
+                          {/* Meter Fill Bar */}
+                          <div className="w-20 bg-gray-200 h-1.5 overflow-hidden border border-gray-300">
+                            <div
+                              className={`h-full ${trendMeter.meterColor} transition-all duration-500`}
+                              style={{ width: `${trendMeter.meterFillPercent}%` }}
+                            />
+                          </div>
+
+                          <div className="flex items-center space-x-1 text-[10px] font-bold text-gray-700">
+                            <Activity className="w-3 h-3 text-emerald-600" />
+                            <span>200MA: {trendMeter.slopePercent > 0 ? '+' : ''}{trendMeter.slopePercent.toFixed(2)}%/mo</span>
+                          </div>
+                        </div>
+                      </td>
+
                       {/* Pattern Type */}
                       <td className="py-3.5 px-2.5">
                         <div className="font-bold text-slate-200">
