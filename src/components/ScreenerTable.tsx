@@ -147,6 +147,14 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
     return 'WAIT';
   };
 
+  const getEntryDistance = (stock: MinerviniTradeSetup) =>
+    stock.pivotPrice > 0 ? ((stock.currentPrice - stock.pivotPrice) / stock.pivotPrice) * 100 : 0;
+
+  const getStopDistance = (stock: MinerviniTradeSetup) =>
+    stock.currentPrice > 0 && stock.stopLossPrice > 0
+      ? ((stock.currentPrice - stock.stopLossPrice) / stock.currentPrice) * 100
+      : 0;
+
   const handleSort = (field: SortField) => {
     if (sortBy === field) {
       setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
@@ -448,6 +456,9 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                 {renderSortHeader('200MA Trend', 'TREND_SLOPE', 'center')}
                 <th className="py-3 px-2.5">Pattern / Stage</th>
                 {renderSortHeader('VCP Heatmap', 'VCP_INTENSITY', 'center')}
+                <th className="py-3 px-2.5">Signal</th>
+                <th className="py-3 px-2.5">Entry Δ</th>
+                <th className="py-3 px-2.5">Stop Δ</th>
                 <th className="py-3 px-2.5">Pivot Entry</th>
                 <th className="py-3 px-2.5">Stop Loss</th>
                 <th className="py-3 px-2.5">Target (+20%)</th>
@@ -458,7 +469,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
             <tbody className="divide-y divide-white/5 text-xs">
               {filteredStocks.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="py-8 text-center text-gray-500 font-serif italic text-sm">
+                  <td colSpan={16} className="py-8 text-center text-gray-500 font-serif italic text-sm">
                     No growth setups match the selected search or SEPA filter criteria.
                   </td>
                 </tr>
@@ -494,6 +505,29 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                         <div className="text-[11px] text-slate-500 truncate max-w-[150px] mt-0.5 font-sans">
                           {stock.name}
                         </div>
+                      </td>
+
+                      {/* Live signal */}
+                      <td className="py-3.5 px-2.5 text-center">
+                        {(() => {
+                          const signal = getSignal(stock);
+                          const cls = signal === 'BUY' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : signal === 'SELL' ? 'bg-rose-500/15 text-rose-300 border-rose-500/30' : 'bg-amber-500/10 text-amber-300 border-amber-500/20';
+                          return <span className={"inline-flex min-w-[54px] justify-center rounded-lg border px-2 py-1 text-[9px] font-black " + cls}>{signal}</span>;
+                        })()}
+                      </td>
+
+                      {/* Entry distance */}
+                      <td className="py-3.5 px-2.5 font-mono text-xs">
+                        <span className={getEntryDistance(stock) >= 0 ? 'text-emerald-300' : 'text-amber-300'}>
+                          {getEntryDistance(stock) >= 0 ? '+' : ''}{getEntryDistance(stock).toFixed(2)}%
+                        </span>
+                      </td>
+
+                      {/* Stop distance */}
+                      <td className="py-3.5 px-2.5 font-mono text-xs">
+                        <span className={getStopDistance(stock) <= 0 ? 'text-rose-300' : 'text-amber-300'}>
+                          {getStopDistance(stock).toFixed(2)}%
+                        </span>
                       </td>
 
                       {/* Price */}
