@@ -240,6 +240,42 @@ export default function App() {
           </div>
         </div>
 
+        {/* Trading Command Center */}
+        <section className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+          {[
+            ['screener','📊','LIVE SCREENER','Scan NSE/BSE/MCX'],
+            ['chart','📈','VCP RADAR','Patterns & charts'],
+            ['calculator','🎯','TRADE PLAN','Entry / SL / Target'],
+            ['portfolio','💼','PORTFOLIO','Positions & P&L'],
+            ['sector_heatmap','🗺️','SECTORS','Strength heatmap'],
+            ['pocket_pivot','⚡','BREAKOUT','Pocket pivots'],
+            ['vcp_scanner','🔎','VCP SCANNER','Contractions'],
+            ['alert_history','🔔','ALERTS','Live notifications'],
+          ].map(([tab, icon, title, sub]) => (
+            <button key={tab} onClick={() => setActiveTab(tab as AppNavTab)}
+              className={`group text-left rounded-2xl border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-400/50 hover:bg-amber-400/10 ${activeTab === tab ? 'border-amber-400/60 bg-amber-400/10 shadow-lg shadow-amber-500/10' : 'border-white/10 bg-white/[0.035]'}`}>
+              <div className="text-2xl mb-3">{icon}</div>
+              <div className="text-[11px] font-black tracking-wider text-white">{title}</div>
+              <div className="text-[9px] text-slate-500 mt-1">{sub}</div>
+            </button>
+          ))}
+        </section>
+
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            ['UNIVERSE', stocksList.length.toLocaleString(), 'Stocks in scanner'],
+            ['QUALIFIED', totalSetupsCount.toLocaleString(), 'Minervini setups'],
+            ['VOLUME DRY-UP', tightVolumeCount.toLocaleString(), 'Tight volume setups'],
+            ['LIVE TICKS', Number(realtimeStatus?.liveTicks || 0).toLocaleString(), realtimeStatus?.connected ? '5Paisa connected' : 'Awaiting feed'],
+          ].map(([label, value, sub]) => (
+            <div key={label} className="rounded-2xl border border-white/10 bg-[#11151c] px-5 py-4">
+              <div className="text-[9px] uppercase tracking-[0.2em] text-slate-500 font-bold">{label}</div>
+              <div className="text-2xl font-black text-white mt-1">{value}</div>
+              <div className="text-[9px] text-slate-600 mt-1">{sub}</div>
+            </div>
+          ))}
+        </section>
+
         {/* TAB ANIMATED CONTAINER */}
         <AnimatePresence mode="wait">
           {activeTab === 'screener' && (
