@@ -35,7 +35,7 @@ export interface TrendTemplateRule {
 export interface MinerviniTradeSetup {
   ticker: string;
   name: string;
-  exchange: 'NASDAQ' | 'NYSE' | 'NSE' | 'BSE';
+  exchange: 'NASDAQ' | 'NYSE' | 'NSE' | 'BSE' | 'MCX';
   sector: string;
   industry: string;
   currentPrice: number;
