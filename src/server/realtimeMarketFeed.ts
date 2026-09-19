@@ -23,6 +23,10 @@ export class RealtimeMarketFeedService {
   private histories = new Map<string, PricePoint[]>();
   private benchmark: PricePoint[] | undefined;
   private loadingHistories = new Set<string>();
+  private universeCandidates = new Map<string, { exchange: 'NSE' | 'BSE'; symbol: string }>();
+  private qualifying = new Map<string, any>();
+  private static readonly MIN_PRICE = Number(process.env.MIN_UNIVERSE_PRICE || 20);
+  private static readonly MIN_LIQUIDITY = Number(process.env.MIN_UNIVERSE_MIN_LIQUIDITY || 1000000);
 
   async start() {
     const accessToken = fivePaisaAuth.getAccessToken() || process.env.FIVEPAISA_ACCESS_TOKEN;
@@ -41,6 +45,7 @@ export class RealtimeMarketFeedService {
     }
     if (!instruments.length) return false;
     this.instrumentCount = instruments.length;
+    this.universeCandidates = new Map(instruments.map(x => [x.exchange + ':' + x.symbol, { exchange: x.exchange, symbol: x.symbol }]));
     // Warm the same Minervini engine with the latest daily history so every tick can
     // re-evaluate the affected instrument without inventing a separate signal path.
     try {
@@ -65,7 +70,11 @@ export class RealtimeMarketFeedService {
       const key = tick.exchange + ':' + tick.symbol;
       let history = this.histories.get(key);
       let screenerResult: any = undefined;
-      if (!history && !this.loadingHistories.has(key)) {
+      const liquidity = tick.price * Math.max(0, tick.volume);
+      // Stage 1: cheap live universe filter. Expensive Minervini analysis is only run
+      // after price/liquidity sanity checks and after daily history is available.
+      const passesUniverseFilter = tick.price >= RealtimeMarketFeedService.MIN_PRICE && liquidity >= RealtimeMarketFeedService.MIN_LIQUIDITY;
+      if (passesUniverseFilter && !history && !this.loadingHistories.has(key)) {
         this.loadingHistories.add(key);
         void (async () => {
           try {
@@ -76,15 +85,16 @@ export class RealtimeMarketFeedService {
           finally { this.loadingHistories.delete(key); }
         })();
       }
-      if (history?.length) {
+      if (passesUniverseFilter && history?.length) {
         const next = history.map(x => ({ ...x }));
         const last = next[next.length - 1];
         last.close = tick.price; last.high = Math.max(last.high, tick.price); last.low = Math.min(last.low, tick.price); last.volume = Math.max(last.volume, tick.volume);
         const analysis = runMinerviniEngine({ ticker: tick.symbol, currentPrice: tick.price, priceHistory: next }, this.benchmark);
         screenerResult = buildTradeSetup(tick.symbol, tick.symbol, tick.exchange, next, analysis);
         this.histories.set(key, next);
+        if (screenerResult) this.qualifying.set(key, screenerResult);
       }
-      const payload = 'data: ' + JSON.stringify({ ...tick, screenerResult }) + '\\n\\n';
+      const payload = 'data: ' + JSON.stringify({ ...tick, screenerResult, universeFilterPassed: passesUniverseFilter }) + '\\n\\n';
       for (const response of this.clients) response.write(payload);
     }, connected => { this.connected = connected; });
     this.feed.connect();
@@ -97,7 +107,7 @@ export class RealtimeMarketFeedService {
   }
 
   status() {
-    return { configured: Boolean(fivePaisaAuth.getAccessToken() || (process.env.FIVEPAISA_ACCESS_TOKEN && process.env.FIVEPAISA_CLIENT_CODE)), auth: fivePaisaAuth.status(), connected: this.connected, instruments: this.instrumentCount, liveTicks: this.latest.size, scripMaster: fivePaisaScripMaster.status() };
+    return { configured: Boolean(fivePaisaAuth.getAccessToken() || (process.env.FIVEPAISA_ACCESS_TOKEN && process.env.FIVEPAISA_CLIENT_CODE)), auth: fivePaisaAuth.status(), connected: this.connected, instruments: this.instrumentCount, liveTicks: this.latest.size, qualifyingCount: this.qualifying.size, universeMode: 'FULL_NSE_BSE -> LIQUIDITY_FILTER -> MINERVINI', filter: { minPrice: RealtimeMarketFeedService.MIN_PRICE, minLiquidity: RealtimeMarketFeedService.MIN_LIQUIDITY }, scripMaster: fivePaisaScripMaster.status() };
   }
 
   addClient(response: Response) {
