@@ -16,6 +16,7 @@ export interface FivePaisaRealtimeConfig {
 }
 
 type TickHandler = (tick: MarketTick) => void;
+type ConnectionHandler = (connected: boolean) => void;
 const exchangeCode = (exchange: FivePaisaInstrument['exchange']) => exchange === 'NSE' ? 'N' : 'B';
 
 function parseTick(raw: any, instruments: FivePaisaInstrument[]): MarketTick | null {
@@ -46,7 +47,7 @@ export class FivePaisaMarketFeed {
   private stopped = true;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(private readonly config: FivePaisaRealtimeConfig, private readonly onTick: TickHandler) {}
+  constructor(private readonly config: FivePaisaRealtimeConfig, private readonly onTick: TickHandler, private readonly onConnection?: ConnectionHandler) {}
 
   connect() { this.stopped = false; this.open(); }
 
@@ -65,6 +66,7 @@ export class FivePaisaMarketFeed {
     this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
+      this.onConnection?.(true);
       this.ws?.send(JSON.stringify({
         Method: 'MarketFeedV3',
         Operation: 'Subscribe',
@@ -98,6 +100,7 @@ export class FivePaisaMarketFeed {
     this.ws.onerror = () => this.ws?.close();
     this.ws.onclose = () => {
       this.ws = null;
+      this.onConnection?.(false);
       if (!this.stopped) this.reconnectTimer = setTimeout(() => this.open(), this.config.reconnectMs ?? 3000);
     };
   }
