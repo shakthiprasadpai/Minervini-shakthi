@@ -7,6 +7,45 @@ import { fivePaisaAuth } from './fivePaisaAuthService';
 import { createBigulProvider, createXtsProvider, runMinerviniEngine, buildTradeSetup } from '../engine';
 import type { PricePoint } from '../types';
 
+
+function adaptivePriorityScore(tick: MarketTick, history: PricePoint[], analysis: any): number {
+  const current = tick.price;
+  const pivot = Number(analysis?.pivotPrice || 0);
+  const entryZone = Number(analysis?.buyZoneMax || 0);
+  const pivotDistance = pivot > 0 ? Math.abs(current - pivot) / pivot * 100 : 999;
+  // 0-35: price approaching/inside the Minervini pivot buy zone.
+  const pivotScore = pivot > 0
+    ? current >= pivot && current <= (entryZone || pivot * 1.05)
+      ? 35
+      : pivotDistance <= 2 ? 32
+      : pivotDistance <= 4 ? 24
+      : pivotDistance <= 7 ? 12
+      : 0
+    : 0;
+
+  // 0-25: VCP contraction quality.
+  const vcpScore = Math.min(25, Math.max(0, Number(analysis?.vcpScore || 0) * 0.25));
+
+  // 0-20: unusual volume / accumulation.
+  const recent = history.slice(-5);
+  const baseline = history.slice(-25, -5);
+  const avgRecent = recent.length ? recent.reduce((s, x) => s + x.volume, 0) / recent.length : 0;
+  const avgBaseline = baseline.length ? baseline.reduce((s, x) => s + x.volume, 0) / baseline.length : avgRecent;
+  const volumeRatio = avgBaseline > 0 ? avgRecent / avgBaseline : 1;
+  const volumeScore = Math.min(20, Math.max(0, (volumeRatio - 1) * 50));
+
+  // 0-20: breakout proximity / actual breakout confirmation.
+  const breakoutScore = analysis?.breakoutStatus === 'ABOVE_PIVOT'
+    ? 20
+    : analysis?.breakoutStatus === 'IN_BUY_ZONE'
+      ? 17
+      : pivotDistance <= 3 ? 14
+      : pivotDistance <= 5 ? 8
+      : 0;
+
+  return Math.round(Math.min(100, pivotScore + vcpScore + volumeScore + breakoutScore));
+}
+
 function configuredSymbols(): Array<{ exchange: 'NSE' | 'BSE' | 'MCX'; symbol: string }> {
   return (process.env.SCREENER_SYMBOLS || '').split(',').map(x => x.trim()).filter(Boolean).map(spec => {
     const parts = spec.split(':');
@@ -107,6 +146,8 @@ export class RealtimeMarketFeedService {
         last.close = tick.price; last.high = Math.max(last.high, tick.price); last.low = Math.min(last.low, tick.price); last.volume = Math.max(last.volume, tick.volume);
         const analysis = runMinerviniEngine({ ticker: tick.symbol, currentPrice: tick.price, priceHistory: next }, this.benchmark);
         screenerResult = buildTradeSetup(tick.symbol, tick.symbol, tick.exchange, next, analysis);
+        const adaptiveScore = adaptivePriorityScore(tick, next, analysis);
+        this.feed?.updatePriorityScore(key, adaptiveScore);
         this.histories.set(key, next);
         if (screenerResult) this.qualifying.set(key, screenerResult);
       }
