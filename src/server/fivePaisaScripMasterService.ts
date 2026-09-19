@@ -52,7 +52,7 @@ export class FivePaisaScripMasterService {
   }
 
   status() {
-    return { configured: true, filePath: this.filePath, count: this.cache.size, updatedAt: this.lastUpdatedAt, universeMode: (process.env.AUTO_UNIVERSE || 'true').toLowerCase() === 'true' ? 'FULL_NSE_BSE_CASH' : 'CONFIGURED_SYMBOLS' };
+    return { configured: true, filePath: this.filePath, count: this.cache.size, updatedAt: this.lastUpdatedAt, universeMode: (process.env.AUTO_UNIVERSE || 'true').toLowerCase() === 'true' ? 'FULL_NSE_BSE_CASH_MCX' : 'CONFIGURED_SYMBOLS' };
   }
 
   private key(exchange: string, symbol: string) { return `${exchange.toUpperCase()}:${symbol.trim().toUpperCase()}`; }
