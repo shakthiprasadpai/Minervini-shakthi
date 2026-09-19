@@ -5,6 +5,7 @@ import { GoogleGenAI } from '@google/genai';
 import { createBigulProvider, createXtsProvider, runMinerviniEngine, buildTradeSetup, backtestMinervini, rankRsRatings } from './src/engine';
 import { initDatabase, pool } from './src/db/database';
 import { RealtimeMarketFeedService } from './src/server/realtimeMarketFeed';
+import { startFivePaisaScripMaster, fivePaisaScripMaster } from './src/server/scripMasterScheduler';
 
 async function startServer() {
   const app = express();
@@ -14,7 +15,10 @@ async function startServer() {
 
   const getMarketDataProvider = () => process.env.MARKET_DATA_PROVIDER === 'xts' ? createXtsProvider() : createBigulProvider();
   const realtimeFeed = new RealtimeMarketFeedService();
-  if ((process.env.REALTIME_MARKET_PROVIDER || '').toLowerCase() === '5paisa') realtimeFeed.start();
+  if ((process.env.REALTIME_MARKET_PROVIDER || '').toLowerCase() === '5paisa') {
+    await startFivePaisaScripMaster();
+    await realtimeFeed.start();
+  }
 
   app.get('/api/health', async (_req, res) => {
     let database = 'disabled';
@@ -103,6 +107,7 @@ async function startServer() {
   });
 
   app.get('/api/market/realtime-status', (_req, res) => res.json({ provider: '5paisa', ...realtimeFeed.status() }));
+  app.post('/api/market/scrip-master/refresh', async (_req, res) => { try { const count = await fivePaisaScripMaster.refresh(); res.json({ ok: true, count, ...fivePaisaScripMaster.status() }); } catch (e: any) { res.status(503).json({ error: 'SCRIP_MASTER_REFRESH_FAILED', message: e?.message || String(e) }); } });
 
   app.get('/api/market/stream', (_req, res) => realtimeFeed.addClient(res));
 
