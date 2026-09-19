@@ -4,6 +4,7 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { createBigulProvider, createXtsProvider, runMinerviniEngine, buildTradeSetup, backtestMinervini, rankRsRatings } from './src/engine';
 import { initDatabase, pool } from './src/db/database';
+import { RealtimeMarketFeedService } from './src/server/realtimeMarketFeed';
 
 async function startServer() {
   const app = express();
@@ -12,6 +13,8 @@ async function startServer() {
   app.use(express.json());
 
   const getMarketDataProvider = () => process.env.MARKET_DATA_PROVIDER === 'xts' ? createXtsProvider() : createBigulProvider();
+  const realtimeFeed = new RealtimeMarketFeedService();
+  if ((process.env.REALTIME_MARKET_PROVIDER || '').toLowerCase() === '5paisa') realtimeFeed.start();
 
   app.get('/api/health', async (_req, res) => {
     let database = 'disabled';
@@ -98,6 +101,10 @@ async function startServer() {
       });
     }
   });
+
+  app.get('/api/market/realtime-status', (_req, res) => res.json({ provider: '5paisa', ...realtimeFeed.status() }));
+
+  app.get('/api/market/stream', (_req, res) => realtimeFeed.addClient(res));
 
   app.get('/api/market/status', (_req, res) => {
     res.json({
