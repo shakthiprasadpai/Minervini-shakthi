@@ -6,3 +6,5 @@ CREATE TABLE IF NOT EXISTS price_alerts(id BIGSERIAL PRIMARY KEY,ticker TEXT NOT
 CREATE TABLE IF NOT EXISTS screener_runs(id BIGSERIAL PRIMARY KEY,run_at TIMESTAMPTZ DEFAULT now(),universe_count INTEGER NOT NULL,result_count INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_trades_ticker ON trades(ticker);
 CREATE INDEX IF NOT EXISTS idx_holdings_ticker ON portfolio_holdings(ticker);
+
+ALTER TABLE portfolio_holdings ADD COLUMN IF NOT EXISTS stock_name TEXT;
