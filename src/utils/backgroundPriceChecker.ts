@@ -3,6 +3,8 @@ import { getCurrencySymbol } from './sepaCalculator';
 
 export const ALERTS_STORAGE_KEY = 'minervini_price_alerts';
 export const TRACKER_LOGS_KEY = 'minervini_price_tracker_logs';
+let alertsCache: PriceAlert[] = [];
+if (typeof window !== 'undefined') fetch('/api/alerts').then(r=>r.ok?r.json():[]).then(d=>{alertsCache=d; window.dispatchEvent(new CustomEvent('minervini_alerts_updated'));}).catch(()=>{});
 
 export interface BackgroundCheckLog {
   id: string;
@@ -17,84 +19,12 @@ export interface BackgroundCheckLog {
   triggered: boolean;
 }
 
-// Ensure default alerts exist in localStorage for initial stocks
+// Alerts are persisted by the backend database. Browser memory is only a short-lived UI cache.
 export function initializeLocalStorageAlerts(stocks: MinerviniTradeSetup[]): PriceAlert[] {
-  try {
-    const existing = localStorage.getItem(ALERTS_STORAGE_KEY);
-    if (existing) {
-      const parsed = JSON.parse(existing);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-  } catch (e) {
-    console.error('Failed to read price alerts from localStorage:', e);
-  }
-
-  // Create initial default pivot entry, stop loss, and VCP volatility dry-up alerts for provided stocks
-  const initialAlerts: PriceAlert[] = stocks.slice(0, 4).flatMap((stock) => [
-    {
-      id: `alert-${stock.ticker}-pivot-${Date.now()}`,
-      ticker: stock.ticker,
-      stockName: stock.name,
-      targetType: 'PIVOT_ENTRY',
-      targetPrice: stock.pivotPrice,
-      triggerProximityPercent: 1.5,
-      currentPrice: stock.currentPrice,
-      status: 'ACTIVE',
-      createdAt: new Date().toLocaleDateString(),
-      exchange: stock.exchange,
-      notes: `VCP Pivot Entry Breakout Target @ ${getCurrencySymbol(stock.exchange)}${stock.pivotPrice}`,
-    },
-    {
-      id: `alert-${stock.ticker}-stop-${Date.now()}`,
-      ticker: stock.ticker,
-      stockName: stock.name,
-      targetType: 'STOP_LOSS',
-      targetPrice: stock.stopLossPrice,
-      triggerProximityPercent: 1.0,
-      currentPrice: stock.currentPrice,
-      status: 'ACTIVE',
-      createdAt: new Date().toLocaleDateString(),
-      exchange: stock.exchange,
-      notes: `Hard Risk Stop Loss Level @ ${getCurrencySymbol(stock.exchange)}${stock.stopLossPrice}`,
-    },
-    {
-      id: `alert-${stock.ticker}-volatility-${Date.now()}`,
-      ticker: stock.ticker,
-      stockName: stock.name,
-      targetType: 'VOLATILITY_DRYUP',
-      targetPrice: stock.pivotPrice,
-      triggerProximityPercent: 1.5,
-      currentPrice: stock.currentPrice,
-      status: 'ACTIVE',
-      createdAt: new Date().toLocaleDateString(),
-      exchange: stock.exchange,
-      volatilityTightnessTargetPct: 5.0,
-      volatilityVolumeDryUpTargetPct: -50.0,
-      notes: `⚡ VCP Volatility Dry-Up Radar: Alert when 3-week price range tightens ≤ 5% with volume dry-up ≤ -50%`,
-    },
-  ]);
-
-  try {
-    localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(initialAlerts));
-  } catch (e) {
-    console.error('Failed to write initial alerts to localStorage:', e);
-  }
-
-  return initialAlerts;
+  if (alertsCache.length) return alertsCache;
+  return stocks.slice(0,4).map(stock => ({id:`alert-${stock.ticker}-pivot`,ticker:stock.ticker,stockName:stock.name,targetType:'PIVOT_ENTRY',targetPrice:stock.pivotPrice,triggerProximityPercent:1.5,currentPrice:stock.currentPrice,status:'ACTIVE',createdAt:new Date().toISOString(),exchange:stock.exchange,notes:'Backend-persisted pivot alert'}));
 }
-
-// Read current alerts from localStorage
-export function getStoredAlerts(): PriceAlert[] {
-  try {
-    const raw = localStorage.getItem(ALERTS_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    console.error(e);
-    return [];
-  }
-}
+export function getStoredAlerts(): PriceAlert[] { return alertsCache; }
 
 // Ensure user's portfolio holdings automatically have active alerts synced
 export function syncPortfolioAlerts(): PriceAlert[] {
@@ -166,13 +96,11 @@ export function syncPortfolioAlerts(): PriceAlert[] {
   }
 }
 
-// Save alerts array to localStorage
+// Save alerts through backend API; no browser database is used.
 export function saveStoredAlerts(alerts: PriceAlert[]): void {
-  try {
-    localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(alerts));
-  } catch (e) {
-    console.error(e);
-  }
+  alertsCache = alerts;
+  if (typeof window !== 'undefined') fetch('/api/alerts/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(alerts)}).catch(()=>{});
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('minervini_alerts_updated'));
 }
 
 // Read tracker logs
