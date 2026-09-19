@@ -456,6 +456,9 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
             <thead>
               <tr className="border-b border-[#e5e4e1] text-[10px] uppercase tracking-[0.2em] text-[#b5a68d] font-bold bg-[#f9f8f5]">
                 {renderSortHeader('Stock & Sector', 'TICKER')}
+                <th className="py-3 px-2.5 text-center">Signal</th>
+                <th className="py-3 px-2.5 text-center">Entry Δ</th>
+                <th className="py-3 px-2.5 text-center">Stop Δ</th>
                 {renderSortHeader('Price', 'PRICE')}
                 {renderSortHeader('Chg %', 'CHANGE_PERCENT')}
                 {renderSortHeader('RS Rating', 'RS_RATING', 'center')}
@@ -463,14 +466,12 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                 {renderSortHeader('200MA Trend', 'TREND_SLOPE', 'center')}
                 <th className="py-3 px-2.5">Pattern / Stage</th>
                 {renderSortHeader('VCP Heatmap', 'VCP_INTENSITY', 'center')}
-                <th className="py-3 px-2.5">Signal</th>
-                <th className="py-3 px-2.5">Entry Δ</th>
-                <th className="py-3 px-2.5">Stop Δ</th>
                 <th className="py-3 px-2.5">Pivot Entry</th>
                 <th className="py-3 px-2.5">Stop Loss</th>
                 <th className="py-3 px-2.5">Target (+20%)</th>
                 <th className="py-3 px-2.5 text-center">R/R</th>
-                <th className="py-3 px-2.5 text-right">Chart / Action</th>
+                <th className="py-3 px-2.5 text-center">Chart</th>
+                <th className="py-3 px-2.5 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-xs">
