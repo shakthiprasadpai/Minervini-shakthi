@@ -758,7 +758,6 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                             <span>Scan VCP</span>
                             <ChevronRight className="w-3.5 h-3.5" />
                           </button>
-                        </div>
                       </td>
 
                     </tr>
