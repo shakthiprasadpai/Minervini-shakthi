@@ -133,6 +133,14 @@ function getChartUrl(stock: MinerviniTradeSetup): string {
   return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(symbol)}`;
 }
 
+function getScreenerUrl(stock: MinerviniTradeSetup): string {
+  return `https://www.screener.in/company/${encodeURIComponent(stock.ticker)}/`;
+}
+
+function getChartinkUrl(stock: MinerviniTradeSetup): string {
+  return `https://chartink.com/stocks/${encodeURIComponent(stock.ticker)}.html`;
+}
+
 export const ScreenerTable: React.FC<ScreenerTableProps> = ({
   stocks,
   selectedTicker,
@@ -452,7 +460,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
         />
       ) : viewMode === 'table' ? (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1400px] text-left border-collapse">
+          <table className="w-full min-w-[1500px] text-left border-collapse">
             <thead>
               <tr className="border-b border-[#e5e4e1] text-[10px] uppercase tracking-[0.2em] text-[#b5a68d] font-bold bg-[#f9f8f5]">
                 {renderSortHeader('Stock & Sector', 'TICKER')}
@@ -471,6 +479,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                 <th className="py-3 px-2.5">Target (+20%)</th>
                 <th className="py-3 px-2.5 text-center">R/R</th>
                 <th className="py-3 px-2.5 text-center">Chart</th>
+                <th className="py-3 px-2.5 text-center">Screeners</th>
                 <th className="py-3 px-2.5 text-right">Action</th>
               </tr>
             </thead>
@@ -736,6 +745,34 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                           <ExternalLink className="w-3.5 h-3.5" />
                           Chart
                         </a>
+                      </td>
+
+                      {/* External screeners */}
+                      <td className="py-3.5 px-2.5 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <a
+                            href={getScreenerUrl(stock)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center justify-center rounded-md bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-2 py-1 text-[9px] uppercase tracking-wider border border-emerald-600 transition-colors"
+                            title={`Open ${stock.ticker} on Screener.in`}
+                            aria-label={`Open ${stock.ticker} on Screener.in`}
+                          >
+                            Screener.in
+                          </a>
+                          <a
+                            href={getChartinkUrl(stock)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center justify-center rounded-md bg-sky-500 hover:bg-sky-400 text-slate-950 font-black px-2 py-1 text-[9px] uppercase tracking-wider border border-sky-600 transition-colors"
+                            title={`Open ${stock.ticker} on Chartink`}
+                            aria-label={`Open ${stock.ticker} on Chartink`}
+                          >
+                            Chartink
+                          </a>
+                        </div>
                       </td>
 
                       {/* Action */}
