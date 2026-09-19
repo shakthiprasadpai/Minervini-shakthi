@@ -69,7 +69,7 @@ export class RealtimeMarketFeedService {
       }
       const payload = 'data: ' + JSON.stringify({ ...tick, screenerResult }) + '\\n\\n';
       for (const response of this.clients) response.write(payload);
-    });
+    }, connected => { this.connected = connected; });
     this.feed.connect();
     return true;
   }
