@@ -27,6 +27,7 @@ import { SectorStrengthView } from './components/SectorStrengthView';
 import { PatternVisualsLibrary } from './components/PatternVisualsLibrary';
 import { ExportTradeData } from './components/ExportTradeData';
 import { runtimeConfig } from './config/runtime';
+import { MOCK_STOCKS } from './data/mockStocks';
 import { MinerviniTradeSetup } from './types';
 import { formatCurrency, formatVolume, getCurrencySymbol, calculateBreakoutProbability } from './utils/sepaCalculator';
 import { TrendingUp, ShieldCheck, Target, Droplets, ArrowUpRight, Flame, BarChart3, Calculator, Sparkles, Gem } from 'lucide-react';
@@ -44,11 +45,42 @@ const EMPTY_STOCK: MinerviniTradeSetup = {
 export default function App() {
   const [stocksList, setStocksList] = useState<MinerviniTradeSetup[]>(runtimeConfig.demoMode ? MOCK_STOCKS : []);
   const [selectedStock, setSelectedStock] = useState<MinerviniTradeSetup | null>(runtimeConfig.demoMode ? MOCK_STOCKS[0] : null);
+  const [marketDataStatus, setMarketDataStatus] = useState<'LOADING' | 'LIVE' | 'UNAVAILABLE'>('LOADING');
   const [activeTab, setActiveTab] = useState<AppNavTab>('screener');
   const [isObsidian, setIsObsidian] = useState<boolean>(true); // Default to Obsidian Dark theme for luxury feel
 
   useEffect(() => {
-    fetch('/api/screener').then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); }).then(data => { const live=data.results||[]; setStocksList(live); if(live.length) setSelectedStock(live[0]); setMarketDataStatus('LIVE'); }).catch(() => setMarketDataStatus('UNAVAILABLE'));
+    const controller = new AbortController();
+    const loadLiveScreener = async () => {
+      try {
+        const response = await fetch(`${runtimeConfig.apiBaseUrl}/api/screener`, { signal: controller.signal });
+        if (!response.ok) throw new Error(await response.text());
+        const data = await response.json();
+        const live = Array.isArray(data.results) ? data.results : [];
+        if (live.length > 0) {
+          setStocksList(live);
+          setSelectedStock(current =>
+            current
+              ? live.find((x: MinerviniTradeSetup) => x.ticker === current.ticker && x.exchange === current.exchange) ?? live[0]
+              : live[0]
+          );
+          setMarketDataStatus('LIVE');
+        } else {
+          setMarketDataStatus('UNAVAILABLE');
+        }
+      } catch (error) {
+        if ((error as Error).name !== 'AbortError') {
+          console.error('Live screener unavailable:', error);
+          if (!runtimeConfig.demoMode) {
+            setStocksList([]);
+            setSelectedStock(null);
+          }
+          setMarketDataStatus('UNAVAILABLE');
+        }
+      }
+    };
+    loadLiveScreener();
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
