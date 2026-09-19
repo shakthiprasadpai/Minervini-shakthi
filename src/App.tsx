@@ -92,12 +92,11 @@ export default function App() {
   }, [runtimeConfig.apiBaseUrl, runtimeConfig.demoMode]);
 
   useEffect(() => {
-    if (!selectedStock || runtimeConfig.demoMode) return;
+    if (runtimeConfig.demoMode) return;
     const stream = new EventSource(`${runtimeConfig.apiBaseUrl}/api/market/stream`);
     stream.onmessage = event => {
       try {
         const tick = JSON.parse(event.data);
-        if (tick.exchange !== selectedStock.exchange || tick.symbol !== selectedStock.ticker) return;
         setStocksList(current => current.map(stock =>
           stock.exchange === tick.exchange && stock.ticker === tick.symbol
             ? (tick.screenerResult ? { ...tick.screenerResult } : { ...stock, currentPrice: tick.price, changePercent: tick.changePercent, pivotVolume: tick.volume })
@@ -117,7 +116,7 @@ export default function App() {
       // Keep the screener's last known values; the backend reconnects to 5paisa.
     };
     return () => stream.close();
-  }, [selectedStock?.ticker, selectedStock?.exchange, runtimeConfig.apiBaseUrl, runtimeConfig.demoMode]);
+  }, [runtimeConfig.apiBaseUrl, runtimeConfig.demoMode]);
 
   useEffect(() => {
     if (isObsidian) {
