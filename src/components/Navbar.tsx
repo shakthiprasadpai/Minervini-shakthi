@@ -43,14 +43,14 @@ export const Navbar: React.FC<NavbarProps> = ({
   realtimeStatus
 }) => {
   return (
-    <header className="bg-white/80 backdrop-blur-md border-b border-[#e5e4e1] text-[#1a1a1a] sticky top-0 z-40 shadow-xs transition-colors duration-300">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <header className="bg-[#080b10]/90 backdrop-blur-xl border-b border-white/10 text-white sticky top-0 z-40 shadow-2xl transition-colors duration-300">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           
           {/* Brand Logo & Editorial Title */}
           <div className="flex items-center space-x-3 cursor-pointer group" onClick={() => setActiveTab('screener')}>
             <div className={`w-10 h-10 flex items-center justify-center font-serif italic font-bold text-xl shadow-sm transition-transform group-hover:scale-105 ${
-              isObsidian ? 'bg-amber-500 text-black' : 'bg-[#1a1a1a] text-white'
+              isObsidian ? 'bg-gradient-to-br from-amber-300 to-amber-500 text-black' : 'bg-[#1a1a1a] text-white'
             }`}>
               α
             </div>
@@ -67,7 +67,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   Minervini SEPA
                 </span>
               </div>
-              <h1 className="text-xl sm:text-2xl font-serif italic font-black tracking-tight leading-none mt-0.5">
+              <h1 className="text-xl sm:text-2xl font-serif italic font-black tracking-tight leading-none mt-0.5 text-white">
                 Growth Stock Alpha
               </h1>
             </div>
@@ -75,10 +75,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Quick Metrics Badges & OBSIDIAN Toggle Button */}
           <div className="hidden lg:flex items-center space-x-4 text-[11px] font-mono">
-            <div className="bg-[#f9f8f5] border border-[#e5e4e1] px-3.5 py-1.5 flex items-center space-x-2">
+            <div className="bg-white/5 border border-white/10 rounded-xl px-3.5 py-1.5 flex items-center space-x-2">
               <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
-              <span className="text-gray-500 uppercase tracking-wider text-[10px] font-sans">Qualified Setups:</span>
-              <span className="font-bold text-[#1a1a1a]">{totalSetupsCount} Stocks</span>
+              <span className="text-slate-500 uppercase tracking-wider text-[10px] font-sans">Qualified Setups:</span>
+              <span className="font-bold text-white">{totalSetupsCount} Stocks</span>
             </div>
             <div className="bg-[#f9f8f5] border border-[#e5e4e1] px-3.5 py-1.5 flex items-center space-x-2">
               <span className="text-emerald-700 font-bold">💧 Dry-Up Volume:</span>
