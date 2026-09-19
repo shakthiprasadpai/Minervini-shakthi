@@ -34,6 +34,24 @@ async function startServer() {
     } catch(e:any) { res.status(503).json({ error:'MARKET_DATA_UNAVAILABLE', message:e?.message||String(e) }); }
   });
 
+  app.get('/api/portfolio', async (_req,res) => {
+    if(!pool) return res.status(503).json({error:'DATABASE_NOT_CONFIGURED'});
+    const r=await pool.query('SELECT id,ticker,stock_name AS "stockName",exchange,shares,entry_price AS "entryPrice",current_price AS "currentPrice",buy_date AS "buyDate",stop_loss_price AS "stopLossPrice",pivot_target_price AS "pivotTargetPrice",notes FROM portfolio_holdings ORDER BY id DESC');
+    res.json(r.rows);
+  });
+  app.post('/api/portfolio/sync', async (req,res) => {
+    if(!pool) return res.status(503).json({error:'DATABASE_NOT_CONFIGURED'});
+    const client=await pool.connect(); try { await client.query('BEGIN'); await client.query('DELETE FROM portfolio_holdings'); for(const h of (req.body||[])){await client.query('INSERT INTO portfolio_holdings(ticker,exchange,shares,entry_price,current_price,buy_date,stop_loss_price,pivot_target_price,notes) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[h.ticker,h.exchange,h.shares,h.entryPrice,h.currentPrice,h.buyDate,h.stopLossPrice,h.pivotTargetPrice,h.notes||null]);} await client.query('COMMIT'); res.json({ok:true}); } catch(e){await client.query('ROLLBACK'); res.status(500).json({error:'PORTFOLIO_SYNC_FAILED'});} finally{client.release();}
+  });
+  app.get('/api/journal', async (_req,res) => {
+    if(!pool) return res.status(503).json({error:'DATABASE_NOT_CONFIGURED'});
+    const r=await pool.query('SELECT id,ticker,exchange,opened_at AS date,entry_price AS "entryPrice",exit_price AS "exitPrice",notes,status AS "tradeStatus" FROM trades ORDER BY id DESC'); res.json(r.rows);
+  });
+  app.post('/api/journal/sync', async (req,res) => {
+    if(!pool) return res.status(503).json({error:'DATABASE_NOT_CONFIGURED'});
+    const client=await pool.connect(); try{await client.query('BEGIN'); await client.query('DELETE FROM trades'); for(const n of (req.body||[])){await client.query('INSERT INTO trades(ticker,exchange,side,quantity,entry_price,exit_price,pnl,status,opened_at,notes) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',[n.ticker,n.exchange,'BUY',1,n.entryPrice||null,n.exitPrice||null,null,n.tradeStatus||'PLANNING',n.date||new Date().toISOString(),n.notes||null]);} await client.query('COMMIT'); res.json({ok:true});}catch(e){await client.query('ROLLBACK');res.status(500).json({error:'JOURNAL_SYNC_FAILED'});}finally{client.release();}
+  });
+
   app.get('/api/quote/:exchange/:ticker', async (req,res) => {
     try { const provider=getMarketDataProvider(); const q=await provider.getQuote(req.params.ticker,req.params.exchange.toUpperCase() as 'NSE'|'BSE'); res.json(q); }
     catch(e:any){res.status(503).json({error:'MARKET_DATA_UNAVAILABLE',message:e?.message||String(e)});}
