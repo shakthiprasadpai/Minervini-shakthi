@@ -52,7 +52,7 @@ async function startServer() {
   });
   app.post('/api/portfolio/sync', async (req,res) => {
     if(!pool) return res.status(503).json({error:'DATABASE_NOT_CONFIGURED'});
-    const client=await pool.connect(); try { await client.query('BEGIN'); await client.query('DELETE FROM portfolio_holdings'); for(const h of (req.body||[])){await client.query('INSERT INTO portfolio_holdings(ticker,exchange,shares,entry_price,current_price,buy_date,stop_loss_price,pivot_target_price,notes) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[h.ticker,h.exchange,h.shares,h.entryPrice,h.currentPrice,h.buyDate,h.stopLossPrice,h.pivotTargetPrice,h.notes||null]);} await client.query('COMMIT'); res.json({ok:true}); } catch(e){await client.query('ROLLBACK'); res.status(500).json({error:'PORTFOLIO_SYNC_FAILED'});} finally{client.release();}
+    const client=await pool.connect(); try { await client.query('BEGIN'); await client.query('DELETE FROM portfolio_holdings'); for(const h of (req.body||[])){await client.query('INSERT INTO portfolio_holdings(ticker,stock_name,exchange,shares,entry_price,current_price,buy_date,stop_loss_price,pivot_target_price,notes) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[h.ticker,h.stockName||h.ticker,h.exchange,h.shares,h.entryPrice,h.currentPrice,h.buyDate,h.stopLossPrice,h.pivotTargetPrice,h.notes||null]);} await client.query('COMMIT'); res.json({ok:true}); } catch(e){await client.query('ROLLBACK'); res.status(500).json({error:'PORTFOLIO_SYNC_FAILED'});} finally{client.release();}
   });
   app.get('/api/journal', async (_req,res) => {
     if(!pool) return res.status(503).json({error:'DATABASE_NOT_CONFIGURED'});
