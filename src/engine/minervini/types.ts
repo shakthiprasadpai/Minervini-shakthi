@@ -8,6 +8,7 @@ export interface MinerviniEngineResult {
   stage: 'STAGE_2' | 'NOT_STAGE_2' | 'UNKNOWN';
   vcpDetected: boolean;
   vcpScore: number;
+  contractions?: import('../../types').VcpContraction[];
   volumeScore: number;
   breakoutStatus: 'ABOVE_PIVOT' | 'IN_BUY_ZONE' | 'BELOW_PIVOT' | 'NO_PIVOT';
   pivotPrice?: number;
