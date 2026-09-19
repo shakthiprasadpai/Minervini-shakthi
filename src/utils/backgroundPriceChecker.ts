@@ -27,74 +27,7 @@ export function initializeLocalStorageAlerts(stocks: MinerviniTradeSetup[]): Pri
 export function getStoredAlerts(): PriceAlert[] { return alertsCache; }
 
 // Ensure user's portfolio holdings automatically have active alerts synced
-export function syncPortfolioAlerts(): PriceAlert[] {
-  try {
-    const rawPortfolio = localStorage.getItem('minervini_sepa_portfolio');
-    if (!rawPortfolio) return getStoredAlerts();
-    const holdings = JSON.parse(rawPortfolio);
-    if (!Array.isArray(holdings) || holdings.length === 0) return getStoredAlerts();
-
-    const storedAlerts = getStoredAlerts();
-    let updated = [...storedAlerts];
-    let changed = false;
-
-    holdings.forEach((h: any) => {
-      // Check Pivot Target alert for holding
-      const hasPivotAlert = updated.some(
-        (a) => a.ticker === h.ticker && a.targetType === 'PIVOT_ENTRY' && Math.abs(a.targetPrice - h.pivotTargetPrice) < 0.01
-      );
-
-      if (!hasPivotAlert && h.pivotTargetPrice > 0) {
-        const newPivotAlert: PriceAlert = {
-          id: `alert-portfolio-${h.ticker}-pivot-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-          ticker: h.ticker,
-          stockName: h.stockName || h.ticker,
-          targetType: 'PIVOT_ENTRY',
-          targetPrice: h.pivotTargetPrice,
-          triggerProximityPercent: 1.5,
-          currentPrice: h.currentPrice || h.entryPrice,
-          status: 'ACTIVE',
-          createdAt: new Date().toLocaleDateString(),
-          exchange: h.exchange || 'NASDAQ',
-          notes: `💼 Portfolio Holding Pivot Target @ ${getCurrencySymbol(h.exchange)}${h.pivotTargetPrice}`,
-        };
-        updated.unshift(newPivotAlert);
-        changed = true;
-      }
-
-      // Check Stop Loss alert for holding
-      const hasStopAlert = updated.some(
-        (a) => a.ticker === h.ticker && a.targetType === 'STOP_LOSS' && Math.abs(a.targetPrice - h.stopLossPrice) < 0.01
-      );
-
-      if (!hasStopAlert && h.stopLossPrice > 0) {
-        const newStopAlert: PriceAlert = {
-          id: `alert-portfolio-${h.ticker}-stop-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-          ticker: h.ticker,
-          stockName: h.stockName || h.ticker,
-          targetType: 'STOP_LOSS',
-          targetPrice: h.stopLossPrice,
-          triggerProximityPercent: 1.0,
-          currentPrice: h.currentPrice || h.entryPrice,
-          status: 'ACTIVE',
-          createdAt: new Date().toLocaleDateString(),
-          exchange: h.exchange || 'NASDAQ',
-          notes: `💼 Portfolio Holding Stop Loss Level @ ${getCurrencySymbol(h.exchange)}${h.stopLossPrice}`,
-        };
-        updated.unshift(newStopAlert);
-        changed = true;
-      }
-    });
-
-    if (changed) {
-      saveStoredAlerts(updated);
-    }
-    return updated;
-  } catch (e) {
-    console.error('Failed to sync portfolio alerts:', e);
-    return getStoredAlerts();
-  }
-}
+export function syncPortfolioAlerts(): PriceAlert[] { return getStoredAlerts(); }
 
 // Save alerts through backend API; no browser database is used.
 export function saveStoredAlerts(alerts: PriceAlert[]): void {
