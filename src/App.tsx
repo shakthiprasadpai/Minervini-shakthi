@@ -69,6 +69,22 @@ export default function App() {
 
   const currencySymbol = selectedStock ? getCurrencySymbol(selectedStock?.exchange ?? 'NSE') : '₹';
 
+  if (!selectedStock) {
+    return (
+      <div className="min-h-screen bg-[#0b0d11] text-white flex items-center justify-center p-8">
+        <div className="max-w-xl text-center space-y-4">
+          <h1 className="text-3xl font-bold">Minervini Screener — Live Data Required</h1>
+          <p className="text-gray-300">
+            Demo data is disabled. Connect the market-data service and load an NSE/BSE stock before using the screener.
+          </p>
+          <p className="text-sm text-gray-400">
+            For local UI testing only, set VITE_DEMO_MODE=true.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`min-h-screen font-sans antialiased selection:bg-[#1a1a1a] selection:text-white pb-16 transition-colors duration-300 ${
       isObsidian ? 'bg-[#0b0d11] text-[#f1f5f9]' : 'bg-[#f9f8f5] text-[#1a1a1a]'
