@@ -154,217 +154,31 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
-          {/* Editorial Style Navigation Tabs */}
-          <nav className="flex items-center space-x-1 sm:space-x-6 text-[11px] uppercase tracking-widest font-semibold">
-            <button
-              id="nav-tab-screener"
-              onClick={() => setActiveTab('screener')}
-              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
-                activeTab === 'screener'
-                  ? 'border-[#1a1a1a] text-[#1a1a1a] font-bold'
-                  : 'border-transparent text-gray-500 hover:text-black hover:border-gray-300'
-              }`}
-            >
-              <BarChart3 className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Minervini Strategy</span>
-            </button>
-
-            <button
-              id="nav-tab-chart"
-              onClick={() => setActiveTab('chart')}
-              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
-                activeTab === 'chart'
-                  ? 'border-[#1a1a1a] text-[#1a1a1a] font-bold'
-                  : 'border-transparent text-gray-500 hover:text-black hover:border-gray-300'
-              }`}
-            >
-              <TrendingUp className="w-3.5 h-3.5" />
-              <span>VCP Scans ({selectedStockTicker})</span>
-            </button>
-
-            <button
-              id="nav-tab-calculator"
-              onClick={() => setActiveTab('calculator')}
-              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
-                activeTab === 'calculator'
-                  ? 'border-[#1a1a1a] text-[#1a1a1a] font-bold'
-                  : 'border-transparent text-gray-500 hover:text-black hover:border-gray-300'
-              }`}
-            >
-              <Calculator className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Trade Plan</span>
-            </button>
-
-            <button
-              id="nav-tab-portfolio"
-              onClick={() => setActiveTab('portfolio')}
-              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
-                activeTab === 'portfolio'
-                  ? 'border-[#1a1a1a] text-[#1a1a1a] font-bold'
-                  : 'border-transparent text-gray-500 hover:text-black hover:border-gray-300'
-              }`}
-            >
-              <Briefcase className="w-3.5 h-3.5" />
-              <span>My Portfolio</span>
-            </button>
-
-            <button
-              id="nav-tab-earnings"
-              onClick={() => setActiveTab('earnings')}
-              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
-                activeTab === 'earnings'
-                  ? 'border-[#1a1a1a] text-[#1a1a1a] font-bold'
-                  : 'border-transparent text-gray-500 hover:text-black hover:border-gray-300'
-              }`}
-            >
-              <Calendar className="w-3.5 h-3.5 text-amber-600" />
-              <span>Earnings Calendar</span>
-            </button>
-
-            <button
-              id="nav-tab-custom"
-              onClick={() => setActiveTab('custom')}
-              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
-                activeTab === 'custom'
-                  ? 'border-[#1a1a1a] text-[#1a1a1a] font-bold'
-                  : 'border-transparent text-gray-500 hover:text-black hover:border-gray-300'
-              }`}
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Scanner</span>
-            </button>
-
-            <button
-              id="nav-tab-playbook"
-              onClick={() => setActiveTab('playbook')}
-              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
-                activeTab === 'playbook'
-                  ? 'border-[#1a1a1a] text-[#1a1a1a] font-bold'
-                  : 'border-transparent text-gray-500 hover:text-black hover:border-gray-300'
-              }`}
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Playbook</span>
-            </button>
-
-            <button
-              id="nav-tab-masterclass"
-              onClick={() => setActiveTab('masterclass')}
-              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
-                activeTab === 'masterclass'
-                  ? 'border-[#1a1a1a] text-[#1a1a1a] font-bold'
-                  : 'border-transparent text-gray-500 hover:text-black hover:border-gray-300'
-              }`}
-            >
-              <Video className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="hidden sm:inline">3C Masterclass</span>
-            </button>
-
-            <button
-              id="nav-tab-obsidian"
-              onClick={() => setActiveTab('obsidian')}
-              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
-                activeTab === 'obsidian'
-                  ? 'border-amber-400 text-amber-500 font-bold'
-                  : 'border-transparent text-gray-500 hover:text-amber-500 hover:border-amber-300'
-              }`}
-            >
-              <Gem className="w-3.5 h-3.5 text-amber-500" />
-              <span className="hidden sm:inline font-bold">Obsidian Sync</span>
-            </button>
-
-            <button
-              id="nav-tab-pocket-pivot"
-              onClick={() => setActiveTab('pocket_pivot')}
-              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
-                activeTab === 'pocket_pivot'
-                  ? 'border-amber-400 text-amber-400 font-bold'
-                  : 'border-transparent text-gray-500 hover:text-amber-400 hover:border-amber-300'
-              }`}
-            >
-              <Zap className="w-3.5 h-3.5 text-amber-400" />
-              <span className="hidden sm:inline font-bold">Pocket Pivots</span>
-            </button>
-
-            <button
-              id="nav-tab-vcp-scanner"
-              onClick={() => setActiveTab('vcp_scanner')}
-              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
-                activeTab === 'vcp_scanner'
-                  ? 'border-amber-400 text-amber-400 font-bold'
-                  : 'border-transparent text-gray-500 hover:text-amber-400 hover:border-amber-300'
-              }`}
-            >
-              <Target className="w-3.5 h-3.5 text-amber-400" />
-              <span className="hidden sm:inline font-bold">VCP Scanner</span>
-            </button>
-
-            <button
-              id="nav-tab-journal"
-              onClick={() => setActiveTab('journal')}
-              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
-                activeTab === 'journal'
-                  ? 'border-[#1a1a1a] text-[#1a1a1a] font-bold'
-                  : 'border-transparent text-gray-500 hover:text-black hover:border-gray-300'
-              }`}
-            >
-              <BookMarked className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="font-bold">Trade Journal</span>
-            </button>
-
-            <button
-              id="nav-tab-sector-heatmap"
-              onClick={() => setActiveTab('sector_heatmap')}
-              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
-                activeTab === 'sector_heatmap'
-                  ? 'border-purple-500 text-purple-400 font-bold'
-                  : 'border-transparent text-gray-500 hover:text-purple-400 hover:border-purple-300'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5 text-purple-400" />
-              <span className="font-bold">Sector Heat Map</span>
-            </button>
-
-            <button
-              id="nav-tab-alert-history"
-              onClick={() => setActiveTab('alert_history')}
-              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
-                activeTab === 'alert_history'
-                  ? 'border-amber-400 text-amber-400 font-bold'
-                  : 'border-transparent text-gray-500 hover:text-amber-400 hover:border-amber-300'
-              }`}
-            >
-              <BellRing className="w-3.5 h-3.5 text-amber-400" />
-              <span className="font-bold">Price Alert History</span>
-            </button>
-
-            <button
-              id="nav-tab-pattern-library"
-              onClick={() => setActiveTab('pattern_library')}
-              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
-                activeTab === 'pattern_library'
-                  ? 'border-amber-400 text-amber-400 font-bold'
-                  : 'border-transparent text-gray-500 hover:text-amber-400 hover:border-amber-300'
-              }`}
-            >
-              <BookOpen className="w-3.5 h-3.5 text-amber-400" />
-              <span className="font-bold">Pattern Visuals Library</span>
-            </button>
-
-            <button
-              id="nav-tab-export-data"
-              onClick={() => setActiveTab('export_data')}
-              className={`flex items-center space-x-1.5 py-2 transition-all border-b-2 ${
-                activeTab === 'export_data'
-                  ? 'border-emerald-500 text-emerald-400 font-bold'
-                  : 'border-transparent text-gray-500 hover:text-emerald-400 hover:border-emerald-300'
-              }`}
-            >
-              <Download className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="font-bold">Export Trade Data</span>
-            </button>
+          {/* Command Center Buttons */}
+          <nav className="w-full mt-3 pb-3 overflow-x-auto">
+            <div className="flex min-w-max items-center gap-2">
+              {[
+                ['screener','📊','Screener'], ['chart','📈','VCP Chart'], ['calculator','🎯','Trade Plan'],
+                ['portfolio','💼','Portfolio'], ['earnings','📅','Earnings'], ['custom','⚙️','Scanner'],
+                ['playbook','📚','Playbook'], ['pocket_pivot','⚡','Pocket Pivot'], ['vcp_scanner','🔎','VCP Scanner'],
+                ['journal','📝','Journal'], ['sector_heatmap','🗺️','Sector Heatmap'], ['alert_history','🔔','Alerts'],
+                ['pattern_library','🧩','Patterns'], ['export_data','⬇️','Export']
+              ].map(([tab, icon, label]) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab as AppNavTab)}
+                  className={`group inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${
+                    activeTab === tab
+                      ? 'border-amber-400/60 bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/10'
+                      : 'border-white/10 bg-white/5 text-slate-300 hover:border-amber-400/40 hover:bg-amber-400/10 hover:text-amber-300'
+                  }`}
+                >
+                  <span className="text-sm">{icon}</span>
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
           </nav>
-
         </div>
       </div>
     </header>
