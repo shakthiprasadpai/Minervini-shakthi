@@ -43,12 +43,16 @@ export class FivePaisaScripMasterService {
     return this.cache.get(this.key(exchange, symbol));
   }
 
+  allCashInstruments(): FivePaisaScrip[] {
+    return Array.from(this.cache.values()).sort((a, b) => a.exchange.localeCompare(b.exchange) || a.symbol.localeCompare(b.symbol));
+  }
+
   findMany(instruments: Array<{ exchange: 'NSE' | 'BSE'; symbol: string }>): FivePaisaScrip[] {
     return instruments.map(x => this.get(x.exchange, x.symbol)).filter((x): x is FivePaisaScrip => Boolean(x));
   }
 
   status() {
-    return { configured: true, filePath: this.filePath, count: this.cache.size, updatedAt: this.lastUpdatedAt };
+    return { configured: true, filePath: this.filePath, count: this.cache.size, updatedAt: this.lastUpdatedAt, universeMode: (process.env.AUTO_UNIVERSE || 'true').toLowerCase() === 'true' ? 'FULL_NSE_BSE_CASH' : 'CONFIGURED_SYMBOLS' };
   }
 
   private key(exchange: string, symbol: string) { return `${exchange.toUpperCase()}:${symbol.trim().toUpperCase()}`; }
