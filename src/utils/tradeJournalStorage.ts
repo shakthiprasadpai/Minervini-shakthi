@@ -19,27 +19,18 @@ const DEFAULT_TRADE_GOALS: TradeGoals = {
   targetDisciplineScore: 4.5,
 };
 
-export function getStoredTradeGoals(): TradeGoals {
-  try {
-    const raw = localStorage.getItem(STORAGE_GOALS_KEY);
-    if (!raw) {
-      localStorage.setItem(STORAGE_GOALS_KEY, JSON.stringify(DEFAULT_TRADE_GOALS));
-      return DEFAULT_TRADE_GOALS;
-    }
-    return JSON.parse(raw);
-  } catch (err) {
-    console.error('Error reading trade goals from localStorage:', err);
-    return DEFAULT_TRADE_GOALS;
-  }
+let tradeGoalsCache: TradeGoals = DEFAULT_TRADE_GOALS;
+let journalCache: TradeJournalNote[] = [];
+let hydrated = false;
+
+if (typeof window !== 'undefined') {
+  fetch('/api/journal').then(r => r.ok ? r.json() : []).then(data => { journalCache = data; hydrated = true; window.dispatchEvent(new CustomEvent('minervini_journal_updated')); }).catch(()=>{});
 }
 
+export function getStoredTradeGoals(): TradeGoals { return tradeGoalsCache; }
 export function saveStoredTradeGoals(goals: TradeGoals): void {
-  try {
-    localStorage.setItem(STORAGE_GOALS_KEY, JSON.stringify(goals));
-    window.dispatchEvent(new CustomEvent('minervini_goals_updated'));
-  } catch (err) {
-    console.error('Error saving trade goals to localStorage:', err);
-  }
+  tradeGoalsCache = goals;
+  window.dispatchEvent(new CustomEvent('minervini_goals_updated'));
 }
 
 const INITIAL_JOURNAL_NOTES: TradeJournalNote[] = [
@@ -103,26 +94,13 @@ const INITIAL_JOURNAL_NOTES: TradeJournalNote[] = [
   }
 ];
 
-export function getStoredJournalNotes(): TradeJournalNote[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(INITIAL_JOURNAL_NOTES));
-      return INITIAL_JOURNAL_NOTES;
-    }
-    return JSON.parse(raw);
-  } catch (err) {
-    console.error('Error reading journal notes from localStorage:', err);
-    return INITIAL_JOURNAL_NOTES;
-  }
-}
+export function getStoredJournalNotes(): TradeJournalNote[] { return journalCache; }
 
 export function saveStoredJournalNotes(notes: TradeJournalNote[]): void {
-  try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(notes));
+  journalCache = notes;
+  if (typeof window !== 'undefined') {
+    fetch('/api/journal/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(notes)}).catch(()=>{});
     window.dispatchEvent(new CustomEvent('minervini_journal_updated'));
-  } catch (err) {
-    console.error('Error saving journal notes to localStorage:', err);
   }
 }
 
