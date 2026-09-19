@@ -6,10 +6,10 @@ import { fivePaisaAuth } from './fivePaisaAuthService';
 import { createBigulProvider, createXtsProvider, runMinerviniEngine, buildTradeSetup } from '../engine';
 import type { PricePoint } from '../types';
 
-function configuredSymbols(): Array<{ exchange: 'NSE' | 'BSE'; symbol: string }> {
+function configuredSymbols(): Array<{ exchange: 'NSE' | 'BSE' | 'MCX'; symbol: string }> {
   return (process.env.SCREENER_SYMBOLS || '').split(',').map(x => x.trim()).filter(Boolean).map(spec => {
     const parts = spec.split(':');
-    const exchange = (/^(NSE|BSE)$/i.test(parts[0]) ? parts[0] : 'NSE').toUpperCase() as 'NSE' | 'BSE';
+    const exchange = (/^(NSE|BSE|MCX)$/i.test(parts[0]) ? parts[0] : 'NSE').toUpperCase() as 'NSE' | 'BSE' | 'MCX';
     return { exchange, symbol: (/^(NSE|BSE)$/i.test(parts[0]) ? parts.slice(1).join(':') : spec).trim() };
   }).filter(x => x.symbol);
 }
@@ -23,7 +23,7 @@ export class RealtimeMarketFeedService {
   private histories = new Map<string, PricePoint[]>();
   private benchmark: PricePoint[] | undefined;
   private loadingHistories = new Set<string>();
-  private universeCandidates = new Map<string, { exchange: 'NSE' | 'BSE'; symbol: string }>();
+  private universeCandidates = new Map<string, { exchange: 'NSE' | 'BSE' | 'MCX'; symbol: string }>();
   private qualifying = new Map<string, any>();
   private static readonly MIN_PRICE = Number(process.env.MIN_UNIVERSE_PRICE || 20);
   private static readonly MIN_LIQUIDITY = Number(process.env.MIN_UNIVERSE_MIN_LIQUIDITY || 1000000);
@@ -37,7 +37,7 @@ export class RealtimeMarketFeedService {
     if (raw && raw !== '[]') {
       try { instruments = JSON.parse(raw); } catch { throw new Error('FIVEPAISA_INSTRUMENTS_JSON must be valid JSON'); }
     } else if ((process.env.AUTO_UNIVERSE || 'true').toLowerCase() === 'true') {
-      const mapped = fivePaisaScripMaster.allCashInstruments();
+      const mapped = fivePaisaScripMaster.allAutoInstruments();
       instruments = mapped.map(x => ({ exchange: x.exchange, exchangeType: x.exchangeType, scripCode: x.scripCode, symbol: x.symbol }));
     } else {
       const mapped = fivePaisaScripMaster.findMany(configuredSymbols());
