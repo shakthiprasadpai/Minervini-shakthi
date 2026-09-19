@@ -159,7 +159,7 @@ export interface PortfolioHolding {
   id: string;
   ticker: string;
   stockName: string;
-  exchange: 'NASDAQ' | 'NYSE' | 'NSE' | 'BSE';
+  exchange: 'NASDAQ' | 'NYSE' | 'NSE' | 'BSE' | 'MCX';
   shares: number;
   entryPrice: number;
   currentPrice: number;
@@ -180,7 +180,7 @@ export interface TradeJournalNote {
   id: string;
   ticker: string;
   stockName: string;
-  exchange: 'NASDAQ' | 'NYSE' | 'NSE' | 'BSE';
+  exchange: 'NASDAQ' | 'NYSE' | 'NSE' | 'BSE' | 'MCX';
   date: string;
   setupType: string;
   entryPrice?: number;
