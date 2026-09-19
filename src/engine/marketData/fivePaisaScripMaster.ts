@@ -2,7 +2,7 @@ import { request } from 'node:https';
 import { request as httpRequest } from 'node:http';
 
 export interface FivePaisaScrip {
-  exchange: 'NSE' | 'BSE';
+  exchange: 'NSE' | 'BSE' | 'MCX';
   exchangeType: 'C' | 'D' | 'U';
   scripCode: number;
   symbol: string;
@@ -85,11 +85,11 @@ export function parseFivePaisaScripMaster(text: string): FivePaisaScrip[] {
   const result: FivePaisaScrip[] = [];
   for (const row of rows) {
     const exchRaw = String(value(row, 'Exch', 'Exchange') ?? '').toUpperCase();
-    const exchange = exchRaw === 'N' || exchRaw === 'NSE' ? 'NSE' : exchRaw === 'B' || exchRaw === 'BSE' ? 'BSE' : null;
+    const exchange = exchRaw === 'N' || exchRaw === 'NSE' ? 'NSE' : exchRaw === 'B' || exchRaw === 'BSE' ? 'BSE' : exchRaw === 'M' || exchRaw === 'MCX' ? 'MCX' : null;
     const exchangeType = String(value(row, 'ExchType', 'ExchangeType') ?? '').toUpperCase();
     const code = Number(value(row, 'ScripCode', 'Scrip', 'ScripCodeId'));
     const symbol = String(value(row, 'Symbol', 'Name', 'ScripName', 'ShortName') ?? '').trim().toUpperCase();
-    if (!exchange || exchangeType !== 'C' || !Number.isFinite(code) || !symbol) continue;
+    if (!exchange || !((exchange === 'MCX' && exchangeType === 'D') || ((exchange === 'NSE' || exchange === 'BSE') && exchangeType === 'C')) || !Number.isFinite(code) || !symbol) continue;
     result.push({
       exchange,
       exchangeType: 'C',
