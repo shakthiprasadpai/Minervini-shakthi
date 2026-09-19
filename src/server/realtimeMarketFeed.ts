@@ -2,6 +2,7 @@ import type { Response } from 'express';
 import { FivePaisaMarketFeed, type FivePaisaInstrument } from '../engine/marketData/providers/fivePaisaWebSocket';
 import type { MarketTick } from '../engine/marketData/realtimeTypes';
 import { fivePaisaScripMaster } from './scripMasterScheduler';
+import { fivePaisaAuth } from './fivePaisaAuthService';
 
 function configuredSymbols(): Array<{ exchange: 'NSE' | 'BSE'; symbol: string }> {
   return (process.env.SCREENER_SYMBOLS || '').split(',').map(x => x.trim()).filter(Boolean).map(spec => {
@@ -19,8 +20,8 @@ export class RealtimeMarketFeedService {
   private instrumentCount = 0;
 
   async start() {
-    const accessToken = process.env.FIVEPAISA_ACCESS_TOKEN;
-    const clientCode = process.env.FIVEPAISA_CLIENT_CODE;
+    const accessToken = fivePaisaAuth.getAccessToken() || process.env.FIVEPAISA_ACCESS_TOKEN;
+    const clientCode = fivePaisaAuth.getClientCode() || process.env.FIVEPAISA_CLIENT_CODE;
     if (!accessToken || !clientCode) return false;
     let instruments: FivePaisaInstrument[] = [];
     const raw = process.env.FIVEPAISA_INSTRUMENTS_JSON;
@@ -48,7 +49,7 @@ export class RealtimeMarketFeedService {
   }
 
   status() {
-    return { configured: Boolean(process.env.FIVEPAISA_ACCESS_TOKEN && process.env.FIVEPAISA_CLIENT_CODE), connected: this.connected, instruments: this.instrumentCount, liveTicks: this.latest.size, scripMaster: fivePaisaScripMaster.status() };
+    return { configured: Boolean(fivePaisaAuth.getAccessToken() || (process.env.FIVEPAISA_ACCESS_TOKEN && process.env.FIVEPAISA_CLIENT_CODE)), auth: fivePaisaAuth.status(), connected: this.connected, instruments: this.instrumentCount, liveTicks: this.latest.size, scripMaster: fivePaisaScripMaster.status() };
   }
 
   addClient(response: Response) {
