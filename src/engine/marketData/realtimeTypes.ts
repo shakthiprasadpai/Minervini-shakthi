@@ -1,5 +1,5 @@
 export interface MarketTick {
-  exchange: 'NSE' | 'BSE';
+  exchange: 'NSE' | 'BSE' | 'MCX';
   symbol: string;
   scripCode: number;
   price: number;
