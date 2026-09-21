@@ -187,6 +187,19 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
     stop: stock.stopLossPrice,
   });
 
+  // ATR-based trailing stop: never loosens the original stop and only trails upward.
+  // The UI uses the current ATR already available in the screener data/calculator.
+  const getTrailingStop = (stock: MinerviniTradeSetup): { price: number; atr: number; multiple: number } => {
+    const atr = stock.atr14 && stock.atr14 > 0 ? stock.atr14 : calculateDailyVolatilityMetrics(stock).atr14;
+    const multiple = 2;
+    const atrTrail = stock.currentPrice > 0 && atr > 0 ? stock.currentPrice - multiple * atr : stock.stopLossPrice;
+    return {
+      price: Math.max(stock.stopLossPrice, atrTrail),
+      atr,
+      multiple,
+    };
+  };
+
   const handleSort = (field: SortField) => {
     if (sortBy === field) {
       setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
@@ -477,7 +490,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
         />
       ) : viewMode === 'table' ? (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1800px] text-left border-collapse">
+          <table className="w-full min-w-[2000px] text-left border-collapse">
             <thead>
               <tr className="border-b border-[#e5e4e1] text-[10px] uppercase tracking-[0.2em] text-[#b5a68d] font-bold bg-[#f9f8f5]">
                 {renderSortHeader('Stock & Sector', 'TICKER')}
@@ -496,6 +509,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                 <th className="py-3 px-2.5 text-center">Exit</th>
                 <th className="py-3 px-2.5 text-center">Hold Days</th>
                 <th className="py-3 px-2.5">Stop Loss</th>
+                <th className="py-3 px-2.5 text-center">Trailing SL</th>
                 <th className="py-3 px-2.5">Target (+20%)</th>
                 <th className="py-3 px-2.5 text-center">R/R</th>
                 <th className="py-3 px-2.5 text-center">Chart</th>
@@ -518,6 +532,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                   const trendMeter = calculateTrendStrengthMeter(stock);
                   const holdingDays = getHoldingDays(stock);
                   const exitPlan = getExitPlan(stock);
+                  const trailingStop = getTrailingStop(stock);
 
                   return (
                     <tr
@@ -752,6 +767,13 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                         <div className="text-[10px] text-red-700/80">
                           -{stock.stopLossPercent.toFixed(1)}% Stop
                         </div>
+                      </td>
+
+                      {/* ATR Trailing Stop */}
+                      <td className="py-3.5 px-2.5 text-center font-mono">
+                        <div className="font-bold text-orange-300">{formatCurrency(trailingStop.price, currency)}</div>
+                        <div className="text-[10px] text-gray-500">2× ATR ({formatCurrency(trailingStop.atr, currency)})</div>
+                        <div className="text-[9px] text-orange-400/80">ratchets upward</div>
                       </td>
 
                       {/* Profit Target 1 */}
