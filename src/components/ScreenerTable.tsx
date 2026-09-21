@@ -187,22 +187,63 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
     stop: stock.stopLossPrice,
   });
 
-  // ATR trailing stop: anchor the trail to the highest recorded price so it never
-  // moves lower just because the current price pulls back.
-  const getTrailingStop = (stock: MinerviniTradeSetup): { price: number; atr: number; multiple: number; anchor: number } => {
-    const atr = stock.atr14 && stock.atr14 > 0 ? stock.atr14 : calculateDailyVolatilityMetrics(stock).atr14;
-    const multiple = 2;
+  // Adaptive ATR trailing stop:
+  // - VCP stage controls the base trail width.
+  // - ATR as % of price widens/narrows the trail for the stock's current volatility.
+  // - The high-water mark prevents the trail from moving lower on a pullback.
+  const getTrailingStop = (stock: MinerviniTradeSetup): {
+    price: number;
+    atr: number;
+    multiple: number;
+    anchor: number;
+    atrPercent: number;
+  } => {
+    const volCalc = calculateDailyVolatilityMetrics(stock);
+    const atr = stock.atr14 && stock.atr14 > 0 ? stock.atr14 : volCalc.atr14;
+    const atrPercent = stock.currentPrice > 0 && atr > 0
+      ? (atr / stock.currentPrice) * 100
+      : volCalc.atr14Percent;
+
+    let multiple: number;
+    switch (stock.vcpStage) {
+      case 'Breakout Pending':
+        multiple = 1.5;
+        break;
+      case 'Active Breakout':
+        multiple = 2;
+        break;
+      case 'T4':
+        multiple = 2;
+        break;
+      case 'T3':
+        multiple = 2.5;
+        break;
+      case 'T2':
+      default:
+        multiple = 2.5;
+        break;
+    }
+
+    // Volatility adjustment: tighter for calm stocks, wider for volatile stocks.
+    if (atrPercent > 5) {
+      multiple = Math.min(2.5, multiple + 0.5);
+    } else if (atrPercent > 0 && atrPercent <= 2.5) {
+      multiple = Math.max(1.5, multiple - 0.5);
+    }
+
     const historyHigh = stock.priceHistory.reduce(
       (highest, point) => Math.max(highest, point.high || point.close || 0),
       0
     );
     const anchor = Math.max(stock.currentPrice || 0, historyHigh);
     const atrTrail = anchor > 0 && atr > 0 ? anchor - multiple * atr : stock.stopLossPrice;
+
     return {
       price: Math.max(stock.stopLossPrice, atrTrail),
       atr,
       multiple,
       anchor,
+      atrPercent,
     };
   };
 
