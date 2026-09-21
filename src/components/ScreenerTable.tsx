@@ -187,16 +187,22 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
     stop: stock.stopLossPrice,
   });
 
-  // ATR-based trailing stop: never loosens the original stop and only trails upward.
-  // The UI uses the current ATR already available in the screener data/calculator.
-  const getTrailingStop = (stock: MinerviniTradeSetup): { price: number; atr: number; multiple: number } => {
+  // ATR trailing stop: anchor the trail to the highest recorded price so it never
+  // moves lower just because the current price pulls back.
+  const getTrailingStop = (stock: MinerviniTradeSetup): { price: number; atr: number; multiple: number; anchor: number } => {
     const atr = stock.atr14 && stock.atr14 > 0 ? stock.atr14 : calculateDailyVolatilityMetrics(stock).atr14;
     const multiple = 2;
-    const atrTrail = stock.currentPrice > 0 && atr > 0 ? stock.currentPrice - multiple * atr : stock.stopLossPrice;
+    const historyHigh = stock.priceHistory.reduce(
+      (highest, point) => Math.max(highest, point.high || point.close || 0),
+      0
+    );
+    const anchor = Math.max(stock.currentPrice || 0, historyHigh);
+    const atrTrail = anchor > 0 && atr > 0 ? anchor - multiple * atr : stock.stopLossPrice;
     return {
       price: Math.max(stock.stopLossPrice, atrTrail),
       atr,
       multiple,
+      anchor,
     };
   };
 
@@ -773,7 +779,7 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                       <td className="py-3.5 px-2.5 text-center font-mono">
                         <div className="font-bold text-orange-300">{formatCurrency(trailingStop.price, currency)}</div>
                         <div className="text-[10px] text-gray-500">2× ATR ({formatCurrency(trailingStop.atr, currency)})</div>
-                        <div className="text-[9px] text-orange-400/80">ratchets upward</div>
+                        <div className="text-[9px] text-orange-400/80">High-water mark: {formatCurrency(trailingStop.anchor, currency)}</div>
                       </td>
 
                       {/* Profit Target 1 */}
