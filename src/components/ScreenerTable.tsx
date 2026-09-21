@@ -819,8 +819,8 @@ export const ScreenerTable: React.FC<ScreenerTableProps> = ({
                       {/* ATR Trailing Stop */}
                       <td className="py-3.5 px-2.5 text-center font-mono">
                         <div className="font-bold text-orange-300">{formatCurrency(trailingStop.price, currency)}</div>
-                        <div className="text-[10px] text-gray-500">2× ATR ({formatCurrency(trailingStop.atr, currency)})</div>
-                        <div className="text-[9px] text-orange-400/80">High-water mark: {formatCurrency(trailingStop.anchor, currency)}</div>
+                        <div className="text-[10px] text-gray-500">{trailingStop.multiple.toFixed(1)}× ATR ({formatCurrency(trailingStop.atr, currency)})</div>
+                        <div className="text-[9px] text-orange-400/80">ATR: {trailingStop.atrPercent.toFixed(1)}% • High-water mark: {formatCurrency(trailingStop.anchor, currency)}</div>
                       </td>
 
                       {/* Profit Target 1 */}
