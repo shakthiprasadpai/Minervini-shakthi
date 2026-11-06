@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "chartink": {
+      "command": "/absolute/path/to/Minervini-shakthi/chartink-mcp/.venv/bin/python",
+      "args": ["/absolute/path/to/Minervini-shakthi/chartink-mcp/server.py"]
+    }
+  }
+}
