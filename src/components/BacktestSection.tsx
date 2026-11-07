@@ -77,7 +77,7 @@ export const BacktestSection: React.FC<{ apiBaseUrl: string; stocks: MinerviniTr
       setResult(body); setRanFor(t);
     } catch (err: any) {
       setResult(null);
-      setError(`Could not run the backtest. ${err?.message || ''} Sign in to 5paisa first if prices are not loading.`.trim());
+      setError(`Could not run the backtest. ${err?.message || 'The server did not answer.'} Backtests read daily history from the market data provider set in .env (MARKET_DATA_PROVIDER), not from the 5paisa sign-in.`);
     } finally { setBusy(false); }
   };
 
