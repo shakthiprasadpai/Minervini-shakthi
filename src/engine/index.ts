@@ -13,4 +13,5 @@ export * from './backtest/backtestEngine';
 export * from './risk/positionSizer';
 
 export * from './marketData/xtsProvider';
+export * from './marketData/fivePaisaProvider';
 export * from './minervini/setupBuilder';
