@@ -1,9 +1,14 @@
 import { PricePoint } from '../../types';
+import { averageVolume, highestHigh } from './indicators';
 
-export function detectBreakout(candles: PricePoint[]) {
-  if (candles.length < 21) return { breakout: false, pivotPrice: null as number|null };
-  const current = candles[candles.length-1], prior = candles.slice(-21,-1);
-  const pivotPrice = Math.max(...prior.map(c=>c.high));
-  const avgVolume = prior.reduce((s,c)=>s+c.volume,0)/prior.length;
-  return { breakout: current.close > pivotPrice && current.volume >= avgVolume*1.4, pivotPrice };
+export const BREAKOUT_VOLUME_MULTIPLE = 1.4;
+
+/** Close above the pivot on volume >= 1.4x the prior 20-day average. Pass the VCP pivot when known. */
+export function detectBreakout(candles: PricePoint[], pivotOverride?: number | null) {
+  if (candles.length < 21) return { breakout: false, pivotPrice: (pivotOverride ?? null) as number | null, volumeRatio: 0 };
+  const last = candles.length - 1, current = candles[last];
+  const pivotPrice = pivotOverride ?? highestHigh(candles, last - 20, last - 1);
+  const avgVolume = averageVolume(candles, last - 20, last - 1);
+  const volumeRatio = avgVolume > 0 ? current.volume / avgVolume : 0;
+  return { breakout: current.close > pivotPrice && volumeRatio >= BREAKOUT_VOLUME_MULTIPLE, pivotPrice, volumeRatio };
 }

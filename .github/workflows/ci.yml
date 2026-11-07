@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   validate:
-    name: Lint and Build
+    name: Lint, Test and Build
     runs-on: ubuntu-latest
 
     steps:
@@ -24,13 +24,19 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
-      - name: Install dependencies
-        run: npm install
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
 
       - name: TypeScript lint
         run: npm run lint
+
+      - name: Engine tests
+        run: npm test
 
       - name: Production build
         run: npm run build
