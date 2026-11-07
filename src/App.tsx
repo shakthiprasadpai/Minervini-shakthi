@@ -26,6 +26,7 @@ import { BreakoutProbabilityEngine } from './components/BreakoutProbabilityEngin
 import { SectorStrengthView } from './components/SectorStrengthView';
 import { PatternVisualsLibrary } from './components/PatternVisualsLibrary';
 import { ExportTradeData } from './components/ExportTradeData';
+import { StageScanner } from './components/StageScanner';
 import { runtimeConfig } from './config/runtime';
 import { MOCK_STOCKS } from './data/mockStocks';
 import { MinerviniTradeSetup } from './types';
@@ -244,7 +245,7 @@ export default function App() {
         </div>
 
         {/* Trading Command Center */}
-        <section className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+        <section className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-3">
           {[
             ['screener','📊','LIVE SCREENER','Scan NSE/BSE/MCX'],
             ['chart','📈','VCP RADAR','Patterns & charts'],
@@ -253,6 +254,7 @@ export default function App() {
             ['sector_heatmap','🗺️','SECTORS','Strength heatmap'],
             ['pocket_pivot','⚡','BREAKOUT','Pocket pivots'],
             ['vcp_scanner','🔎','VCP SCANNER','Contractions'],
+            ['stage_scan','🐻','STAGE SCAN','Stage 2 and bear'],
             ['alert_history','🔔','ALERTS','Live notifications'],
           ].map(([tab, icon, title, sub]) => (
             <button key={tab} onClick={() => setActiveTab(tab as AppNavTab)}
@@ -626,6 +628,26 @@ export default function App() {
               <VcpPatternScanner
                 stocks={stocksList}
                 onSelectStock={(stock) => setSelectedStock(stock)}
+                onViewChart={(stock) => {
+                  setSelectedStock(stock);
+                  setActiveTab('chart');
+                }}
+              />
+            </motion.div>
+          )}
+
+          {/* TAB: STAGE SCAN */}
+          {activeTab === 'stage_scan' && (
+            <motion.div
+              key="stage_scan"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="space-y-8"
+            >
+              <StageScanner
+                stocks={stocksList}
                 onViewChart={(stock) => {
                   setSelectedStock(stock);
                   setActiveTab('chart');

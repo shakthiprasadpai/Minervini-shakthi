@@ -15,6 +15,7 @@ export type AppNavTab =
   | 'obsidian' 
   | 'pocket_pivot' 
   | 'vcp_scanner' 
+  | 'stage_scan'
   | 'journal'
   | 'sector_heatmap'
   | 'alert_history'
@@ -161,7 +162,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               {[
                 ['dashboard','🏠','Dashboard'], ['screener','📊','Screener'], ['chart','📈','VCP Chart'], ['calculator','🎯','Trade Plan'],
                 ['portfolio','💼','Portfolio'], ['earnings','📅','Earnings'], ['custom','⚙️','Scanner'],
-                ['playbook','📚','Playbook'], ['pocket_pivot','⚡','Pocket Pivot'], ['vcp_scanner','🔎','VCP Scanner'],
+                ['playbook','📚','Playbook'], ['pocket_pivot','⚡','Pocket Pivot'], ['vcp_scanner','🔎','VCP Scanner'], ['stage_scan','🐻','Stage Scan'],
                 ['journal','📝','Journal'], ['sector_heatmap','🗺️','Sector Heatmap'], ['alert_history','🔔','Alerts'],
                 ['pattern_library','🧩','Patterns'], ['export_data','⬇️','Export']
               ].map(([tab, icon, label]) => (
