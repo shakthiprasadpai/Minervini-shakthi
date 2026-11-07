@@ -392,7 +392,11 @@ Provide 4 to 6 accurate, realistic, high-signal financial headlines. Return ONLY
       });
     }  });
 
-  await initDatabase();
+  try { await initDatabase(); }
+  catch (e: any) {
+    // The database is optional: a missing or unreachable one must not stop the screener from starting.
+    console.warn(`Database unavailable (${e?.code || e?.message || e}). Starting without it; saved portfolio, alerts and journal will not sync. Clear DATABASE_URL in .env to silence this.`);
+  }
 
   // Vite middleware setup
   if (process.env.NODE_ENV !== 'production') {
