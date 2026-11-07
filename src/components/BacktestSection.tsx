@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Loader2, Play } from 'lucide-react';
 import { MinerviniTradeSetup } from '../types';
 import { equityCurve, backtestVerdict } from '../utils/dashboardMetrics';
+import { saveToObsidian, summarizeSave } from './ObsidianPanel';
 import { formatCurrency, getCurrencySymbol } from '../utils/sepaCalculator';
 
 interface Trade {
@@ -55,6 +56,7 @@ export const BacktestSection: React.FC<{ apiBaseUrl: string; stocks: MinerviniTr
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [ranFor, setRanFor] = useState('');
+  const [saveMsg, setSaveMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const suggestions = useMemo(() => stocks.slice(0, 200).map(s => s.ticker), [stocks]);
   const sym = getCurrencySymbol(exchange);
@@ -74,11 +76,18 @@ export const BacktestSection: React.FC<{ apiBaseUrl: string; stocks: MinerviniTr
       });
       const body = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(body?.message || `Server answered ${r.status}`);
-      setResult(body); setRanFor(t);
+      setResult(body); setRanFor(t); setSaveMsg(null);
     } catch (err: any) {
       setResult(null);
       setError(`Could not run the backtest. ${err?.message || 'The server did not answer.'} Backtests read daily history from the market data provider set in .env (MARKET_DATA_PROVIDER), not from the 5paisa sign-in.`);
     } finally { setBusy(false); }
+  };
+
+  const saveNote = async () => {
+    if (!result) return;
+    setSaveMsg(null);
+    try { setSaveMsg({ ok: true, text: summarizeSave(await saveToObsidian(apiBaseUrl, { kind: 'backtest', ticker: ranFor, result: { ...result, ticker: ranFor, trades: result.trades.slice(-200) } })) }); }
+    catch (e: any) { setSaveMsg({ ok: false, text: `Could not save. ${e?.message || ''}`.trim() }); }
   };
 
   return (
@@ -176,6 +185,10 @@ export const BacktestSection: React.FC<{ apiBaseUrl: string; stocks: MinerviniTr
               {result.trades.length > 25 && <p className="mt-2 text-xs text-slate-500">Showing the latest 25 of {result.trades.length} trades.</p>}
             </div>
           )}
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button type="button" onClick={saveNote} className="rounded-lg border border-white/15 bg-white/[0.04] px-4 py-2 text-sm text-slate-100 transition hover:bg-white/[0.09] focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400">Save to Obsidian</button>
+            {saveMsg && <span role={saveMsg.ok ? 'status' : 'alert'} className={`text-sm ${saveMsg.ok ? 'text-emerald-300' : 'text-rose-300'}`}>{saveMsg.text}</span>}
+          </div>
           <p className="mt-4 text-xs text-slate-600">Past results do not predict future trades. Costs and slippage are applied on both sides of each trade.</p>
         </div>
       )}

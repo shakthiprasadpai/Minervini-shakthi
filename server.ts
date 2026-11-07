@@ -8,6 +8,7 @@ import { initDatabase, pool } from './src/db/database';
 import { RealtimeMarketFeedService } from './src/server/realtimeMarketFeed';
 import { fivePaisaAuth } from './src/server/fivePaisaAuthService';
 import { registerFivePaisaOAuth } from './src/server/fivePaisaOAuth';
+import { resolveVault, writeNote, renderTradePlan, renderDailySummary, renderBacktest, safeName } from './src/server/obsidianVault';
 import { startFivePaisaScripMaster, fivePaisaScripMaster } from './src/server/scripMasterScheduler';
 
 async function startServer() {
@@ -171,6 +172,34 @@ async function startServer() {
   app.get('/api/quote/:exchange/:ticker', async (req,res) => {
     try { const provider=getMarketDataProvider(); const q=await provider.getQuote(req.params.ticker,req.params.exchange.toUpperCase() as 'NSE'|'BSE'); res.json(q); }
     catch(e:any){res.status(503).json({error:'MARKET_DATA_UNAVAILABLE',message:e?.message||String(e)});}
+  });
+
+  // ---- Obsidian vault (notes are written to OBSIDIAN_VAULT_PATH on the machine running this server)
+  app.get('/api/obsidian/status', (_req,res) => {
+    const vault=resolveVault(process.env.OBSIDIAN_VAULT_PATH);
+    res.json({ configured: Boolean((process.env.OBSIDIAN_VAULT_PATH||'').trim()), connected: Boolean(vault), vaultName: vault? vault.split(/[\\/]/).filter(Boolean).pop() : null });
+  });
+
+  app.post('/api/obsidian/export', (req,res) => {
+    const vault=resolveVault(process.env.OBSIDIAN_VAULT_PATH);
+    if(!vault) return res.status(409).json({error:'VAULT_NOT_CONNECTED',message:'Set OBSIDIAN_VAULT_PATH in .env to your vault folder and restart the server.'});
+    try {
+      const b=req.body||{}; const date=new Date(Date.now()+5.5*3600e3).toISOString().slice(0,10); // India date
+      const setups=Array.isArray(b.setups)?b.setups.slice(0,25):[];
+      const results:any[]=[];
+      if(b.kind==='plans'){
+        if(!setups.length) return res.status(400).json({error:'NOTHING_TO_SAVE',message:'No setups to save.'});
+        for(const s of setups){ if(!safeName(s?.ticker)) continue; results.push(writeNote(vault,'Plans',`${safeName(s.ticker)} ${date}`,renderTradePlan(s,date))); }
+      } else if(b.kind==='daily'){
+        const funnel=Array.isArray(b.funnel)?b.funnel.slice(0,10).map((f:any)=>({label:String(f?.label??''),count:Number(f?.count)||0})):[];
+        results.push(writeNote(vault,'Daily',`Screener ${date}`,renderDailySummary(date,funnel,setups.filter((s:any)=>safeName(s?.ticker)))));
+      } else if(b.kind==='backtest'){
+        if(!safeName(b.result?.ticker||b.ticker)||!Array.isArray(b.result?.trades)) return res.status(400).json({error:'NOTHING_TO_SAVE',message:'No backtest result to save.'});
+        const r={...b.result,ticker:b.result.ticker||b.ticker,trades:b.result.trades.slice(-200)};
+        results.push(writeNote(vault,'Backtests',`${safeName(r.ticker)} backtest ${date}`,renderBacktest(r,date)));
+      } else return res.status(400).json({error:'BAD_KIND',message:'kind must be plans, daily or backtest.'});
+      res.json({results});
+    } catch(e:any){ res.status(500).json({error:'EXPORT_FAILED',message:e?.message||String(e)}); }
   });
 
   app.post('/api/backtest', async (req,res) => {
