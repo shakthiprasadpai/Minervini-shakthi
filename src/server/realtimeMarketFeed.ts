@@ -4,7 +4,8 @@ import { FivePaisaWebSocketPool } from '../engine/marketData/providers/fivePaisa
 import type { MarketTick } from '../engine/marketData/realtimeTypes';
 import { fivePaisaScripMaster } from './scripMasterScheduler';
 import { fivePaisaAuth } from './fivePaisaAuthService';
-import { createXtsProvider, runMinerviniEngine, buildTradeSetup } from '../engine';
+import { runMinerviniEngine, buildTradeSetup } from '../engine';
+import { getMarketDataProvider } from './marketDataProvider';
 import type { PricePoint } from '../types';
 
 
@@ -89,7 +90,7 @@ export class RealtimeMarketFeedService {
     // Warm the same Minervini engine with the latest daily history so every tick can
     // re-evaluate the affected instrument without inventing a separate signal path.
     try {
-      const provider = createXtsProvider();
+      const provider = getMarketDataProvider();
       if ((process.env.MINERVINI_PRELOAD_HISTORY || 'false').toLowerCase() === 'true') {
         for (const instrument of instruments) {
           const history = await provider.getDailyCandles(instrument.symbol, instrument.exchange);
@@ -133,7 +134,7 @@ export class RealtimeMarketFeedService {
         this.loadingHistories.add(key);
         void (async () => {
           try {
-            const provider = createXtsProvider();
+            const provider = getMarketDataProvider();
             const loaded = await provider.getDailyCandles(tick.symbol, tick.exchange);
             if (loaded.length >= 200) this.histories.set(key, loaded);
           } catch (error) { console.error('Live Minervini history load failed:', key, error); }

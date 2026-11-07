@@ -3,10 +3,11 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
-import { createXtsProvider, runMinerviniEngine, buildTradeSetup, backtestMinervini, rankRsRatings, relativeStrengthScore, MIN_TREND_BARS } from './src/engine';
+import { runMinerviniEngine, buildTradeSetup, backtestMinervini, rankRsRatings, relativeStrengthScore, MIN_TREND_BARS } from './src/engine';
 import { initDatabase, pool } from './src/db/database';
 import { RealtimeMarketFeedService } from './src/server/realtimeMarketFeed';
 import { fivePaisaAuth } from './src/server/fivePaisaAuthService';
+import { getMarketDataProvider, providerName } from './src/server/marketDataProvider';
 import { registerFivePaisaOAuth } from './src/server/fivePaisaOAuth';
 import { resolveVault, writeNote, renderTradePlan, renderDailySummary, renderBacktest, safeName } from './src/server/obsidianVault';
 import { startFivePaisaScripMaster, fivePaisaScripMaster } from './src/server/scripMasterScheduler';
@@ -17,7 +18,6 @@ async function startServer() {
 
   app.use(express.json());
 
-  const getMarketDataProvider = () => createXtsProvider();
   const realtimeFeed = new RealtimeMarketFeedService();
   if ((process.env.REALTIME_MARKET_PROVIDER || '').toLowerCase() === '5paisa') await fivePaisaAuth.start();
   registerFivePaisaOAuth(app, async () => { await realtimeFeed.stop(); await realtimeFeed.start(); });
@@ -29,7 +29,7 @@ async function startServer() {
   app.get('/api/health', async (_req, res) => {
     let database = 'disabled';
     if (pool) { try { await pool.query('SELECT 1'); database = 'ok'; } catch { database = 'error'; } }
-    res.json({ ok: true, marketDataProvider: 'xts', database });
+    res.json({ ok: true, marketDataProvider: providerName(), database });
   });
 
   app.get('/api/screener', async (_req, res) => {
@@ -108,7 +108,7 @@ async function startServer() {
       }
 
       res.json({
-        provider: 'xts',
+        provider: providerName(),
         exchanges: ['NSE', 'BSE', 'MCX'],
         configuredCount: universe.length,
         resultCount: results.length,
@@ -129,12 +129,11 @@ async function startServer() {
 
   app.get('/api/market/status', (_req, res) => {
     res.json({
-      provider: 'xts',
+      provider: providerName(),
       exchanges: ['NSE', 'BSE'],
-      configured: Boolean(
-        process.env.XTS_MARKET_DATA_BASE_URL ||
-        process.env.MARKET_DATA_BASE_URL
-      ),
+      configured: providerName() === '5paisa'
+        ? Boolean(fivePaisaAuth.getAccessToken())
+        : Boolean(process.env.XTS_MARKET_DATA_BASE_URL || process.env.MARKET_DATA_BASE_URL),
       screenerSymbolsConfigured: Boolean(process.env.SCREENER_SYMBOLS),
       automaticUniverse: (process.env.AUTO_UNIVERSE || 'true').toLowerCase() === 'true',
       universeCount: fivePaisaScripMaster.status().count
