@@ -173,10 +173,26 @@ async function startServer() {
   });
 
   app.post('/api/backtest', async (req,res) => {
-    try { const provider=getMarketDataProvider(); const ticker=String(req.body.ticker); const candles=await provider.getDailyCandles(ticker,(req.body.exchange||'NSE').toUpperCase()); const result=backtestMinervini(ticker,candles,{initialCapital:Number(req.body.initialCapital||100000),riskPerTradePercent:Number(req.body.riskPerTradePercent||1),commissionPercent:Number(req.body.commissionPercent||0),slippagePercent:Number(req.body.slippagePercent||0)}); res.json(result); }
+    try {
+      const b=req.body||{};
+      const ticker=String(b.ticker||'').trim().toUpperCase();
+      if(!ticker) return res.status(400).json({error:'BACKTEST_FAILED',message:'ticker is required'});
+      const num=(v:any,d:number,min:number,max:number)=>{const n=Number(v);return Number.isFinite(n)&&v!==''&&v!=null?Math.min(max,Math.max(min,n)):d;};
+      const trailing=num(b.trailingAtrMultiple,0,0,10);
+      const provider=getMarketDataProvider();
+      const candles=await provider.getDailyCandles(ticker,String(b.exchange||'NSE').toUpperCase() as any);
+      const result=backtestMinervini(ticker,candles,{
+        initialCapital:num(b.initialCapital,100000,1000,1e9),
+        riskPerTradePercent:num(b.riskPerTradePercent,1,0.1,5),
+        commissionPercent:num(b.commissionPercent,0,0,2),
+        slippagePercent:num(b.slippagePercent,0,0,5),
+        maxAllocationPercent:num(b.maxAllocationPercent,20,1,100),
+        ...(trailing>0?{trailingAtrMultiple:trailing}:{})
+      });
+      res.json({...result,barsTested:candles.length,firstDate:candles[0]?.date??null,lastDate:candles[candles.length-1]?.date??null});
+    }
     catch(e:any){res.status(400).json({error:'BACKTEST_FAILED',message:e?.message||String(e)});}
   });
-
 
   // Helper for Gemini AI instance
   const getGeminiClient = () => {

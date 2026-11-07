@@ -187,3 +187,22 @@ test('auth result page only targets its own origin when messaging the opener', (
   assert.match(renderAuthResultPage(true, 'x'), /window\.location\.origin\)/);
   assert.ok(!/postMessage\([^)]*'\*'/.test(renderAuthResultPage(true, 'x')));
 });
+
+/* ---------------------------------------------------------------- backtest helpers */
+import { backtestVerdict, equityCurve } from './dashboardMetrics';
+
+test('equityCurve: starts at capital, accumulates in exit-date order', () => {
+  const pts = equityCurve(1000, [
+    { exitDate: '2026-03-01', pnl: -50 },
+    { exitDate: '2026-02-01', pnl: 200 }
+  ]);
+  assert.deepEqual(pts.map(p => p.equity), [1000, 1200, 1150]);
+  assert.deepEqual(equityCurve(500, []), [{ date: '', equity: 500 }]);
+});
+
+test('backtestVerdict does not oversell small samples', () => {
+  assert.match(backtestVerdict({ trades: [], totalReturnPercent: 0, maxDrawdownPercent: 0 }), /No trades/);
+  assert.match(backtestVerdict({ trades: [1], totalReturnPercent: 30, maxDrawdownPercent: -2 }), /too few/);
+  assert.match(backtestVerdict({ trades: new Array(12).fill(1), totalReturnPercent: -4, maxDrawdownPercent: -9 }), /loss overall/);
+  assert.match(backtestVerdict({ trades: new Array(12).fill(1), totalReturnPercent: 18.2, maxDrawdownPercent: -7.5 }), /18\.2%.*7\.5%/);
+});
