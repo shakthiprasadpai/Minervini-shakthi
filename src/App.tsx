@@ -41,7 +41,7 @@ const EMPTY_STOCK: MinerviniTradeSetup = {
   trendScore: 0, avgVolume20d: 0, pivotVolume: 0, volumeDryUpPercent: 0, isTightVolume: false,
   pivotPrice: 0, buyZoneMax: 0, stopLossPrice: 0, stopLossPercent: 0, target1Price: 0,
   target1Percent: 0, target2Price: 0, target2Percent: 0, riskRewardRatio: 0, contractions: [],
-  priceHistory: [], sepaNotes: 'Connect Bigul/XTS market data to load the live screener.'
+  priceHistory: [], sepaNotes: 'Connect XTS market data to load the live screener.'
 };
 
 export default function App() {

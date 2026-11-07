@@ -79,7 +79,7 @@ export const BacktestSection: React.FC<{ apiBaseUrl: string; stocks: MinerviniTr
       setResult(body); setRanFor(t); setSaveMsg(null);
     } catch (err: any) {
       setResult(null);
-      setError(`Could not run the backtest. ${err?.message || 'The server did not answer.'} Backtests read daily history from the market data provider set in .env (MARKET_DATA_PROVIDER), not from the 5paisa sign-in.`);
+      setError(`Could not run the backtest. ${err?.message || 'The server did not answer.'} Backtests read daily history from the XTS market data settings in .env (XTS_MARKET_DATA_BASE_URL and XTS_ACCESS_TOKEN), not from the 5paisa sign-in.`);
     } finally { setBusy(false); }
   };
 

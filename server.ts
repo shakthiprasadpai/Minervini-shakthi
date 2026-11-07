@@ -3,7 +3,7 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
-import { createBigulProvider, createXtsProvider, runMinerviniEngine, buildTradeSetup, backtestMinervini, rankRsRatings, relativeStrengthScore, MIN_TREND_BARS } from './src/engine';
+import { createXtsProvider, runMinerviniEngine, buildTradeSetup, backtestMinervini, rankRsRatings, relativeStrengthScore, MIN_TREND_BARS } from './src/engine';
 import { initDatabase, pool } from './src/db/database';
 import { RealtimeMarketFeedService } from './src/server/realtimeMarketFeed';
 import { fivePaisaAuth } from './src/server/fivePaisaAuthService';
@@ -17,7 +17,7 @@ async function startServer() {
 
   app.use(express.json());
 
-  const getMarketDataProvider = () => process.env.MARKET_DATA_PROVIDER === 'xts' ? createXtsProvider() : createBigulProvider();
+  const getMarketDataProvider = () => createXtsProvider();
   const realtimeFeed = new RealtimeMarketFeedService();
   if ((process.env.REALTIME_MARKET_PROVIDER || '').toLowerCase() === '5paisa') await fivePaisaAuth.start();
   registerFivePaisaOAuth(app, async () => { await realtimeFeed.stop(); await realtimeFeed.start(); });
@@ -29,7 +29,7 @@ async function startServer() {
   app.get('/api/health', async (_req, res) => {
     let database = 'disabled';
     if (pool) { try { await pool.query('SELECT 1'); database = 'ok'; } catch { database = 'error'; } }
-    res.json({ ok: true, marketDataProvider: process.env.MARKET_DATA_PROVIDER || 'bigul', database });
+    res.json({ ok: true, marketDataProvider: 'xts', database });
   });
 
   app.get('/api/screener', async (_req, res) => {
@@ -108,7 +108,7 @@ async function startServer() {
       }
 
       res.json({
-        provider: process.env.MARKET_DATA_PROVIDER || 'bigul',
+        provider: 'xts',
         exchanges: ['NSE', 'BSE', 'MCX'],
         configuredCount: universe.length,
         resultCount: results.length,
@@ -129,10 +129,9 @@ async function startServer() {
 
   app.get('/api/market/status', (_req, res) => {
     res.json({
-      provider: process.env.MARKET_DATA_PROVIDER || 'bigul',
+      provider: 'xts',
       exchanges: ['NSE', 'BSE'],
       configured: Boolean(
-        process.env.BIGUL_API_BASE_URL ||
         process.env.XTS_MARKET_DATA_BASE_URL ||
         process.env.MARKET_DATA_BASE_URL
       ),

@@ -12,6 +12,5 @@ export * from './backtest/types';
 export * from './backtest/backtestEngine';
 export * from './risk/positionSizer';
 
-export * from './marketData/bigulProvider';
 export * from './marketData/xtsProvider';
 export * from './minervini/setupBuilder';
