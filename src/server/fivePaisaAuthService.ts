@@ -20,11 +20,11 @@ export class FivePaisaAuthService {
     const encryptionKey=process.env.FIVEPAISA_ENCRYPTION_KEY;
     const userId=process.env.FIVEPAISA_USER_ID;
     if(!appKey||!encryptionKey||!userId) throw new Error('5Paisa auth credentials are not configured');
-    const response=await fetch(TOKEN_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({head:{key:appKey},body:{requestToken,EncryKey:encryptionKey,userId}})});
+    const response=await fetch(TOKEN_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({head:{Key:appKey},body:{RequestToken:requestToken,EncryKey:encryptionKey,UserId:userId}})});
     if(!response.ok) throw new Error('5Paisa access-token API returned HTTP '+response.status);
     const json:any=await response.json();
     const body=json?.body||{};
-    if(!body.AccessToken) throw new Error(body.Message||'5Paisa did not return an access token');
+    if(!body.AccessToken) throw new Error((body.Message||'5Paisa did not return an access token')+' (check FIVEPAISA_APP_KEY, FIVEPAISA_ENCRYPTION_KEY and FIVEPAISA_USER_ID in .env, and finish the 5paisa login within a minute or two)');
     const expires=new Date(); expires.setHours(23,59,59,999);
     this.state={accessToken:body.AccessToken,clientCode:String(body.ClientCode||process.env.FIVEPAISA_CLIENT_CODE||''),expiresAt:expires.toISOString(),obtainedAt:new Date().toISOString()};
     await this.save();
@@ -37,7 +37,7 @@ export class FivePaisaAuthService {
   status(){ return {configured:Boolean(process.env.FIVEPAISA_APP_KEY&&process.env.FIVEPAISA_ENCRYPTION_KEY&&process.env.FIVEPAISA_USER_ID),hasToken:Boolean(this.getAccessToken()),clientCode:this.getClientCode(),expiresAt:this.state?.expiresAt||null}; }
 
   private isValid(){ return Boolean(this.state?.accessToken && new Date(this.state.expiresAt).getTime()>Date.now()+60_000); }
-  private scheduleRefresh(){ if(this.refreshTimer) clearTimeout(this.refreshTimer); const ms=Math.max(60_000,new Date(this.state!.expiresAt).getTime()-Date.now()-5*60_000); this.refreshTimer=setTimeout(()=>this.expireToken(),ms); }
+  private scheduleRefresh(){ if(this.refreshTimer) clearTimeout(this.refreshTimer); const ms=Math.max(60_000,new Date(this.state!.expiresAt).getTime()-Date.now()-5*60_000); this.refreshTimer=setTimeout(()=>this.expireToken(),ms); this.refreshTimer.unref?.(); }
   private expireToken(){ this.state=null; }
   private async load(){ try{this.state=JSON.parse(await fs.readFile(STATE_FILE,'utf8'));}catch{} }
   private async save(){ await fs.mkdir(path.dirname(STATE_FILE),{recursive:true}); await fs.writeFile(STATE_FILE,JSON.stringify(this.state,null,2),'utf8'); }
