@@ -32,6 +32,7 @@ import { MinerviniTradeSetup } from './types';
 import { formatCurrency, formatVolume, getCurrencySymbol, calculateBreakoutProbability } from './utils/sepaCalculator';
 import { TrendingUp, ShieldCheck, Target, Droplets, ArrowUpRight, Flame, BarChart3, Calculator, Sparkles, Gem } from 'lucide-react';
 import { LiveMarketStatus } from './components/LiveMarketStatus';
+import { TradingDashboard } from './components/TradingDashboard';
 
 const EMPTY_STOCK: MinerviniTradeSetup = {
   ticker: '—', name: 'No market data loaded', exchange: 'NSE', sector: '—', industry: '—',
@@ -48,7 +49,7 @@ export default function App() {
   const [selectedStock, setSelectedStock] = useState<MinerviniTradeSetup | null>(runtimeConfig.demoMode ? MOCK_STOCKS[0] : null);
   const [marketDataStatus, setMarketDataStatus] = useState<'LOADING' | 'LIVE' | 'UNAVAILABLE'>('LOADING');
   const [realtimeStatus, setRealtimeStatus] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<AppNavTab>('screener');
+  const [activeTab, setActiveTab] = useState<AppNavTab>('dashboard');
   const [isObsidian, setIsObsidian] = useState<boolean>(true); // Default to Obsidian Dark theme for luxury feel
 
   useEffect(() => {
@@ -153,14 +154,16 @@ export default function App() {
     return (
       <div className="min-h-screen bg-[#080b10] text-white">
         <LiveMarketStatus apiBaseUrl={runtimeConfig.apiBaseUrl} demoMode={runtimeConfig.demoMode} status={realtimeStatus} />
-        <div className="flex items-center justify-center p-8 min-h-[80vh]">
-          <div className="max-w-xl text-center space-y-4">
-            <h1 className="text-3xl font-bold">Minervini Screener — Live Data Required</h1>
-            <p className="text-gray-300">Demo data is disabled. Connect 5Paisa and load an NSE/BSE stock before using the screener.</p>
-            <a href="/api/5paisa/auth/login" className="inline-flex px-6 py-3 bg-amber-500 text-black font-bold uppercase tracking-wider rounded">Connect 5Paisa</a>
-            <p className="text-sm text-gray-400">For local UI testing only, set VITE_DEMO_MODE=true.</p>
-          </div>
-        </div>
+        <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-16">
+          <TradingDashboard
+            apiBaseUrl={runtimeConfig.apiBaseUrl}
+            demoMode={runtimeConfig.demoMode}
+            stocks={stocksList}
+            realtimeStatus={realtimeStatus}
+            onSelectStock={(stock) => setSelectedStock(stock)}
+            onViewChart={(stock) => { setSelectedStock(stock); setActiveTab('chart'); }}
+          />
+        </main>
       </div>
     );
   }
@@ -278,6 +281,25 @@ export default function App() {
 
         {/* TAB ANIMATED CONTAINER */}
         <AnimatePresence mode="wait">
+          {activeTab === 'dashboard' && (
+            <motion.div
+              key="dashboard"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <TradingDashboard
+                apiBaseUrl={runtimeConfig.apiBaseUrl}
+                demoMode={runtimeConfig.demoMode}
+                stocks={stocksList}
+                realtimeStatus={realtimeStatus}
+                onSelectStock={(stock) => setSelectedStock(stock)}
+                onViewChart={(stock) => { setSelectedStock(stock); setActiveTab('chart'); }}
+              />
+            </motion.div>
+          )}
+
           {activeTab === 'screener' && (
             <motion.div
               key="screener"
