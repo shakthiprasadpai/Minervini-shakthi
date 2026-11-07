@@ -162,3 +162,25 @@ export function recentCloses(stock: Pick<MinerviniTradeSetup, 'priceHistory'>, n
   if (history.length < 2) return [];
   return history.slice(-n).map(p => p.close);
 }
+
+/* ------------------------------------------------------------------ backtest */
+
+export interface EquityPoint { date: string; equity: number }
+
+/** Account value after each closed trade, starting from the initial capital. Trades are taken in exit-date order. */
+export function equityCurve(initialCapital: number, trades: { exitDate: string; pnl: number }[]): EquityPoint[] {
+  const sorted = [...trades].sort((a, b) => a.exitDate.localeCompare(b.exitDate));
+  let equity = initialCapital;
+  const points: EquityPoint[] = [{ date: sorted[0]?.exitDate ?? '', equity }];
+  for (const t of sorted) { equity += t.pnl; points.push({ date: t.exitDate, equity }); }
+  return points;
+}
+
+/** Plain-language read of a result so a thin sample is not mistaken for proof. */
+export function backtestVerdict(r: { trades: unknown[]; totalReturnPercent: number; maxDrawdownPercent: number }): string {
+  const n = r.trades.length;
+  if (n === 0) return 'No trades. The stock never met every Trend Template and VCP rule on a day when it could be bought.';
+  if (n < 10) return `Only ${n} trade${n === 1 ? '' : 's'}. That is too few to say anything about the method.`;
+  if (r.totalReturnPercent <= 0) return `${n} trades and a loss overall. This stock has not rewarded the setup so far.`;
+  return `${n} trades, ${r.totalReturnPercent.toFixed(1)}% return with a worst drop of ${Math.abs(r.maxDrawdownPercent).toFixed(1)}%. One stock's history is a small sample.`;
+}

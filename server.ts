@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
@@ -7,6 +8,7 @@ import { initDatabase, pool } from './src/db/database';
 import { RealtimeMarketFeedService } from './src/server/realtimeMarketFeed';
 import { fivePaisaAuth } from './src/server/fivePaisaAuthService';
 import { registerFivePaisaOAuth } from './src/server/fivePaisaOAuth';
+import { resolveVault, writeNote, renderTradePlan, renderDailySummary, renderBacktest, safeName } from './src/server/obsidianVault';
 import { startFivePaisaScripMaster, fivePaisaScripMaster } from './src/server/scripMasterScheduler';
 
 async function startServer() {
@@ -172,11 +174,55 @@ async function startServer() {
     catch(e:any){res.status(503).json({error:'MARKET_DATA_UNAVAILABLE',message:e?.message||String(e)});}
   });
 
-  app.post('/api/backtest', async (req,res) => {
-    try { const provider=getMarketDataProvider(); const ticker=String(req.body.ticker); const candles=await provider.getDailyCandles(ticker,(req.body.exchange||'NSE').toUpperCase()); const result=backtestMinervini(ticker,candles,{initialCapital:Number(req.body.initialCapital||100000),riskPerTradePercent:Number(req.body.riskPerTradePercent||1),commissionPercent:Number(req.body.commissionPercent||0),slippagePercent:Number(req.body.slippagePercent||0)}); res.json(result); }
-    catch(e:any){res.status(400).json({error:'BACKTEST_FAILED',message:e?.message||String(e)});}
+  // ---- Obsidian vault (notes are written to OBSIDIAN_VAULT_PATH on the machine running this server)
+  app.get('/api/obsidian/status', (_req,res) => {
+    const vault=resolveVault(process.env.OBSIDIAN_VAULT_PATH);
+    res.json({ configured: Boolean((process.env.OBSIDIAN_VAULT_PATH||'').trim()), connected: Boolean(vault), vaultName: vault? vault.split(/[\\/]/).filter(Boolean).pop() : null });
   });
 
+  app.post('/api/obsidian/export', (req,res) => {
+    const vault=resolveVault(process.env.OBSIDIAN_VAULT_PATH);
+    if(!vault) return res.status(409).json({error:'VAULT_NOT_CONNECTED',message:'Set OBSIDIAN_VAULT_PATH in .env to your vault folder and restart the server.'});
+    try {
+      const b=req.body||{}; const date=new Date(Date.now()+5.5*3600e3).toISOString().slice(0,10); // India date
+      const setups=Array.isArray(b.setups)?b.setups.slice(0,25):[];
+      const results:any[]=[];
+      if(b.kind==='plans'){
+        if(!setups.length) return res.status(400).json({error:'NOTHING_TO_SAVE',message:'No setups to save.'});
+        for(const s of setups){ if(!safeName(s?.ticker)) continue; results.push(writeNote(vault,'Plans',`${safeName(s.ticker)} ${date}`,renderTradePlan(s,date))); }
+      } else if(b.kind==='daily'){
+        const funnel=Array.isArray(b.funnel)?b.funnel.slice(0,10).map((f:any)=>({label:String(f?.label??''),count:Number(f?.count)||0})):[];
+        results.push(writeNote(vault,'Daily',`Screener ${date}`,renderDailySummary(date,funnel,setups.filter((s:any)=>safeName(s?.ticker)))));
+      } else if(b.kind==='backtest'){
+        if(!safeName(b.result?.ticker||b.ticker)||!Array.isArray(b.result?.trades)) return res.status(400).json({error:'NOTHING_TO_SAVE',message:'No backtest result to save.'});
+        const r={...b.result,ticker:b.result.ticker||b.ticker,trades:b.result.trades.slice(-200)};
+        results.push(writeNote(vault,'Backtests',`${safeName(r.ticker)} backtest ${date}`,renderBacktest(r,date)));
+      } else return res.status(400).json({error:'BAD_KIND',message:'kind must be plans, daily or backtest.'});
+      res.json({results});
+    } catch(e:any){ res.status(500).json({error:'EXPORT_FAILED',message:e?.message||String(e)}); }
+  });
+
+  app.post('/api/backtest', async (req,res) => {
+    try {
+      const b=req.body||{};
+      const ticker=String(b.ticker||'').trim().toUpperCase();
+      if(!ticker) return res.status(400).json({error:'BACKTEST_FAILED',message:'ticker is required'});
+      const num=(v:any,d:number,min:number,max:number)=>{const n=Number(v);return Number.isFinite(n)&&v!==''&&v!=null?Math.min(max,Math.max(min,n)):d;};
+      const trailing=num(b.trailingAtrMultiple,0,0,10);
+      const provider=getMarketDataProvider();
+      const candles=await provider.getDailyCandles(ticker,String(b.exchange||'NSE').toUpperCase() as any);
+      const result=backtestMinervini(ticker,candles,{
+        initialCapital:num(b.initialCapital,100000,1000,1e9),
+        riskPerTradePercent:num(b.riskPerTradePercent,1,0.1,5),
+        commissionPercent:num(b.commissionPercent,0,0,2),
+        slippagePercent:num(b.slippagePercent,0,0,5),
+        maxAllocationPercent:num(b.maxAllocationPercent,20,1,100),
+        ...(trailing>0?{trailingAtrMultiple:trailing}:{})
+      });
+      res.json({...result,barsTested:candles.length,firstDate:candles[0]?.date??null,lastDate:candles[candles.length-1]?.date??null});
+    }
+    catch(e:any){res.status(400).json({error:'BACKTEST_FAILED',message:e?.message||String(e)});}
+  });
 
   // Helper for Gemini AI instance
   const getGeminiClient = () => {

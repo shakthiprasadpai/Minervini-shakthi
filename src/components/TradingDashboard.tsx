@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { KeyRound, Loader2, LogIn, Radio, RefreshCw, ServerOff, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { MinerviniTradeSetup } from '../types';
 import { formatCurrency, getCurrencySymbol } from '../utils/sepaCalculator';
+import { BacktestSection } from './BacktestSection';
+import { ObsidianPanel } from './ObsidianPanel';
 import {
   AuthFetchState,
   AuthSnapshot,
@@ -411,6 +413,10 @@ export const TradingDashboard: React.FC<TradingDashboardProps> = ({
         )}
         <p className="mt-4 text-xs text-slate-600">Screen results for you to check yourself, not investment advice.</p>
       </section>
+
+      <div className="lg:col-span-3"><ObsidianPanel apiBaseUrl={apiBaseUrl} stocks={stocks} demoMode={demoMode} /></div>
+
+      <div className="lg:col-span-3"><BacktestSection apiBaseUrl={apiBaseUrl} stocks={stocks} demoMode={demoMode} /></div>
     </div>
   );
 };
