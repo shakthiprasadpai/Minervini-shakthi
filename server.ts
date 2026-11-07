@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
-import { createBigulProvider, createXtsProvider, runMinerviniEngine, buildTradeSetup, backtestMinervini, rankRsRatings } from './src/engine';
+import { createBigulProvider, createXtsProvider, runMinerviniEngine, buildTradeSetup, backtestMinervini, rankRsRatings, relativeStrengthScore, MIN_TREND_BARS } from './src/engine';
 import { initDatabase, pool } from './src/db/database';
 import { RealtimeMarketFeedService } from './src/server/realtimeMarketFeed';
 import { fivePaisaAuth } from './src/server/fivePaisaAuthService';
@@ -61,32 +61,41 @@ async function startServer() {
         benchmark = await provider.getDailyCandles(ticker, exchange);
       }
 
-      const raw: Array<{
+      type Loaded = {
         ticker: string;
         exchange: 'NSE' | 'BSE' | 'MCX';
         candles: Awaited<ReturnType<typeof provider.getDailyCandles>>;
-        analysis: any;
-      }> = [];
+        rsScore: number | null;
+      };
+      const loaded: Loaded[] = [];
 
+      // Pass 1: load history and compute each stock's raw RS score against the benchmark.
       for (const instrument of universe) {
         try {
           const candles = await provider.getDailyCandles(instrument.ticker, instrument.exchange);
-          if (candles.length < 200) continue;
-          const current = candles[candles.length - 1].close;
-          const analysis = runMinerviniEngine(
-            { ticker: instrument.ticker, currentPrice: current, priceHistory: candles },
-            benchmark
-          );
-          raw.push({ ticker: instrument.ticker, exchange: instrument.exchange, candles, analysis });
+          if (candles.length < MIN_TREND_BARS) continue;
+          loaded.push({
+            ticker: instrument.ticker,
+            exchange: instrument.exchange,
+            candles,
+            rsScore: benchmark ? relativeStrengthScore(candles, benchmark) : null
+          });
         } catch (e) {
           console.error('Screener instrument failed', instrument, e);
         }
       }
 
-      const ratings = rankRsRatings(raw.map(x => x.analysis.rsRating ?? 0));
-      const results = raw.map((x, i) => {
-        x.analysis.rsRating = ratings[i];
-        return buildTradeSetup(x.ticker, x.ticker, x.exchange, x.candles, x.analysis);
+      // Rank across the whole universe -> true 1-99 percentile RS ratings (undefined without a benchmark).
+      const ratings = rankRsRatings(loaded.map(x => x.rsScore));
+
+      // Pass 2: run the engine with the ranked rating so Trend Template rule 8 uses it.
+      const results = loaded.map((x, i) => {
+        const current = x.candles[x.candles.length - 1].close;
+        const analysis = runMinerviniEngine(
+          { ticker: x.ticker, currentPrice: current, priceHistory: x.candles, rsRating: ratings[i] },
+          benchmark
+        );
+        return buildTradeSetup(x.ticker, x.ticker, x.exchange, x.candles, analysis);
       });
 
       if (pool) {

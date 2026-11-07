@@ -4,6 +4,8 @@ export * from './minervini/rsRating';
 export * from './minervini/vcpDetector';
 export * from './minervini/stageAnalysis';
 export * from './minervini/atrStop';
+export * from './minervini/trendTemplate';
+export * from './minervini/indicators';
 export * from './marketData/types';
 export * from './marketData/httpProvider';
 export * from './backtest/types';

@@ -47,7 +47,7 @@ export interface MinerviniTradeSetup {
   high52w: number;
   low52w: number;
   rsRating: number;
-  patternType: 'VCP (3 Contractions)' | 'VCP (4 Contractions)' | 'High Tight Flag' | 'Cup with Handle' | 'Pivot Pullback';
+  patternType: 'VCP (2 Contractions)' | 'VCP (3 Contractions)' | 'VCP (4 Contractions)' | 'High Tight Flag' | 'Cup with Handle' | 'Pivot Pullback';
   vcpStage: 'T2' | 'T3' | 'T4' | 'Breakout Pending' | 'Active Breakout';
   trendScore: number;
   avgVolume20d: number;
@@ -191,4 +191,17 @@ export interface TradeJournalNote {
   tradeStatus: TradeStatus;
   rating: number;
   chartSnapshotUrl?: string;
+}
+
+export type MinerviniVideoCategory = 'VCP_FOUNDATIONS' | 'EARNINGS_DRIFT' | 'POSITION_SIZING' | '3C_CHEAT';
+
+export interface MinerviniVideoLesson {
+  id: string;
+  title: string;
+  duration: string;
+  youtubeId: string;
+  category: MinerviniVideoCategory;
+  summary: string;
+  keyTimestamps: Array<{ time: string; label: string }>;
+  takeaways: string[];
 }

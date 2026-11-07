@@ -51,10 +51,6 @@ export class FivePaisaScripMasterService {
     return this.allCashInstruments();
   }
 
-  allAutoInstruments(): FivePaisaScrip[] {
-    return this.allCashInstruments();
-  }
-
   findMany(instruments: Array<{ exchange: 'NSE' | 'BSE' | 'MCX'; symbol: string }>): FivePaisaScrip[] {
     return instruments.map(x => this.get(x.exchange, x.symbol)).filter((x): x is FivePaisaScrip => Boolean(x));
   }
