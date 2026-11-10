@@ -5,13 +5,18 @@ import { scanBear, shortPlan, stageList, StageView } from '../utils/stageScan';
 interface Props {
   stocks: MinerviniTradeSetup[];
   onViewChart: (stock: MinerviniTradeSetup) => void;
+  /** Which list to show. Leave out to let the scanner keep its own choice. */
+  view?: StageView;
+  onViewChange?: (view: StageView) => void;
 }
 
 const rupee = (n: number | undefined) =>
   Number.isFinite(n as number) ? `₹${(n as number).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
 
-export const StageScanner: React.FC<Props> = ({ stocks, onViewChart }) => {
-  const [view, setView] = useState<StageView>('STAGE_2');
+export const StageScanner: React.FC<Props> = ({ stocks, onViewChart, view: controlled, onViewChange }) => {
+  const [own, setOwn] = useState<StageView>('STAGE_2');
+  const view = controlled ?? own;
+  const setView = (v: StageView) => { setOwn(v); onViewChange?.(v); };
   const rows = useMemo(() => stageList(stocks, view, 50), [stocks, view]);
   const up = view === 'STAGE_2';
 

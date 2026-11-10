@@ -27,6 +27,9 @@ import { SectorStrengthView } from './components/SectorStrengthView';
 import { PatternVisualsLibrary } from './components/PatternVisualsLibrary';
 import { ExportTradeData } from './components/ExportTradeData';
 import { StageScanner } from './components/StageScanner';
+import { QuickScanner } from './components/QuickScanner';
+import { requestBacktest } from './utils/backtestRequest';
+import type { StageView } from './utils/stageScan';
 import { runtimeConfig } from './config/runtime';
 import { MOCK_STOCKS } from './data/mockStocks';
 import { MinerviniTradeSetup } from './types';
@@ -53,6 +56,9 @@ export default function App() {
   // The screener needs the 5paisa sign-in, so it is read again the moment a sign-in appears.
   const signedIn = Boolean(realtimeStatus?.auth?.hasToken);
   const [activeTab, setActiveTab] = useState<AppNavTab>('dashboard');
+  const [stageView, setStageView] = useState<StageView>('STAGE_2');
+  const [quickOpen, setQuickOpen] = useState(false);
+  const openStageScan = (view: StageView) => { setStageView(view); setActiveTab('stage_scan'); };
   const [isObsidian, setIsObsidian] = useState<boolean>(true); // Default to Obsidian Dark theme for luxury feel
 
   useEffect(() => {
@@ -130,6 +136,14 @@ export default function App() {
     }
   }, [isObsidian]);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setQuickOpen(open => !open); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const totalSetupsCount = stocksList.length;
   const tightVolumeCount = stocksList.filter(s => s.isTightVolume || s.volumeDryUpPercent < -50).length;
 
@@ -177,6 +191,7 @@ export default function App() {
     }`}>
       
       {/* Global Background LocalStorage Pivot Price Checker Toast */}
+      <QuickScanner open={quickOpen} stocks={stocksList} onClose={() => setQuickOpen(false)} onPick={(stock) => { setSelectedStock(stock); setActiveTab('chart'); }} />
       <GlobalNotificationToast
         stocks={stocksList}
         onSelectStock={(stock) => setSelectedStock(stock)}
@@ -193,6 +208,7 @@ export default function App() {
         tightVolumeCount={tightVolumeCount}
         isObsidian={isObsidian}
         onToggleObsidian={() => setIsObsidian(!isObsidian)}
+        onStageScan={openStageScan}
       />
 
       <LiveMarketStatus apiBaseUrl={runtimeConfig.apiBaseUrl} demoMode={runtimeConfig.demoMode} status={realtimeStatus} />
@@ -240,11 +256,46 @@ export default function App() {
             <div className="bg-amber-50 border border-amber-300 p-3 text-center min-w-[130px]">
               <span className="text-[10px] uppercase tracking-[0.2em] text-amber-800 font-bold block">Breakout Prob</span>
               <strong className="text-xl font-mono font-black text-amber-900">
-                {selectedStock ? calculateBreakoutProbability(selectedStock) : { score: 0 }.score}%
+                {(selectedStock ? calculateBreakoutProbability(selectedStock) : { score: 0 }).score}%
               </strong>
             </div>
           </div>
         </div>
+
+        {/* Actions for the selected stock */}
+        <section aria-label="Actions for the selected stock" className="flex flex-wrap items-center gap-3">
+          {(() => {
+            const has = selectedStock && selectedStock.ticker !== '—';
+            const btn = 'inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-bold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 disabled:opacity-40 disabled:cursor-not-allowed';
+            return (
+              <>
+                <a
+                  href={has ? `https://www.tradingview.com/chart/?symbol=${selectedStock.exchange === 'BSE' ? 'BSE' : 'NSE'}%3A${encodeURIComponent(selectedStock.ticker)}` : undefined}
+                  target="_blank" rel="noopener noreferrer" aria-disabled={!has}
+                  className={`${btn} border-blue-500/50 bg-blue-600 text-white hover:bg-blue-500 ${has ? '' : 'pointer-events-none opacity-40'}`}
+                >
+                  Live chart on TradingView
+                </a>
+                <button disabled={!has} onClick={() => setActiveTab('chart')} className={`${btn} border-white/10 bg-white/5 text-slate-100 hover:border-amber-400/50`}>
+                  VCP chart
+                </button>
+                <button
+                  disabled={!has}
+                  onClick={() => { setActiveTab('dashboard'); requestBacktest(selectedStock.ticker); }}
+                  className={`${btn} border-indigo-500/50 bg-indigo-600 text-white hover:bg-indigo-500`}
+                >
+                  Backtest {has ? selectedStock.ticker : 'this stock'}
+                </button>
+                <button onClick={() => openStageScan('STAGE_4')} className={`${btn} border-rose-500/50 bg-rose-600 text-white hover:bg-rose-500`}>
+                  Bear market screen
+                </button>
+                <button onClick={() => setQuickOpen(true)} className={`${btn} border-amber-400/60 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20`}>
+                  Find a stock <kbd className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-[10px]">Ctrl+K</kbd>
+                </button>
+              </>
+            );
+          })()}
+        </section>
 
         {/* Trading Command Center */}
         <section className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-3">
@@ -650,6 +701,8 @@ export default function App() {
             >
               <StageScanner
                 stocks={stocksList}
+                view={stageView}
+                onViewChange={setStageView}
                 onViewChart={(stock) => {
                   setSelectedStock(stock);
                   setActiveTab('chart');
