@@ -13,6 +13,7 @@ import { registerFivePaisaOAuth } from './src/server/fivePaisaOAuth';
 import { resolveVault, writeNote, renderTradePlan, renderDailySummary, renderBacktest, safeName } from './src/server/obsidianVault';
 import { startFivePaisaScripMaster, fivePaisaScripMaster } from './src/server/scripMasterScheduler';
 import { sendTelegramAlert, telegramAlertsConfigured, fetchTelegramChatIdHint } from './src/server/telegramAlertService';
+import { startDailyTelegramDigest } from './src/server/dailyTelegramDigest';
 
 async function startServer() {
   const app = express();
@@ -34,80 +35,88 @@ async function startServer() {
     res.json({ ok: true, marketDataProvider: providerName(), database });
   });
 
+  // Shared by /api/screener and the daily Telegram digest, so both run the identical pipeline.
+  async function runScreener() {
+    const provider = getMarketDataProvider();
+    const universe = screenerUniverse(process.env, () => fivePaisaScripMaster.allAutoInstruments().map(x => ({ ticker: x.symbol, exchange: x.exchange })));
+    if (!universe.length) throw Object.assign(new Error('MARKET_UNIVERSE_NOT_AVAILABLE'), { code: 'MARKET_UNIVERSE_NOT_AVAILABLE' });
+
+    let benchmark: Awaited<ReturnType<typeof provider.getDailyCandles>> | undefined;
+    const benchmarkSpec = (process.env.RS_BENCHMARK_SYMBOL || '').trim();
+    if (benchmarkSpec) {
+      const parts = benchmarkSpec.split(':');
+      const hasExchange = parts.length > 1 && /^(NSE|BSE)$/i.test(parts[0]);
+      const exchange = (hasExchange ? parts[0] : 'NSE').toUpperCase() as 'NSE' | 'BSE';
+      const ticker = (hasExchange ? parts.slice(1).join(':') : benchmarkSpec).trim();
+      benchmark = await provider.getDailyCandles(ticker, exchange);
+    }
+
+    type Loaded = {
+      ticker: string;
+      exchange: 'NSE' | 'BSE' | 'MCX';
+      candles: Awaited<ReturnType<typeof provider.getDailyCandles>>;
+      rsScore: number | null;
+    };
+    const loaded: Loaded[] = [];
+
+    // Pass 1: load history and compute each stock's raw RS score against the benchmark.
+    for (const instrument of universe) {
+      try {
+        const candles = await provider.getDailyCandles(instrument.ticker, instrument.exchange);
+        if (candles.length < MIN_TREND_BARS) continue;
+        loaded.push({
+          ticker: instrument.ticker,
+          exchange: instrument.exchange,
+          candles,
+          rsScore: benchmark ? relativeStrengthScore(candles, benchmark) : null
+        });
+      } catch (e) {
+        console.error('Screener instrument failed', instrument, e);
+      }
+    }
+
+    // Rank across the whole universe -> true 1-99 percentile RS ratings (undefined without a benchmark).
+    const ratings = rankRsRatings(loaded.map(x => x.rsScore));
+
+    // Pass 2: run the engine with the ranked rating so Trend Template rule 8 uses it.
+    const results = loaded.map((x, i) => {
+      const current = x.candles[x.candles.length - 1].close;
+      const analysis = runMinerviniEngine(
+        { ticker: x.ticker, currentPrice: current, priceHistory: x.candles, rsRating: ratings[i] },
+        benchmark
+      );
+      return buildTradeSetup(x.ticker, x.ticker, x.exchange, x.candles, analysis);
+    });
+
+    if (pool) {
+      await pool.query(
+        'INSERT INTO screener_runs(universe_count,result_count) VALUES($1,$2)',
+        [universe.length, results.length]
+      );
+    }
+
+    return { provider: providerName(), universeCount: universe.length, results };
+  }
+
   app.get('/api/screener', async (_req, res) => {
     try {
-      const provider = getMarketDataProvider();
-      const universe = screenerUniverse(process.env, () => fivePaisaScripMaster.allAutoInstruments().map(x => ({ ticker: x.symbol, exchange: x.exchange })));
-      if (!universe.length) return res.status(503).json({ error: 'MARKET_UNIVERSE_NOT_AVAILABLE' });
-
-      let benchmark: Awaited<ReturnType<typeof provider.getDailyCandles>> | undefined;
-      const benchmarkSpec = (process.env.RS_BENCHMARK_SYMBOL || '').trim();
-      if (benchmarkSpec) {
-        const parts = benchmarkSpec.split(':');
-        const hasExchange = parts.length > 1 && /^(NSE|BSE)$/i.test(parts[0]);
-        const exchange = (hasExchange ? parts[0] : 'NSE').toUpperCase() as 'NSE' | 'BSE';
-        const ticker = (hasExchange ? parts.slice(1).join(':') : benchmarkSpec).trim();
-        benchmark = await provider.getDailyCandles(ticker, exchange);
-      }
-
-      type Loaded = {
-        ticker: string;
-        exchange: 'NSE' | 'BSE' | 'MCX';
-        candles: Awaited<ReturnType<typeof provider.getDailyCandles>>;
-        rsScore: number | null;
-      };
-      const loaded: Loaded[] = [];
-
-      // Pass 1: load history and compute each stock's raw RS score against the benchmark.
-      for (const instrument of universe) {
-        try {
-          const candles = await provider.getDailyCandles(instrument.ticker, instrument.exchange);
-          if (candles.length < MIN_TREND_BARS) continue;
-          loaded.push({
-            ticker: instrument.ticker,
-            exchange: instrument.exchange,
-            candles,
-            rsScore: benchmark ? relativeStrengthScore(candles, benchmark) : null
-          });
-        } catch (e) {
-          console.error('Screener instrument failed', instrument, e);
-        }
-      }
-
-      // Rank across the whole universe -> true 1-99 percentile RS ratings (undefined without a benchmark).
-      const ratings = rankRsRatings(loaded.map(x => x.rsScore));
-
-      // Pass 2: run the engine with the ranked rating so Trend Template rule 8 uses it.
-      const results = loaded.map((x, i) => {
-        const current = x.candles[x.candles.length - 1].close;
-        const analysis = runMinerviniEngine(
-          { ticker: x.ticker, currentPrice: current, priceHistory: x.candles, rsRating: ratings[i] },
-          benchmark
-        );
-        return buildTradeSetup(x.ticker, x.ticker, x.exchange, x.candles, analysis);
-      });
-
-      if (pool) {
-        await pool.query(
-          'INSERT INTO screener_runs(universe_count,result_count) VALUES($1,$2)',
-          [universe.length, results.length]
-        );
-      }
-
+      const { provider, universeCount, results } = await runScreener();
       res.json({
-        provider: providerName(),
+        provider,
         exchanges: ['NSE', 'BSE', 'MCX'],
-        configuredCount: universe.length,
+        configuredCount: universeCount,
         resultCount: results.length,
         results
       });
     } catch (e: any) {
       res.status(503).json({
-        error: 'MARKET_DATA_UNAVAILABLE',
+        error: e?.code || 'MARKET_DATA_UNAVAILABLE',
         message: e?.message || String(e)
       });
     }
   });
+
+  startDailyTelegramDigest(runScreener);
 
   app.get('/api/market/realtime-status', (_req, res) => res.json({ provider: '5paisa', ...realtimeFeed.status() }));
   app.post('/api/market/scrip-master/refresh', async (_req, res) => { try { const count = await fivePaisaScripMaster.refresh(); res.json({ ok: true, count, ...fivePaisaScripMaster.status() }); } catch (e: any) { res.status(503).json({ error: 'SCRIP_MASTER_REFRESH_FAILED', message: e?.message || String(e) }); } });
