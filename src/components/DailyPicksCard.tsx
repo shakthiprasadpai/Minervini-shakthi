@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { MinerviniTradeSetup } from '../types';
 import { PickPlan, pickIntraday, pickSwing } from '../utils/dailyPicks';
 import { MANUAL_INTRADAY_PICK, MANUAL_PICKS_AS_OF, MANUAL_SWING_PICK } from '../utils/manualPicks';
+import { formatPickAlert, notifyIfNewPick, sendTelegramAlert } from '../utils/telegramAlerts';
 
 interface Props {
   stocks: MinerviniTradeSetup[];
@@ -10,10 +11,21 @@ interface Props {
 
 const rupee = (n: number) => `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-function Plan({ title, hint, plan, empty, stock, onViewChart }: {
+function Plan({ title, hint, plan, empty, stock, onViewChart, telegramKind }: {
   title: string; hint: string; plan: PickPlan | null; empty: string;
   stock?: MinerviniTradeSetup; onViewChart?: (s: MinerviniTradeSetup) => void;
+  telegramKind: 'Swing' | 'Intraday';
 }) {
+  const [sendState, setSendState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
+
+  const handleSendToTelegram = async () => {
+    if (!plan) return;
+    setSendState('sending');
+    const ok = await sendTelegramAlert(formatPickAlert(telegramKind, plan));
+    setSendState(ok ? 'sent' : 'failed');
+    if (ok) setTimeout(() => setSendState('idle'), 4000);
+  };
+
   return (
     <article className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
       <h3 className="text-lg font-black text-white">{title}</h3>
@@ -51,14 +63,23 @@ function Plan({ title, hint, plan, empty, stock, onViewChart }: {
           <ul className="mt-3 space-y-1 text-xs text-amber-300/90">
             {plan.warnings.map(w => <li key={w}>{w}</li>)}
           </ul>
-          {stock && onViewChart && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {stock && onViewChart && (
+              <button
+                onClick={() => onViewChart(stock)}
+                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-bold text-slate-200 hover:border-amber-400/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+              >
+                View chart
+              </button>
+            )}
             <button
-              onClick={() => onViewChart(stock)}
-              className="mt-4 rounded-lg border border-white/10 px-3 py-1.5 text-xs font-bold text-slate-200 hover:border-amber-400/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+              onClick={handleSendToTelegram}
+              disabled={sendState === 'sending'}
+              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-bold text-sky-200 hover:border-sky-400/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:opacity-50"
             >
-              View chart
+              {sendState === 'sending' ? 'Sending…' : sendState === 'sent' ? 'Sent ✓' : sendState === 'failed' ? 'Failed — retry' : 'Send to Telegram'}
             </button>
-          )}
+          </div>
         </>
       )}
     </article>
@@ -75,6 +96,16 @@ export const DailyPicksCard: React.FC<Props> = ({ stocks, onViewChart }) => {
   const usingManual = stocks.length === 0;
   const swing = usingManual ? MANUAL_SWING_PICK : liveSwing;
   const intraday = usingManual ? MANUAL_INTRADAY_PICK : liveIntraday;
+
+  // Live, non-manual picks only — auto-announce a new ticker in either slot once.
+  useEffect(() => {
+    if (usingManual) return;
+    if (swing) notifyIfNewPick('SWING', swing.ticker, formatPickAlert('Swing', swing));
+  }, [usingManual, swing?.ticker]);
+  useEffect(() => {
+    if (usingManual) return;
+    if (intraday) notifyIfNewPick('INTRADAY', intraday.ticker, formatPickAlert('Intraday', intraday));
+  }, [usingManual, intraday?.ticker]);
 
   return (
     <section className="rounded-3xl border border-white/10 bg-[#11151c] p-6 text-white" aria-labelledby="picks-title">
@@ -94,6 +125,7 @@ export const DailyPicksCard: React.FC<Props> = ({ stocks, onViewChart }) => {
           plan={swing}
           stock={find(liveSwing)}
           onViewChart={onViewChart}
+          telegramKind="Swing"
           empty="No stock passes every swing rule right now. Waiting is better than forcing a trade."
         />
         <Plan
@@ -102,6 +134,7 @@ export const DailyPicksCard: React.FC<Props> = ({ stocks, onViewChart }) => {
           plan={intraday}
           stock={find(liveIntraday)}
           onViewChart={onViewChart}
+          telegramKind="Intraday"
           empty="No stock closed strong on heavy volume near its high. Skip intraday trades until one does."
         />
       </div>

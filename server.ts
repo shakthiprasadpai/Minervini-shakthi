@@ -12,6 +12,7 @@ import { getMarketDataProvider, providerName } from './src/server/marketDataProv
 import { registerFivePaisaOAuth } from './src/server/fivePaisaOAuth';
 import { resolveVault, writeNote, renderTradePlan, renderDailySummary, renderBacktest, safeName } from './src/server/obsidianVault';
 import { startFivePaisaScripMaster, fivePaisaScripMaster } from './src/server/scripMasterScheduler';
+import { sendTelegramAlert, telegramAlertsConfigured, fetchTelegramChatIdHint } from './src/server/telegramAlertService';
 
 async function startServer() {
   const app = express();
@@ -124,6 +125,28 @@ async function startServer() {
       automaticUniverse: (process.env.AUTO_UNIVERSE || 'true').toLowerCase() === 'true',
       universeCount: fivePaisaScripMaster.status().count
     });
+  });
+
+  app.get('/api/telegram/status', (_req, res) => {
+    res.json({ configured: telegramAlertsConfigured() });
+  });
+
+  // Discover the chat id while setting up: message the bot once, then hit this.
+  app.get('/api/telegram/chat-id-hint', async (_req, res) => {
+    const r = await fetchTelegramChatIdHint();
+    if (!r.ok) return res.status(503).json({ error: 'TELEGRAM_LOOKUP_FAILED', message: r.error });
+    res.json({ chatIds: r.chatIds });
+  });
+
+  // Every trade alert the app sends to Telegram (new pick, manual send, stop/target hit)
+  // goes through here, so the bot token never has to reach the browser.
+  app.post('/api/telegram/alert', async (req, res) => {
+    const message = (req.body?.message || '').toString().trim();
+    if (!message) return res.status(400).json({ error: 'MESSAGE_REQUIRED' });
+    if (!telegramAlertsConfigured()) return res.status(503).json({ error: 'TELEGRAM_ALERTS_NOT_CONFIGURED' });
+    const r = await sendTelegramAlert(message);
+    if (!r.ok) return res.status(502).json({ error: 'TELEGRAM_SEND_FAILED', message: r.error });
+    res.json({ ok: true });
   });
 
   app.get('/api/alerts', async (_req,res) => {

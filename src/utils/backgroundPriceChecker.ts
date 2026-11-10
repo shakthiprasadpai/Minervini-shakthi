@@ -1,5 +1,6 @@
 import { PriceAlert, MinerviniTradeSetup } from '../types';
 import { getCurrencySymbol } from './sepaCalculator';
+import { sendTelegramAlert } from './telegramAlerts';
 
 export const ALERTS_STORAGE_KEY = 'minervini_price_alerts';
 export const TRACKER_LOGS_KEY = 'minervini_price_tracker_logs';
@@ -29,8 +30,32 @@ export function getStoredAlerts(): PriceAlert[] { return alertsCache; }
 // Ensure user's portfolio holdings automatically have active alerts synced
 export function syncPortfolioAlerts(): PriceAlert[] { return getStoredAlerts(); }
 
+const TARGET_TYPE_LABEL: Record<PriceAlert['targetType'], string> = {
+  PIVOT_ENTRY: 'Pivot entry crossed',
+  STOP_LOSS: 'Stop-loss hit',
+  CUSTOM_ABOVE: 'Target crossed above',
+  CUSTOM_BELOW: 'Target crossed below',
+  VOLATILITY_DRYUP: 'Volatility dry-up primed',
+  RISK_REWARD_RATIO: 'Risk:reward target hit'
+};
+
+// Any alert that just flipped ACTIVE -> TRIGGERED (stop hit, pivot crossed, RRR
+// target reached, etc.) gets announced on Telegram, whichever code path flipped it.
+function notifyNewlyTriggered(previous: PriceAlert[], next: PriceAlert[]): void {
+  const prevStatus = new Map(previous.map(a => [a.id, a.status]));
+  for (const a of next) {
+    if (a.status === 'TRIGGERED' && prevStatus.get(a.id) !== 'TRIGGERED') {
+      const label = TARGET_TYPE_LABEL[a.targetType] || a.targetType;
+      const emoji = a.targetType === 'STOP_LOSS' ? '🛑' : '🎯';
+      const msg = `${emoji} <b>${label}: ${a.ticker}</b>\n${a.exchange} · Target ₹${a.targetPrice.toFixed(2)} · Last ₹${a.currentPrice.toFixed(2)}${a.notes ? `\n${a.notes}` : ''}`;
+      sendTelegramAlert(msg);
+    }
+  }
+}
+
 // Save alerts through backend API; no browser database is used.
 export function saveStoredAlerts(alerts: PriceAlert[]): void {
+  notifyNewlyTriggered(alertsCache, alerts);
   alertsCache = alerts;
   if (typeof window !== 'undefined') fetch('/api/alerts/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(alerts)}).catch(()=>{});
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('minervini_alerts_updated'));
