@@ -293,6 +293,15 @@ export const SmartStopAdjuster: React.FC<SmartStopAdjusterProps> = ({
   const pivotEntry = stock.pivotPrice;
   const currentPrice = stock.currentPrice;
 
+  // Tracks the highest price seen since this stock was selected, for the 2% trailing stop below.
+  const [peakPrice, setPeakPrice] = useState<number>(currentPrice);
+  useEffect(() => {
+    setPeakPrice(currentPrice);
+  }, [stock.ticker]);
+  useEffect(() => {
+    setPeakPrice(p => Math.max(p, currentPrice));
+  }, [currentPrice]);
+
   // 1. Breakeven Stop Level (+8% to +10% Gain Rule)
   const breakevenStop = pivotEntry;
   const breakevenGainPct = ((currentPrice - pivotEntry) / pivotEntry) * 100;
@@ -309,6 +318,10 @@ export const SmartStopAdjuster: React.FC<SmartStopAdjusterProps> = ({
   const profitLockStop = Number((pivotEntry + Math.max(0, currentPrice - pivotEntry) * 0.5).toFixed(2));
   const isProfitLockEligible = breakevenGainPct >= 10.0;
 
+  // 5. 2% Trailing Stop below the highest price seen since entry — ratchets up only, never down.
+  const trail2Stop = Number((peakPrice * 0.98).toFixed(2));
+  const trail2GiveBackPct = peakPrice > 0 ? ((peakPrice - currentPrice) / peakPrice) * 100 : 0;
+
   return (
     <div className="bg-[#f9f8f5] border border-[#e5e4e1] p-5 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e5e4e1] pb-3">
@@ -323,7 +336,7 @@ export const SmartStopAdjuster: React.FC<SmartStopAdjusterProps> = ({
         </span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 text-xs font-mono">
         {/* Option 1: Breakeven Stop */}
         <div
           className={`p-3 border transition-all flex flex-col justify-between ${
@@ -445,6 +458,36 @@ export const SmartStopAdjuster: React.FC<SmartStopAdjusterProps> = ({
             className="mt-3 w-full py-1.5 bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-[10px] uppercase tracking-wider border border-amber-600 transition-all cursor-pointer"
           >
             Apply Profit Lock Stop
+          </button>
+        </div>
+
+        {/* Option 5: 2% Trailing Stop below the peak price since entry */}
+        <div
+          className={`p-3 border transition-all flex flex-col justify-between ${
+            Math.abs(customStopPrice - trail2Stop) < 0.01
+              ? 'bg-cyan-50 border-cyan-500 ring-1 ring-cyan-500'
+              : 'bg-white border-[#e5e4e1] hover:border-cyan-300'
+          }`}
+        >
+          <div>
+            <div className="flex items-center justify-between text-[10px] font-bold text-cyan-800 uppercase">
+              <span>2% Trailing Stop</span>
+              <span className="text-[9px] text-gray-400 font-mono">
+                Peak: {formatCurrency(peakPrice, currencySymbol)}
+              </span>
+            </div>
+            <div className="text-xl font-bold font-mono text-[#1a1a1a] mt-1">
+              {formatCurrency(trail2Stop, currencySymbol)}
+            </div>
+            <p className="text-[10px] text-gray-500 font-sans mt-1">
+              Ratchets up with the peak price and never loosens. Currently {trail2GiveBackPct.toFixed(1)}% off the peak.
+            </p>
+          </div>
+          <button
+            onClick={() => onUpdateStopPrice(trail2Stop)}
+            className="mt-3 w-full py-1.5 bg-cyan-700 hover:bg-cyan-800 text-white font-bold text-[10px] uppercase tracking-wider border border-cyan-900 transition-all cursor-pointer"
+          >
+            Apply 2% Trailing Stop
           </button>
         </div>
       </div>
