@@ -1,6 +1,7 @@
-import React, { useMemo, useRef, useState } from 'react';
-import { Zap, Send, Calculator, LineChart } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Zap, Send, Calculator, LineChart, MessageCircle } from 'lucide-react';
 import type { MinerviniTradeSetup } from '../types';
+import { isTelegramConfigured, sendTelegramAlert } from '../utils/telegramAlerts';
 
 interface ChatMessage {
   id: number;
@@ -66,6 +67,24 @@ export const HermesDashboard: React.FC<Props> = ({ stock, totalSetupsCount, onOp
 
   const ticker = stock?.ticker ?? 'a stock';
   const queries = useMemo(() => QUICK_QUERIES.map(q => q.replace('{ticker}', ticker)), [ticker]);
+
+  const [telegramConfigured, setTelegramConfigured] = useState<boolean | null>(null);
+  const [telegramSendState, setTelegramSendState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
+  useEffect(() => { isTelegramConfigured().then(setTelegramConfigured); }, []);
+
+  const sendSetupToTelegram = async () => {
+    if (!stock) return;
+    setTelegramSendState('sending');
+    const message =
+      `🪽 <b>Hermes setup: ${stock.ticker}</b>\n` +
+      `${stock.name}\n` +
+      `SEPA score ${sepaScore}/100 · RS ${stock.rsRating}/99 · Trend ${stock.trendScore}/8\n` +
+      `Pivot ${fmt(stock.pivotPrice, currencySymbol)} · Stop ${fmt(stock.stopLossPrice, currencySymbol)}${Number.isFinite(stock.stopLossPercent) ? ` (${stock.stopLossPercent.toFixed(2)}%)` : ''}\n` +
+      `Target 1 ${fmt(stock.target1Price, currencySymbol)}${Number.isFinite(stock.target1Percent) ? ` (+${stock.target1Percent.toFixed(0)}%)` : ''} · R:R ${Number.isFinite(stock.riskRewardRatio) ? `${stock.riskRewardRatio.toFixed(1)}:1` : '—'}`;
+    const ok = await sendTelegramAlert(message);
+    setTelegramSendState(ok ? 'sent' : 'failed');
+    if (ok) setTimeout(() => setTelegramSendState('idle'), 4000);
+  };
 
   const send = (text: string) => {
     if (!text.trim()) return;
@@ -213,6 +232,15 @@ export const HermesDashboard: React.FC<Props> = ({ stock, totalSetupsCount, onOp
           >
             <LineChart className="h-4 w-4" /> View VCP Chart &amp; Contractions
           </button>
+          <button
+            onClick={sendSetupToTelegram}
+            disabled={!stock || telegramSendState === 'sending'}
+            title={telegramConfigured === false ? 'Set TELEGRAM_ALERTS_BOT_TOKEN / TELEGRAM_ALERTS_CHAT_ID in .env first' : undefined}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-400/30 bg-[#0d1119] px-4 py-3 text-xs font-black uppercase tracking-wider text-sky-200 hover:border-sky-400/60 hover:text-sky-100 disabled:opacity-40"
+          >
+            <MessageCircle className="h-4 w-4" />
+            {telegramSendState === 'sending' ? 'Sending…' : telegramSendState === 'sent' ? 'Sent ✓' : telegramSendState === 'failed' ? 'Failed — retry' : 'Send Setup to Telegram'}
+          </button>
         </div>
       </div>
 
@@ -230,6 +258,14 @@ export const HermesDashboard: React.FC<Props> = ({ stock, totalSetupsCount, onOp
             <p className="mt-1 text-xs text-slate-500">
               Continuous Minervini Trend Template evaluation &amp; volume dry-up monitoring across {totalSetupsCount} watchlist stocks.
             </p>
+            {telegramConfigured !== null && (
+              <p className="mt-1 flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
+                <span className={`h-1.5 w-1.5 rounded-full ${telegramConfigured ? 'bg-sky-400' : 'bg-slate-600'}`} />
+                <span className={telegramConfigured ? 'text-sky-300' : 'text-slate-600'}>
+                  Telegram alerts {telegramConfigured ? 'connected' : 'not configured'}
+                </span>
+              </p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-3">
