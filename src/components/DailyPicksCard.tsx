@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import type { MinerviniTradeSetup } from '../types';
 import { PickPlan, pickIntraday, pickSwing } from '../utils/dailyPicks';
+import { MANUAL_INTRADAY_PICK, MANUAL_PICKS_AS_OF, MANUAL_SWING_PICK } from '../utils/manualPicks';
 
 interface Props {
   stocks: MinerviniTradeSetup[];
@@ -62,9 +63,15 @@ function Plan({ title, hint, plan, empty, stock, onViewChart }: {
 }
 
 export const DailyPicksCard: React.FC<Props> = ({ stocks, onViewChart }) => {
-  const swing = useMemo(() => pickSwing(stocks), [stocks]);
-  const intraday = useMemo(() => pickIntraday(stocks), [stocks]);
+  const liveSwing = useMemo(() => pickSwing(stocks), [stocks]);
+  const liveIntraday = useMemo(() => pickIntraday(stocks), [stocks]);
   const find = (p: PickPlan | null) => (p ? stocks.find(s => s.ticker === p.ticker && s.exchange === p.exchange) : undefined);
+
+  // Before the live screener has loaded any stocks, fall back to the last manual screen
+  // rather than showing an empty card. It disappears automatically once real data loads.
+  const usingManual = stocks.length === 0;
+  const swing = usingManual ? MANUAL_SWING_PICK : liveSwing;
+  const intraday = usingManual ? MANUAL_INTRADAY_PICK : liveIntraday;
 
   return (
     <section className="rounded-3xl border border-white/10 bg-[#11151c] p-6 text-white" aria-labelledby="picks-title">
@@ -72,30 +79,29 @@ export const DailyPicksCard: React.FC<Props> = ({ stocks, onViewChart }) => {
       <p className="mt-1 text-sm text-slate-400">
         One swing trade and one intraday trade from the stocks the screener has loaded, with entry, stop and targets on current prices.
       </p>
-      {stocks.length === 0 ? (
-        <p className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm text-slate-400">
-          No stocks have loaded yet. Sign in with 5paisa above. Once you are signed in, the screener reads price history for the Nifty 100, which takes about a minute.
+      {usingManual && (
+        <p className="mt-4 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-xs font-semibold text-amber-200">
+          Showing a manual screen from {MANUAL_PICKS_AS_OF} — not live. Sign in with 5paisa above so the screener loads the Nifty 100 and replaces this automatically.
         </p>
-      ) : (
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <Plan
-            title="Swing pick"
-            hint="Days to weeks. Minervini Trend Template plus a tight base."
-            plan={swing}
-            stock={find(swing)}
-            onViewChart={onViewChart}
-            empty="No stock passes every swing rule right now. Waiting is better than forcing a trade."
-          />
-          <Plan
-            title="Intraday pick"
-            hint="One session. A strong Stage 2 leader that closed strong on heavy volume."
-            plan={intraday}
-            stock={find(intraday)}
-            onViewChart={onViewChart}
-            empty="No stock closed strong on heavy volume near its high. Skip intraday trades until one does."
-          />
-        </div>
       )}
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <Plan
+          title="Swing pick"
+          hint="Days to weeks. Minervini Trend Template plus a tight base."
+          plan={swing}
+          stock={find(liveSwing)}
+          onViewChart={onViewChart}
+          empty="No stock passes every swing rule right now. Waiting is better than forcing a trade."
+        />
+        <Plan
+          title="Intraday pick"
+          hint="One session. A strong Stage 2 leader that closed strong on heavy volume."
+          plan={intraday}
+          stock={find(liveIntraday)}
+          onViewChart={onViewChart}
+          empty="No stock closed strong on heavy volume near its high. Skip intraday trades until one does."
+        />
+      </div>
       <p className="mt-4 text-xs text-slate-600">Screen results for you to check yourself, not investment advice.</p>
     </section>
   );
