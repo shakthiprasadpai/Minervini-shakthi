@@ -19,6 +19,7 @@ export const MANUAL_SWING_PICK: PickPlan = {
   target2: 1679.0,
   riskPercent: 1.82,
   rewardRisk: 2.0,
+  holdingPeriod: '2–8 weeks, reviewed against the stop — exit sooner if the stop or target is hit first',
   reasons: [
     'All Trend Template rules pass: price above the rising 50-day and 200-day averages',
     'Relative strength positive and consistent over 1, 3 and 6 months (+6%, +9.4%, +20.3% vs Nifty)',
@@ -43,6 +44,7 @@ export const MANUAL_INTRADAY_PICK: PickPlan = {
   target2: 12637.0,
   riskPercent: 2.26,
   rewardRisk: 2.0,
+  holdingPeriod: 'Same session only — close before 15:15, no overnight carry',
   reasons: [
     'Last session +4.4% on 3.8x its 20-day average volume',
     'RSI 85 and MFI 87 — strong momentum, up about 24% in a month',

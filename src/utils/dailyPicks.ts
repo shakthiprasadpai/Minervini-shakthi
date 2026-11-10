@@ -14,6 +14,8 @@ export interface PickPlan {
   target2: number;
   riskPercent: number;
   rewardRisk: number;
+  /** How long to plan on holding, e.g. "2–8 weeks" or "Same session only". */
+  holdingPeriod: string;
   reasons: string[];
   warnings: string[];
 }
@@ -61,7 +63,9 @@ export function pickSwing(stocks: MinerviniTradeSetup[]): PickPlan | null {
   return {
     kind: 'SWING', ticker: s.ticker, name: s.name, exchange: s.exchange, price: s.currentPrice,
     entry: r2(entry), stop: r2(stop), target1: r2(s.target1Price), target2: r2(s.target2Price),
-    riskPercent: r2((risk / entry) * 100), rewardRisk: r2(rr), reasons, warnings
+    riskPercent: r2((risk / entry) * 100), rewardRisk: r2(rr),
+    holdingPeriod: '2–8 weeks, reviewed against the stop — exit sooner if the stop or target is hit first',
+    reasons, warnings
   };
 }
 
@@ -97,6 +101,7 @@ export function pickIntraday(stocks: MinerviniTradeSetup[]): PickPlan | null {
     kind: 'INTRADAY', ticker: s.ticker, name: s.name, exchange: s.exchange, price: s.currentPrice,
     entry: r2(entry), stop: r2(stop), target1: r2(entry + 2 * risk), target2: r2(entry + 3 * risk),
     riskPercent: r2((risk / entry) * 100), rewardRisk: 2,
+    holdingPeriod: 'Same session only — close before 15:15, no overnight carry',
     reasons: [
       `Last session +${change.toFixed(1)}% on ${volRatio.toFixed(1)}x its average volume`,
       `Closed in the top ${Math.max(1, Math.round((1 - scored[0].closePos) * 100))}% of the day's range`,

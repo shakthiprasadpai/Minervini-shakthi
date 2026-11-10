@@ -42,6 +42,9 @@ function Plan({ title, hint, plan, empty, stock, onViewChart }: {
           <p className="mt-3 text-xs text-slate-400">
             Risk {plan.riskPercent.toFixed(1)}% per share, first target {plan.rewardRisk.toFixed(1)} times the risk.
           </p>
+          <p className="mt-1 text-xs text-slate-500">
+            <span className="font-semibold text-slate-400">Holding period:</span> {plan.holdingPeriod}
+          </p>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-300">
             {plan.reasons.map(r => <li key={r}>{r}</li>)}
           </ul>
