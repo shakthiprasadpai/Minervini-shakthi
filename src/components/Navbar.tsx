@@ -15,6 +15,7 @@ export type AppNavTab =
   | 'obsidian' 
   | 'pocket_pivot' 
   | 'vcp_scanner' 
+  | 'stage_scan'
   | 'journal'
   | 'sector_heatmap'
   | 'alert_history'
@@ -30,6 +31,7 @@ interface NavbarProps {
   isObsidian?: boolean;
   onToggleObsidian?: () => void;
   realtimeStatus?: any;
+  onStageScan?: (view: 'STAGE_2' | 'STAGE_4') => void;
 }
 
 
@@ -41,7 +43,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   tightVolumeCount,
   isObsidian = false,
   onToggleObsidian,
-  realtimeStatus
+  realtimeStatus,
+  onStageScan
 }) => {
   return (
     <header className="bg-[#080b10]/90 backdrop-blur-xl border-b border-white/10 text-white sticky top-0 z-40 shadow-2xl transition-colors duration-300">
@@ -81,10 +84,21 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="text-slate-500 uppercase tracking-wider text-[10px] font-sans">Qualified Setups:</span>
               <span className="font-bold text-white">{totalSetupsCount} Stocks</span>
             </div>
-            <div className="bg-[#f9f8f5] border border-[#e5e4e1] px-3.5 py-1.5 flex items-center space-x-2">
-              <span className="text-emerald-700 font-bold">💧 Dry-Up Volume:</span>
-              <span className="font-bold text-[#1a1a1a]">{tightVolumeCount} Setups</span>
+            <div className="bg-white/5 border border-white/10 rounded-xl px-3.5 py-1.5 flex items-center space-x-2">
+              <span className="text-sky-300 font-bold">💧 Dry-Up Volume:</span>
+              <span className="font-bold text-white">{tightVolumeCount} Setups</span>
             </div>
+
+            {onStageScan && (
+              <>
+                <button onClick={() => onStageScan('STAGE_2')} className="rounded-xl border border-amber-400/60 bg-amber-400 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-950 hover:bg-amber-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white">
+                  Daily Stage 2 scan
+                </button>
+                <button onClick={() => onStageScan('STAGE_4')} className="rounded-xl border border-rose-500/60 bg-rose-600 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-white hover:bg-rose-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-white">
+                  Bear market, Stage 4
+                </button>
+              </>
+            )}
 
             <a href="/api/5paisa/auth/login" className={`px-3.5 py-1.5 rounded text-[11px] font-bold uppercase tracking-wider font-mono border shadow-sm ${realtimeStatus?.connected ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-amber-500 text-slate-950 border-amber-400 hover:bg-amber-400'}`}>{realtimeStatus?.connected ? '5Paisa LIVE' : 'Connect 5Paisa'}</a>
 
@@ -161,7 +175,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               {[
                 ['dashboard','🏠','Dashboard'], ['screener','📊','Screener'], ['chart','📈','VCP Chart'], ['calculator','🎯','Trade Plan'],
                 ['portfolio','💼','Portfolio'], ['earnings','📅','Earnings'], ['custom','⚙️','Scanner'],
-                ['playbook','📚','Playbook'], ['pocket_pivot','⚡','Pocket Pivot'], ['vcp_scanner','🔎','VCP Scanner'],
+                ['playbook','📚','Playbook'], ['pocket_pivot','⚡','Pocket Pivot'], ['vcp_scanner','🔎','VCP Scanner'], ['stage_scan','🐻','Stage Scan'],
                 ['journal','📝','Journal'], ['sector_heatmap','🗺️','Sector Heatmap'], ['alert_history','🔔','Alerts'],
                 ['pattern_library','🧩','Patterns'], ['export_data','⬇️','Export']
               ].map(([tab, icon, label]) => (

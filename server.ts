@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { screenerUniverse } from './src/config/screenerUniverse';
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
@@ -35,22 +36,7 @@ async function startServer() {
   app.get('/api/screener', async (_req, res) => {
     try {
       const provider = getMarketDataProvider();
-      const configuredSymbols = (process.env.SCREENER_SYMBOLS || '')
-        .split(',')
-        .map(x => x.trim())
-        .filter(Boolean)
-        .map(spec => {
-          const parts = spec.split(':');
-          const hasExchange = parts.length > 1 && /^(NSE|BSE|MCX)$/i.test(parts[0]);
-          const exchange = (hasExchange ? parts[0] : 'NSE').toUpperCase() as 'NSE' | 'BSE' | 'MCX';
-          const ticker = (hasExchange ? parts.slice(1).join(':') : spec).trim();
-          return { ticker, exchange };
-        })
-        .filter(x => x.ticker.length > 0);
-
-      const universe = (process.env.REALTIME_MARKET_PROVIDER || '').toLowerCase() === '5paisa' && (process.env.AUTO_UNIVERSE || 'true').toLowerCase() === 'true'
-        ? fivePaisaScripMaster.allAutoInstruments().map(x => ({ ticker: x.symbol, exchange: x.exchange }))
-        : configuredSymbols;
+      const universe = screenerUniverse(process.env, () => fivePaisaScripMaster.allAutoInstruments().map(x => ({ ticker: x.symbol, exchange: x.exchange })));
       if (!universe.length) return res.status(503).json({ error: 'MARKET_UNIVERSE_NOT_AVAILABLE' });
 
       let benchmark: Awaited<ReturnType<typeof provider.getDailyCandles>> | undefined;

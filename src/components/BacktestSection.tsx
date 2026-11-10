@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import { BACKTEST_EVENT, takePendingBacktest } from '../utils/backtestRequest';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Play } from 'lucide-react';
 import { MinerviniTradeSetup } from '../types';
 import { equityCurve, backtestVerdict } from '../utils/dashboardMetrics';
@@ -57,6 +58,19 @@ export const BacktestSection: React.FC<{ apiBaseUrl: string; stocks: MinerviniTr
   const [result, setResult] = useState<Result | null>(null);
   const [ranFor, setRanFor] = useState('');
   const [saveMsg, setSaveMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    const apply = () => {
+      const t = takePendingBacktest();
+      if (!t) return;
+      setTicker(t);
+      const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      document.getElementById('bt-title')?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    };
+    apply();
+    window.addEventListener(BACKTEST_EVENT, apply);
+    return () => window.removeEventListener(BACKTEST_EVENT, apply);
+  }, []);
 
   const suggestions = useMemo(() => stocks.slice(0, 200).map(s => s.ticker), [stocks]);
   const sym = getCurrencySymbol(exchange);
