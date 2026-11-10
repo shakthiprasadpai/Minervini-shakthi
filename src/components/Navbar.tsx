@@ -2,8 +2,9 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { TrendingUp, BarChart3, Calculator, BookOpen, SlidersHorizontal, Briefcase, Calendar, Video, Gem, Moon, Sun, Zap, Target, BookMarked, Layers, BellRing, Download, Sparkles } from 'lucide-react';
 
-export type AppNavTab = 
+export type AppNavTab =
   | 'dashboard'
+  | 'hermes'
   | 'screener' 
   | 'chart' 
   | 'calculator' 
@@ -173,7 +174,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <nav className="w-full mt-3 pb-3 overflow-x-auto">
             <div className="flex min-w-max items-center gap-2">
               {[
-                ['dashboard','🏠','Dashboard'], ['screener','📊','Screener'], ['chart','📈','VCP Chart'], ['calculator','🎯','Trade Plan'],
+                ['dashboard','🏠','Dashboard'], ['hermes','🪽','Hermes Agent'], ['screener','📊','Screener'], ['chart','📈','VCP Chart'], ['calculator','🎯','Trade Plan'],
                 ['portfolio','💼','Portfolio'], ['earnings','📅','Earnings'], ['custom','⚙️','Scanner'],
                 ['playbook','📚','Playbook'], ['pocket_pivot','⚡','Pocket Pivot'], ['vcp_scanner','🔎','VCP Scanner'], ['stage_scan','🐻','Stage Scan'],
                 ['journal','📝','Journal'], ['sector_heatmap','🗺️','Sector Heatmap'], ['alert_history','🔔','Alerts'],

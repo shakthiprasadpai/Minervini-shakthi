@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Navbar, AppNavTab } from './components/Navbar';
+import { HermesDashboard } from './components/HermesDashboard';
 import { ScreenerTable } from './components/ScreenerTable';
 import { VcpChart } from './components/VcpChart';
 import { TrendTemplateChecklist } from './components/TrendTemplateChecklist';
@@ -685,6 +686,26 @@ export default function App() {
                   setSelectedStock(stock);
                   setActiveTab('chart');
                 }}
+              />
+            </motion.div>
+          )}
+
+          {/* TAB: HERMES AGENT */}
+          {activeTab === 'hermes' && (
+            <motion.div
+              key="hermes"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+            >
+              <HermesDashboard
+                stock={selectedStock}
+                totalSetupsCount={stocksList.length}
+                currencySymbol={currencySymbol}
+                onOpenScanner={() => setQuickOpen(true)}
+                onOpenCalculator={() => setActiveTab('calculator')}
+                onViewChart={() => setActiveTab('chart')}
               />
             </motion.div>
           )}
