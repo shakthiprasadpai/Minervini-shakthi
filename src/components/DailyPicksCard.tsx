@@ -74,7 +74,7 @@ export const DailyPicksCard: React.FC<Props> = ({ stocks, onViewChart }) => {
       </p>
       {stocks.length === 0 ? (
         <p className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm text-slate-400">
-          No stocks have loaded yet. Sign in with 5paisa above so the screener can load price history.
+          No stocks have loaded yet. Sign in with 5paisa above. Once you are signed in, the screener reads price history for the Nifty 100, which takes about a minute.
         </p>
       ) : (
         <div className="mt-6 grid gap-4 md:grid-cols-2">

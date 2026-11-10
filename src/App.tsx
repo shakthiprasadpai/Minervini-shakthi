@@ -50,6 +50,8 @@ export default function App() {
   const [selectedStock, setSelectedStock] = useState<MinerviniTradeSetup | null>(runtimeConfig.demoMode ? MOCK_STOCKS[0] : null);
   const [marketDataStatus, setMarketDataStatus] = useState<'LOADING' | 'LIVE' | 'UNAVAILABLE'>('LOADING');
   const [realtimeStatus, setRealtimeStatus] = useState<any>(null);
+  // The screener needs the 5paisa sign-in, so it is read again the moment a sign-in appears.
+  const signedIn = Boolean(realtimeStatus?.auth?.hasToken);
   const [activeTab, setActiveTab] = useState<AppNavTab>('dashboard');
   const [isObsidian, setIsObsidian] = useState<boolean>(true); // Default to Obsidian Dark theme for luxury feel
 
@@ -85,7 +87,7 @@ export default function App() {
     };
     loadLiveScreener();
     return () => controller.abort();
-  }, []);
+  }, [signedIn]);
 
   useEffect(() => {
     if (runtimeConfig.demoMode) return;
