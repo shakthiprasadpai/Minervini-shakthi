@@ -256,6 +256,51 @@ async function startServer() {
     });
   };
 
+  // API endpoint for the Hermes Agent chat panel. Falls back to the client's own
+  // canned replies (hermesReply in HermesDashboard.tsx) when no key / on error,
+  // so the chat always answers something even without Gemini configured.
+  app.post('/api/hermes/chat', async (req, res) => {
+    try {
+      const query = (req.body?.query || '').toString().trim();
+      const stock = req.body?.stock || null;
+      const currencySymbol = (req.body?.currencySymbol || '₹').toString();
+      if (!query) return res.status(400).json({ error: 'QUERY_REQUIRED' });
+
+      const ai = getGeminiClient();
+      if (!ai) return res.json({ reply: null, source: 'fallback' });
+
+      const stockContext = stock
+        ? `The trader currently has ${stock.ticker} (${stock.name}) selected:\n` +
+          `- Current price: ${currencySymbol}${stock.currentPrice}\n` +
+          `- Trend Template score: ${stock.trendScore}/8\n` +
+          `- RS Rating: ${stock.rsRating}/99\n` +
+          `- Volume dry-up: ${stock.volumeDryUpPercent}% vs 20-day average\n` +
+          `- Pivot entry: ${currencySymbol}${stock.pivotPrice}\n` +
+          `- Stop loss: ${currencySymbol}${stock.stopLossPrice} (${stock.stopLossPercent}%)\n` +
+          `- Target 1: ${currencySymbol}${stock.target1Price} (+${stock.target1Percent}%)\n` +
+          `- Risk/reward: ${stock.riskRewardRatio}:1`
+        : 'No stock is currently selected.';
+
+      const prompt =
+        `You are Hermes Agent, an autonomous SEPA (Specific Entry Point Analysis) trading co-pilot built on Mark Minervini's ` +
+        `Trend Template and Volatility Contraction Pattern (VCP) method. You speak concisely and authoritatively, like an ` +
+        `experienced technical trader, and you ground every answer in the real data given below rather than inventing numbers.\n\n` +
+        `${stockContext}\n\n` +
+        `Trader's question: "${query}"\n\n` +
+        `Reply in 2-4 sentences, plain text (no markdown headers), staying strictly within Minervini's SEPA framework ` +
+        `(Trend Template, VCP, position sizing at ~1% account risk, hard stops, scaling into strength). ` +
+        `If the question needs the selected stock's data and none is selected, say so and suggest loading one from the screener.`;
+
+      const response = await ai.models.generateContent({ model: 'gemini-3.6-flash', contents: prompt });
+      const text = (response.text || '').trim();
+      if (!text) return res.json({ reply: null, source: 'fallback' });
+      res.json({ reply: text, source: 'gemini' });
+    } catch (err: any) {
+      console.error('Hermes chat Gemini error (falling back to canned reply):', err?.message || err);
+      res.json({ reply: null, source: 'fallback' });
+    }
+  });
+
   // API endpoint for AI-powered Mark Minervini SEPA analysis
   app.post('/api/analyze-setup', async (req, res) => {
     let stock: any = null;

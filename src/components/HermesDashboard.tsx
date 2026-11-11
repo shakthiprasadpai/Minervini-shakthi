@@ -86,15 +86,29 @@ export const HermesDashboard: React.FC<Props> = ({ stock, totalSetupsCount, onOp
     if (ok) setTimeout(() => setTelegramSendState('idle'), 4000);
   };
 
-  const send = (text: string) => {
+  const [isThinking, setIsThinking] = useState(false);
+
+  const send = async (text: string) => {
     if (!text.trim()) return;
-    const id = idRef.current++;
-    setMessages(m => [...m, { id, from: 'YOU', text, time: now() }]);
-    const reply = hermesReply(text, stock, currencySymbol);
-    setTimeout(() => {
-      setMessages(m => [...m, { id: idRef.current++, from: 'HERMES', text: reply, time: now() }]);
-    }, 300);
+    setMessages(m => [...m, { id: idRef.current++, from: 'YOU', text, time: now() }]);
     setDraft('');
+    setIsThinking(true);
+
+    let reply: string;
+    try {
+      const res = await fetch('/api/hermes/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: text, stock, currencySymbol })
+      });
+      const data = res.ok ? await res.json() : null;
+      reply = data?.reply || hermesReply(text, stock, currencySymbol);
+    } catch {
+      reply = hermesReply(text, stock, currencySymbol);
+    }
+
+    setIsThinking(false);
+    setMessages(m => [...m, { id: idRef.current++, from: 'HERMES', text: reply, time: now() }]);
   };
 
   return (
@@ -124,7 +138,7 @@ export const HermesDashboard: React.FC<Props> = ({ stock, totalSetupsCount, onOp
             </span>
           </div>
 
-          {messages.length > 0 && (
+          {(messages.length > 0 || isThinking) && (
             <div className="mt-4 flex-1 space-y-3 overflow-y-auto rounded-xl border border-white/5 bg-black/20 p-3">
               {messages.map(m => (
                 <div key={m.id} className={m.from === 'YOU' ? 'text-right' : 'text-left'}>
@@ -138,6 +152,13 @@ export const HermesDashboard: React.FC<Props> = ({ stock, totalSetupsCount, onOp
                   <div className="mt-0.5 text-[9px] text-slate-600">{m.time}</div>
                 </div>
               ))}
+              {isThinking && (
+                <div className="text-left">
+                  <div className="inline-block animate-pulse rounded-lg bg-white/[0.06] px-3 py-2 text-xs text-slate-400">
+                    Hermes is thinking…
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
