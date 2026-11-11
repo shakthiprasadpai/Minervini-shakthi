@@ -14,15 +14,25 @@ export async function sendTelegramAlert(message: string): Promise<boolean> {
   }
 }
 
-export async function isTelegramConfigured(): Promise<boolean> {
+export interface TelegramStatus {
+  configured: boolean;
+  recipientCount: number;
+}
+
+export async function getTelegramStatus(): Promise<TelegramStatus> {
   try {
     const res = await fetch('/api/telegram/status');
-    if (!res.ok) return false;
+    if (!res.ok) return { configured: false, recipientCount: 0 };
     const data = await res.json();
-    return Boolean(data?.configured);
+    return { configured: Boolean(data?.configured), recipientCount: Number(data?.recipientCount) || 0 };
   } catch {
-    return false;
+    return { configured: false, recipientCount: 0 };
   }
+}
+
+/** @deprecated use getTelegramStatus() for recipient-count detail too */
+export async function isTelegramConfigured(): Promise<boolean> {
+  return (await getTelegramStatus()).configured;
 }
 
 // Keeps us from re-announcing the same pick every time the screener re-runs.

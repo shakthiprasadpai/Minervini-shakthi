@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Zap, Send, Calculator, LineChart, MessageCircle } from 'lucide-react';
 import type { MinerviniTradeSetup } from '../types';
-import { isTelegramConfigured, sendTelegramAlert } from '../utils/telegramAlerts';
+import { getTelegramStatus, sendTelegramAlert } from '../utils/telegramAlerts';
 
 interface ChatMessage {
   id: number;
@@ -69,8 +69,14 @@ export const HermesDashboard: React.FC<Props> = ({ stock, totalSetupsCount, onOp
   const queries = useMemo(() => QUICK_QUERIES.map(q => q.replace('{ticker}', ticker)), [ticker]);
 
   const [telegramConfigured, setTelegramConfigured] = useState<boolean | null>(null);
+  const [telegramRecipientCount, setTelegramRecipientCount] = useState(0);
   const [telegramSendState, setTelegramSendState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
-  useEffect(() => { isTelegramConfigured().then(setTelegramConfigured); }, []);
+  useEffect(() => {
+    getTelegramStatus().then(s => {
+      setTelegramConfigured(s.configured);
+      setTelegramRecipientCount(s.recipientCount);
+    });
+  }, []);
 
   const sendSetupToTelegram = async () => {
     if (!stock) return;
@@ -283,7 +289,9 @@ export const HermesDashboard: React.FC<Props> = ({ stock, totalSetupsCount, onOp
               <p className="mt-1 flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
                 <span className={`h-1.5 w-1.5 rounded-full ${telegramConfigured ? 'bg-sky-400' : 'bg-slate-600'}`} />
                 <span className={telegramConfigured ? 'text-sky-300' : 'text-slate-600'}>
-                  Telegram alerts {telegramConfigured ? 'connected' : 'not configured'}
+                  {telegramConfigured
+                    ? `Telegram alerts connected · ${telegramRecipientCount} recipient${telegramRecipientCount === 1 ? '' : 's'}`
+                    : 'Telegram alerts not configured'}
                 </span>
               </p>
             )}
