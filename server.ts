@@ -139,7 +139,8 @@ async function startServer() {
   });
 
   app.get('/api/telegram/status', (_req, res) => {
-    res.json({ configured: telegramAlertsConfigured() });
+    const chatIds = (process.env.TELEGRAM_ALERTS_CHAT_ID || '').split(',').map(s => s.trim()).filter(Boolean);
+    res.json({ configured: telegramAlertsConfigured(), recipientCount: chatIds.length });
   });
 
   // Discover the chat id while setting up: message the bot once, then hit this.

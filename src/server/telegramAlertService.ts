@@ -1,26 +1,31 @@
-// Sends trade alerts (new picks, manual sends, stop/target hits) to Telegram.
+// Sends trade alerts (new picks, manual sends, stop/target hits) to Telegram,
+// to one or more recipients.
 //
 // Uses its OWN bot (TELEGRAM_ALERTS_BOT_TOKEN), separate from any bot used to
 // chat with Claude — reusing one token for both would collide on webhook/polling.
 // Create a second bot via @BotFather, then set in .env:
 //   TELEGRAM_ALERTS_BOT_TOKEN=123456:ABC-...
-//   TELEGRAM_ALERTS_CHAT_ID=your numeric chat id
+//   TELEGRAM_ALERTS_CHAT_ID=your numeric chat id, or several comma-separated
+//     (e.g. "1248931500,998877665") to alert multiple people individually.
 //
-// To find your chat id: message your new bot once, then GET
-// https://api.telegram.org/bot<token>/getUpdates and read message.chat.id.
+// To find a chat id: have that person message the bot once, then GET
+// https://api.telegram.org/bot<token>/getUpdates (or /api/telegram/chat-id-hint
+// on this app) and read message.chat.id.
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org';
 
-export function telegramAlertsConfigured(): boolean {
-  return Boolean((process.env.TELEGRAM_ALERTS_BOT_TOKEN || '').trim() && (process.env.TELEGRAM_ALERTS_CHAT_ID || '').trim());
+function configuredChatIds(): string[] {
+  return (process.env.TELEGRAM_ALERTS_CHAT_ID || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
 }
 
-export async function sendTelegramAlert(message: string): Promise<{ ok: boolean; error?: string }> {
-  const token = (process.env.TELEGRAM_ALERTS_BOT_TOKEN || '').trim();
-  const chatId = (process.env.TELEGRAM_ALERTS_CHAT_ID || '').trim();
-  if (!token || !chatId) {
-    return { ok: false, error: 'TELEGRAM_ALERTS_NOT_CONFIGURED' };
-  }
+export function telegramAlertsConfigured(): boolean {
+  return Boolean((process.env.TELEGRAM_ALERTS_BOT_TOKEN || '').trim() && configuredChatIds().length > 0);
+}
+
+async function sendToOneChat(token: string, chatId: string, message: string): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await fetch(`${TELEGRAM_API_BASE}/bot${token}/sendMessage`, {
       method: 'POST',
@@ -35,6 +40,23 @@ export async function sendTelegramAlert(message: string): Promise<{ ok: boolean;
   } catch (e: any) {
     return { ok: false, error: e?.message || String(e) };
   }
+}
+
+/** Sends to every configured chat id. Succeeds if at least one recipient got it; errors list each failure. */
+export async function sendTelegramAlert(message: string): Promise<{ ok: boolean; error?: string }> {
+  const token = (process.env.TELEGRAM_ALERTS_BOT_TOKEN || '').trim();
+  const chatIds = configuredChatIds();
+  if (!token || chatIds.length === 0) {
+    return { ok: false, error: 'TELEGRAM_ALERTS_NOT_CONFIGURED' };
+  }
+  const results = await Promise.all(chatIds.map(id => sendToOneChat(token, id, message)));
+  const failures = results
+    .map((r, i) => (r.ok ? null : `${chatIds[i]}: ${r.error}`))
+    .filter((x): x is string => x !== null);
+  const anyOk = results.some(r => r.ok);
+  if (!anyOk) return { ok: false, error: failures.join('; ') };
+  if (failures.length) console.error('[telegram] Some recipients failed:', failures.join('; '));
+  return { ok: true };
 }
 
 // One-time helper for the user to discover their chat id while setting this up.
