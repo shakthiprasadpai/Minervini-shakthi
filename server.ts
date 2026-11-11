@@ -14,6 +14,7 @@ import { resolveVault, writeNote, renderTradePlan, renderDailySummary, renderBac
 import { startFivePaisaScripMaster, fivePaisaScripMaster } from './src/server/scripMasterScheduler';
 import { sendTelegramAlert, telegramAlertsConfigured, fetchTelegramChatIdHint } from './src/server/telegramAlertService';
 import { startDailyTelegramDigest } from './src/server/dailyTelegramDigest';
+import { startFivePaisaLoginReminder } from './src/server/fivePaisaLoginReminder';
 
 async function startServer() {
   const app = express();
@@ -28,6 +29,7 @@ async function startServer() {
     await startFivePaisaScripMaster();
     await realtimeFeed.start();
   }
+  startFivePaisaLoginReminder();
 
   app.get('/api/health', async (_req, res) => {
     let database = 'disabled';
