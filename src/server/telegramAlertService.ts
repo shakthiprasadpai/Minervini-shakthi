@@ -59,16 +59,33 @@ export async function sendTelegramAlert(message: string): Promise<{ ok: boolean;
   return { ok: true };
 }
 
-// One-time helper for the user to discover their chat id while setting this up.
-export async function fetchTelegramChatIdHint(): Promise<{ ok: boolean; chatIds?: number[]; error?: string }> {
+export interface ChatIdHint {
+  id: number;
+  type: string; // 'private' | 'group' | 'supergroup' | 'channel'
+  /** Group/channel title, or the person's name for a private chat. */
+  name: string;
+}
+
+// One-time helper for the user to discover their chat id (and name/title, so
+// several lookalike groups/people can be told apart) while setting this up.
+export async function fetchTelegramChatIdHint(): Promise<{ ok: boolean; chats?: ChatIdHint[]; error?: string }> {
   const token = (process.env.TELEGRAM_ALERTS_BOT_TOKEN || '').trim();
   if (!token) return { ok: false, error: 'TELEGRAM_ALERTS_BOT_TOKEN_NOT_SET' };
   try {
     const res = await fetch(`${TELEGRAM_API_BASE}/bot${token}/getUpdates`);
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data?.ok === false) return { ok: false, error: data?.description || `HTTP_${res.status}` };
-    const ids = Array.from(new Set((data.result || []).map((u: any) => u.message?.chat?.id).filter((x: any) => x != null)));
-    return { ok: true, chatIds: ids as number[] };
+    const byId = new Map<number, ChatIdHint>();
+    for (const u of data.result || []) {
+      const chat = u.message?.chat;
+      if (!chat?.id) continue;
+      byId.set(chat.id, {
+        id: chat.id,
+        type: chat.type || 'unknown',
+        name: chat.title || [chat.first_name, chat.last_name].filter(Boolean).join(' ') || chat.username || String(chat.id)
+      });
+    }
+    return { ok: true, chats: Array.from(byId.values()) };
   } catch (e: any) {
     return { ok: false, error: e?.message || String(e) };
   }

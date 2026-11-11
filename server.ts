@@ -147,7 +147,7 @@ async function startServer() {
   app.get('/api/telegram/chat-id-hint', async (_req, res) => {
     const r = await fetchTelegramChatIdHint();
     if (!r.ok) return res.status(503).json({ error: 'TELEGRAM_LOOKUP_FAILED', message: r.error });
-    res.json({ chatIds: r.chatIds });
+    res.json({ chats: r.chats });
   });
 
   // Every trade alert the app sends to Telegram (new pick, manual send, stop/target hit)
