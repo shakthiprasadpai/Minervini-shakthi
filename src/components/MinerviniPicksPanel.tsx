@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, ExternalLink } from 'lucide-react';
 import type { PriceAlert } from '../types';
+
+/** The standalone Claude dashboard artifact showing this same picks data as charts/tiles. */
+const DASHBOARD_ARTIFACT_URL = 'https://claude.ai/artifact/UyXGKo1JYY1jNqbhPKhxZb';
 
 /**
  * Curated Minervini-setup picks, one per market-cap bucket, screened via the
@@ -77,7 +80,7 @@ export const MinerviniPicksPanel: React.FC<Props> = ({ currencySymbol }) => {
         <h3 className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">
           <TrendingUp className="h-3.5 w-3.5 text-amber-400" /> Minervini picks — one per cap bucket
         </h3>
-        <div className="flex gap-2 text-[10px] font-bold uppercase tracking-wider">
+        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider">
           <span className="rounded-md border border-emerald-400/40 bg-emerald-400/10 px-2 py-0.5 text-emerald-300">
             {counts.Triggered ?? 0} triggered
           </span>
@@ -87,6 +90,14 @@ export const MinerviniPicksPanel: React.FC<Props> = ({ currencySymbol }) => {
           <span className="rounded-md border border-slate-500/40 bg-slate-500/10 px-2 py-0.5 text-slate-400">
             {counts.Planning ?? 0} planning
           </span>
+          <a
+            href={DASHBOARD_ARTIFACT_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 rounded-md border border-sky-400/40 bg-sky-400/10 px-2 py-0.5 text-sky-300 hover:border-sky-400/70 hover:text-sky-200"
+          >
+            Full dashboard <ExternalLink className="h-3 w-3" />
+          </a>
         </div>
       </div>
 
