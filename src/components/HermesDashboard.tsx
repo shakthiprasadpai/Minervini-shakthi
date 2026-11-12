@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Zap, Send, Calculator, LineChart, MessageCircle } from 'lucide-react';
 import type { MinerviniTradeSetup } from '../types';
 import { getTelegramStatus, sendTelegramAlert } from '../utils/telegramAlerts';
+import { MinerviniPicksPanel } from './MinerviniPicksPanel';
 
 interface ChatMessage {
   id: number;
@@ -310,6 +311,9 @@ export const HermesDashboard: React.FC<Props> = ({ stock, totalSetupsCount, onOp
           </button>
         </div>
       </div>
+
+      {/* Minervini picks — one per market-cap bucket */}
+      <MinerviniPicksPanel currencySymbol={currencySymbol} />
 
       {/* Footer */}
       <div className="flex flex-col gap-1 border-t border-white/5 pt-4 text-[10px] text-slate-600 sm:flex-row sm:items-center sm:justify-between">
